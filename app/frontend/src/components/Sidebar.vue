@@ -12,7 +12,7 @@
 
     <nav class="nav-section">
       <button
-        v-for="item in navItems"
+        v-for="item in visibleNavItems"
         :key="item.type"
         class="nav-item"
         :class="{ active: store.activeType === item.type }"
@@ -36,45 +36,30 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useResourceStore } from '../stores/resources'
+import { useSettingsStore } from '../stores/settings'
+import { NAV_ITEM_DEFS } from '../config/navItems'
 import type { ResourceType } from '../stores/resources'
 
 const store = useResourceStore()
+const settingsStore = useSettingsStore()
 const router = useRouter()
 
-const navItems: Array<{ type: ResourceType | 'all'; svg: string; label: string }> = [
-  {
-    type: 'all',
-    label: '全部',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>`
-  },
-  {
-    type: 'game',
-    label: '游戏',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11.5" r=".6" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".6" fill="currentColor"/><path d="M21 12c0 5-2.5 8-9 8S3 17 3 12 5.5 4 12 4s9 3 9 8z"/></svg>`
-  },
-  {
-    type: 'app',
-    label: '应用程序',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><circle cx="7" cy="7" r=".8" fill="currentColor"/><circle cx="10" cy="7" r=".8" fill="currentColor"/></svg>`
-  },
-  {
-    type: 'image',
-    label: '图片',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
-  },
-  {
-    type: 'video',
-    label: '视频',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3V10z"/></svg>`
-  }
-]
+onMounted(() => settingsStore.load())
+
+const visibleNavItems = computed(() =>
+  settingsStore.sidebarNav
+    .filter(cfg => cfg.visible)
+    .map(cfg => NAV_ITEM_DEFS.find(d => d.type === cfg.type))
+    .filter((d): d is typeof NAV_ITEM_DEFS[0] => d !== undefined)
+)
 
 const settingsIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
 
-function select(type: ResourceType | 'all') {
-  store.activeType = type
+function select(type: string) {
+  store.activeType = type as ResourceType | 'all'
   router.push('/library')
 }
 </script>

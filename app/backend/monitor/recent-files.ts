@@ -19,6 +19,14 @@ const EXT_MAP: Record<string, Resource['type']> = {
   '.mp4': 'video', '.mkv': 'video', '.avi': 'video',
   '.mov': 'video', '.wmv': 'video', '.flv': 'video',
   '.webm': 'video', '.m4v': 'video',
+  // 漫画（CBZ/CBR 是明确的漫画格式，不会误判为其他类型）
+  '.cbz': 'comic', '.cbr': 'comic', '.cbt': 'comic',
+  // 音乐
+  '.mp3': 'music', '.flac': 'music', '.wav': 'music',
+  '.aac': 'music', '.ogg': 'music', '.m4a': 'music',
+  '.ape': 'music', '.wma': 'music',
+  // 小说/电子书（txt/pdf 不加：太泛，误判率高）
+  '.epub': 'novel', '.mobi': 'novel', '.azw3': 'novel', '.azw': 'novel',
   // 可执行（游戏/应用，后续异步区分）
   '.exe': 'app'
 }

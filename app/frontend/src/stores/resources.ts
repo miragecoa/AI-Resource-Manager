@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
-export type ResourceType = 'image' | 'game' | 'app' | 'video'
+export type ResourceType = 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel'
 
 export interface Resource {
   id: string
@@ -47,10 +47,13 @@ export const useResourceStore = defineStore('resources', () => {
 
   const counts = computed(() => ({
     all: items.value.length,
-    image: items.value.filter((r) => r.type === 'image').length,
     game: items.value.filter((r) => r.type === 'game').length,
     app: items.value.filter((r) => r.type === 'app').length,
-    video: items.value.filter((r) => r.type === 'video').length
+    image: items.value.filter((r) => r.type === 'image').length,
+    video: items.value.filter((r) => r.type === 'video').length,
+    comic: items.value.filter((r) => r.type === 'comic').length,
+    music: items.value.filter((r) => r.type === 'music').length,
+    novel: items.value.filter((r) => r.type === 'novel').length
   }))
 
   async function loadAll() {
