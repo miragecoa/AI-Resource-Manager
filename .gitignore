@@ -1,0 +1,39 @@
+# Internal notes (local only, not for public repo)
+notes/
+
+# Claude Code tooling (local only)
+.claude/
+
+# Dependencies
+app/node_modules/
+app/frontend/node_modules/
+
+# Build output
+app/out/
+app/frontend/dist/
+
+# Electron packaged output
+app/dist-build/
+release/
+
+# Database (user data, never commit)
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/
+
+# Secrets / License keys (never commit)
+*.lic
+*.pem
+*.key
