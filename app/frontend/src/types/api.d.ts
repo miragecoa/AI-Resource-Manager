@@ -27,8 +27,26 @@ declare global {
       files: {
         openPath: (filePath: string) => Promise<void>
         openInExplorer: (filePath: string) => Promise<void>
+        readImage: (filePath: string) => Promise<string | null>
+        getAppIcon: (filePath: string) => Promise<string | null>
       }
       onNewResource: (callback: (entry: object) => void) => () => void
+      monitor: {
+        scanNow: () => Promise<import('../stores/resources').Resource[]>
+      }
+      ignoredPaths: {
+        getAll: () => Promise<string[]>
+        remove: (filePath: string) => Promise<void>
+      }
+      loginItem: {
+        get: () => Promise<boolean>
+        set: (enable: boolean) => Promise<void>
+      }
+      app: {
+        quit: () => Promise<void>
+        setZoom: (factor: number) => void
+        getZoom: () => number
+      }
     }
   }
 }

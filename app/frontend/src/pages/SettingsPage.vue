@@ -23,6 +23,41 @@
             <span class="toggle-thumb" />
           </button>
         </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">开机自动启动</div>
+            <div class="setting-desc">登录 Windows 时自动在后台启动，持续收录文件</div>
+          </div>
+          <button
+            class="toggle"
+            :class="{ on: settingsStore.autostartEnabled }"
+            @click="settingsStore.setAutostart(!settingsStore.autostartEnabled)"
+            :aria-label="settingsStore.autostartEnabled ? '关闭自启' : '开启自启'"
+          >
+            <span class="toggle-thumb" />
+          </button>
+        </div>
+      </section>
+
+      <!-- 界面缩放 -->
+      <section class="section">
+        <h2 class="section-title">界面缩放</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">缩放比例</div>
+            <div class="setting-desc">调整整体界面大小，立即生效并自动保存</div>
+          </div>
+          <div class="zoom-group">
+            <button
+              v-for="level in zoomLevels"
+              :key="level.value"
+              class="zoom-btn"
+              :class="{ active: settingsStore.zoom === level.value }"
+              @click="settingsStore.setZoom(level.value)"
+            >{{ level.label }}</button>
+          </div>
+        </div>
       </section>
 
       <!-- 数据管理 -->
@@ -56,7 +91,17 @@ import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 
-onMounted(() => settingsStore.load())
+onMounted(async () => {
+  await settingsStore.load()
+})
+
+const zoomLevels = [
+  { label: '75%',  value: 0.75 },
+  { label: '100%', value: 1.0  },
+  { label: '125%', value: 1.25 },
+  { label: '150%', value: 1.5  },
+  { label: '200%', value: 2.0  }
+]
 </script>
 
 <style scoped>
@@ -172,6 +217,38 @@ onMounted(() => settingsStore.load())
 .toggle.on .toggle-thumb {
   transform: translateX(16px);
   background: #fff;
+}
+
+/* Zoom selector */
+.zoom-group {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.zoom-btn {
+  padding: 5px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.zoom-btn:hover {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+
+.zoom-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
 }
 
 /* About card */

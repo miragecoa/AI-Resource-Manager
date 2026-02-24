@@ -1,13 +1,12 @@
 <template>
-  <div class="card" @dblclick="$emit('open', resource)" @contextmenu.prevent="showMenu = true">
-    <div class="cover">
+  <div class="card" :class="{ 'menu-open': showMenu }" @dblclick="$emit('open', resource)" @contextmenu.prevent="showMenu = true">
+    <div class="cover" :class="{ 'is-app': resource.type === 'app' }">
       <img
-        v-if="resource.cover_path"
-        :src="`file://${resource.cover_path}`"
+        v-if="thumbSrc"
+        :src="thumbSrc"
         :alt="resource.title"
-        loading="lazy"
       />
-      <div v-else class="cover-placeholder">
+      <div v-else class="cover-placeholder" style="pointer-events:none">
         <span class="type-icon" v-html="typeIcon" />
       </div>
     </div>
@@ -30,6 +29,9 @@
         <span v-html="folderIcon" />在文件夹中显示
       </button>
       <hr />
+      <button @click="$emit('remove', resource); showMenu = false" class="danger">
+        <span v-html="removeIcon" />从库中删除
+      </button>
       <button @click="$emit('ignore', resource); showMenu = false" class="danger">
         <span v-html="ignoreIcon" />忽略此文件
       </button>
@@ -38,16 +40,36 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 import type { Resource } from '../stores/resources'
 
 const props = defineProps<{ resource: Resource }>()
 defineEmits<{
   open: [resource: Resource]
+  remove: [resource: Resource]
   ignore: [resource: Resource]
 }>()
 
 const showMenu = ref(false)
+const thumbSrc = ref<string | null>(null)
+
+// 通过 IPC 加载预览图，彻底绕开 URL 编码 / 跨域问题
+watchEffect(async () => {
+  const r = props.resource
+  if (r.cover_path) {
+    thumbSrc.value = await window.api.files.readImage(r.cover_path)
+    return
+  }
+  if (r.type === 'image') {
+    thumbSrc.value = await window.api.files.readImage(r.file_path)
+    return
+  }
+  if (r.type === 'app') {
+    thumbSrc.value = await window.api.files.getAppIcon(r.file_path)
+    return
+  }
+  thumbSrc.value = null
+})
 
 const TYPE_ICONS: Record<string, string> = {
   image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
@@ -60,6 +82,7 @@ const typeIcon = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.ap
 
 const openIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
 const folderIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+const removeIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
 const ignoreIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`
 
 function openInExplorer() {
@@ -85,8 +108,13 @@ function openInExplorer() {
   box-shadow: 0 8px 24px rgba(99, 102, 241, 0.12);
 }
 
+/* 菜单打开时把卡片提升到同级卡片之上，避免被遮盖 */
+.card.menu-open {
+  z-index: 50;
+}
+
 .cover {
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 16 / 9;
   background: var(--surface);
   border-radius: 7px 7px 0 0;
   overflow: hidden;
@@ -99,6 +127,16 @@ function openInExplorer() {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 应用图标：系统提取的图标尺寸固定（48px），居中显示而不拉伸 */
+.cover.is-app img {
+  width: auto;
+  height: auto;
+  max-width: 60%;
+  max-height: 60%;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 .cover-placeholder {

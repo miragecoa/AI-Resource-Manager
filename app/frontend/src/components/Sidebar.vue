@@ -36,21 +36,18 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useResourceStore } from '../stores/resources'
 import type { ResourceType } from '../stores/resources'
 
 const store = useResourceStore()
+const router = useRouter()
 
 const navItems: Array<{ type: ResourceType | 'all'; svg: string; label: string }> = [
   {
     type: 'all',
     label: '全部',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>`
-  },
-  {
-    type: 'image',
-    label: '图片',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
   },
   {
     type: 'game',
@@ -63,6 +60,11 @@ const navItems: Array<{ type: ResourceType | 'all'; svg: string; label: string }
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><circle cx="7" cy="7" r=".8" fill="currentColor"/><circle cx="10" cy="7" r=".8" fill="currentColor"/></svg>`
   },
   {
+    type: 'image',
+    label: '图片',
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
+  },
+  {
     type: 'video',
     label: '视频',
     svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3V10z"/></svg>`
@@ -73,6 +75,7 @@ const settingsIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 
 function select(type: ResourceType | 'all') {
   store.activeType = type
+  router.push('/library')
 }
 </script>
 
