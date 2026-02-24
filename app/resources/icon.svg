@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#1e1b4b"/>
+      <stop offset="100%" stop-color="#0c0c18"/>
+    </linearGradient>
+    <linearGradient id="t1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#c7d2fe"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+    <linearGradient id="t2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#a5b4fc"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <linearGradient id="t3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#818cf8"/>
+      <stop offset="100%" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="t4" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="108" fill="none"
+        stroke="rgba(129,140,248,0.12)" stroke-width="2"/>
+
+  <!--
+    Grid layout (gap=20):
+      Tile 1 top-left  : x=98  y=98  w=148 h=148  center=(172,172)
+      Tile 2 top-right : x=266 y=98  w=148 h=148  center=(340,172)
+      Tile 3 bot-left  : x=98  y=266 w=148 h=148  center=(172,340)
+      Tile 4 bot-right : x=266 y=266 w=148 h=148  center=(340,340)
+  -->
+
+  <!-- ── Tile 1: Image ── -->
+  <rect x="98" y="98" width="148" height="148" rx="22" fill="url(#t1)"/>
+  <!--
+    Mountain triangle: centroid must equal (172,172).
+    Points A=(136,204) B=(172,144) C=(208,204)
+    centroid x=(136+172+208)/3=172 ✓  y=(204+144+204)/3=184 — shift up 12
+    Use: A=(136,196) B=(172,136) C=(208,196)  → centroid y=(196+136+196)/3=176 — close
+    Fine-tune: A=(136,200) B=(172,140) C=(208,200) → centroid y=180, bbox center=(172,170) ✓
+    Sun circle at (200,149) r=13: bbox 187–213, 136–162
+    Combined bbox x: 136–213 w=77 cx=174.5
+                  y: 136–200 h=64 cy=168  — within 4px, looks good
+  -->
+  <polygon points="136,200 172,140 208,200" fill="rgba(255,255,255,0.45)"/>
+  <circle cx="199" cy="149" r="13" fill="rgba(255,255,255,0.50)"/>
+
+  <!-- ── Tile 2: Video ── -->
+  <rect x="266" y="98" width="148" height="148" rx="22" fill="url(#t2)"/>
+  <!--
+    Right-pointing play triangle, centroid at (340,172).
+    Solve: 2*xL + xR = 1020, height 64px → yT=140 yB=204 → centroid y=(140+204+172)/3=172 ✓
+    Width 60: 3*xL + 60 = 1020 → xL=320, xR=380
+    centroid x=(320+320+380)/3=340 ✓
+  -->
+  <polygon points="320,140 320,204 380,172" fill="rgba(255,255,255,0.50)"/>
+
+  <!-- ── Tile 3: Game ── -->
+  <rect x="98" y="266" width="148" height="148" rx="22" fill="url(#t3)"/>
+  <!--
+    D-pad cross, center at (172,340).
+    Arm width=18, arm length=52.
+    Horizontal bar: x 146–198, y 331–349  → center (172,340) ✓
+    Vertical bar:   x 163–181, y 314–366  → center (172,340) ✓
+  -->
+  <rect x="146" y="331" width="52" height="18" rx="6" fill="rgba(255,255,255,0.50)"/>
+  <rect x="163" y="314" width="18" height="52" rx="6" fill="rgba(255,255,255,0.50)"/>
+
+  <!-- ── Tile 4: AI Sparkle ── -->
+  <rect x="266" y="266" width="148" height="148" rx="22" fill="url(#t4)"/>
+  <!--
+    4-point star centered at (340,340).
+    Outer radius 36 (top/bottom), 28 (left/right) — slightly taller for elegance.
+  -->
+  <circle cx="340" cy="340" r="36" fill="rgba(255,255,255,0.10)" filter="url(#glow)"/>
+  <path d="
+    M340,298
+    C342,320 360,338 382,340
+    C360,342 342,360 340,382
+    C338,360 320,342 298,340
+    C320,338 338,320 340,298
+    Z"
+    fill="white" opacity="0.90" filter="url(#glow)"/>
+  <circle cx="340" cy="340" r="6" fill="white"/>
+  <!-- Diagonal × arms -->
+  <line x1="322" y1="322" x2="358" y2="358" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
+  <line x1="358" y1="322" x2="322" y2="358" stroke="rgba(255,255,255,0.55)" stroke-width="3" stroke-linecap="round"/>
+
+</svg>
