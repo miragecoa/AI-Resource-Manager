@@ -5,11 +5,14 @@ export const SCHEMA_SQL = `
     title       TEXT NOT NULL,
     file_path   TEXT NOT NULL UNIQUE,
     cover_path  TEXT,
-    rating      INTEGER DEFAULT 0,
-    note        TEXT,
-    meta        TEXT,
-    added_at    INTEGER NOT NULL,
-    updated_at  INTEGER NOT NULL
+    rating         INTEGER DEFAULT 0,
+    note           TEXT,
+    meta           TEXT,
+    added_at       INTEGER NOT NULL,
+    updated_at     INTEGER NOT NULL,
+    open_count     INTEGER DEFAULT 0,
+    total_run_time INTEGER DEFAULT 0,
+    last_run_at    INTEGER
   );
 
   CREATE TABLE IF NOT EXISTS tags (

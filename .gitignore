@@ -18,6 +18,7 @@ app/dist-build/
 release/
 
 # Database (user data, never commit)
+app/data/
 *.db
 *.db-shm
 *.db-wal

@@ -4,8 +4,16 @@ import { extname, basename, join } from 'path'
 import { spawn, execFile, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import { createInterface } from 'readline'
-import { upsertResource, isIgnored } from '../db/queries'
+import { upsertResource, isIgnored, recordProcessStart, recordProcessStop, getResourceByPath } from '../db/queries'
 import type { Resource } from '../db/queries'
+
+export interface RunningEvent {
+  resourceId: string
+  running: boolean
+  startTime?: number      // running=true 时附带
+  elapsedSeconds?: number // running=false 时附带
+  resource?: Resource     // 更新后的资源数据（含新的统计字段）
+}
 
 const execFileAsync = promisify(execFile)
 
@@ -50,7 +58,11 @@ const BLOCKED_PROCESS_PATHS = [
 // Steam / Chrome 的帮助进程已经被 \\cef\\ \\helper\\ \\crashpad\\ 覆盖到了
 const BLOCKED_PATH_SEGMENTS = [
   '\\cef\\', '\\lib\\', '\\libs\\',
-  '\\helper\\', '\\helpers\\', '\\crashpad\\'
+  '\\helper\\', '\\helpers\\', '\\crashpad\\',
+  '\\node_modules\\',  // VS Code 扩展宿主、npm/yarn 工具链中的辅助 exe
+  '\\miniconda',       // Miniconda / Miniconda3 / MiniForge 等变体（前缀匹配）
+  '\\anaconda',        // Anaconda 发行版
+  '\\microsoft\\onedrive\\', // OneDrive（路径含版本号，用路径段过滤）
 ]
 
 // 已知系统/后台进程名（不含 .exe，小写）
@@ -58,8 +70,11 @@ const BLOCKED_EXE_NAMES = new Set([
   'conhost', 'svchost', 'dllhost', 'rundll32', 'taskhost', 'taskhostw',
   'werfault', 'werfaultsecure', 'wermgr', 'sihost', 'fontdrvhost',
   'searchprotocolhost', 'searchfilterhost', 'searchindexer',
-  'steamwebhelper', 'crashpad_handler', 'chrome_crashpad_handler',
-  'git', 'updater'
+  'steamwebhelper', 'gameoverlayui64', 'gameoverlayrenderer64',  // Steam overlay
+  'crashpad_handler', 'chrome_crashpad_handler',
+  'git', 'updater',
+  'onedrive', 'onedriveupdater', 'filecoauth',  // OneDrive 后台进程
+  'conda', 'pip',      // Python 包管理工具（conda/pip 本身不是用户资源）
 ])
 
 // 系统文件扩展名黑名单
@@ -81,9 +96,69 @@ function isBlockedProcess(exePath: string): boolean {
   return false
 }
 
+// ── 运行会话追踪 ─────────────────────────────────────────────────────
+interface RunningSession {
+  resourceId: string
+  filePath: string
+  startTime: number
+}
+
+const runningSessions = new Map<number, RunningSession>()  // pid → session
+let pidCheckInterval: ReturnType<typeof setInterval> | null = null
+let onRunningChangeCb: ((event: RunningEvent) => void) | undefined
+
+function isPidAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true } catch (e: any) { return e.code === 'EPERM' }
+}
+
+function startPidCheck(): void {
+  if (pidCheckInterval) return
+  pidCheckInterval = setInterval(() => {
+    for (const [pid, session] of runningSessions) {
+      if (!isPidAlive(pid)) {
+        const elapsed = Math.floor((Date.now() - session.startTime) / 1000)
+        runningSessions.delete(pid)
+        if (pidCheckInterval && runningSessions.size === 0) {
+          clearInterval(pidCheckInterval)
+          pidCheckInterval = null
+        }
+        try {
+          const updated = recordProcessStop(session.resourceId, elapsed)
+          onRunningChangeCb?.({ resourceId: session.resourceId, running: false, elapsedSeconds: elapsed, resource: updated ?? undefined })
+        } catch (e) {
+          console.error('[Monitor] recordProcessStop failed:', e)
+        }
+      }
+    }
+  }, 5000)
+}
+
+export function killRunningResource(resourceId: string): void {
+  for (const [pid, session] of runningSessions) {
+    if (session.resourceId === resourceId) {
+      try {
+        execFile('taskkill', ['/PID', pid.toString(), '/F'], { windowsHide: true }, () => {})
+      } catch { /* ignore */ }
+      return
+    }
+  }
+}
+
+export function getRunningSessions(): Array<{ resourceId: string; startTime: number }> {
+  return Array.from(runningSessions.entries()).map(([, s]) => ({ resourceId: s.resourceId, startTime: s.startTime }))
+}
+// ─────────────────────────────────────────────────────────────────────
+
 let recentWatcher: FSWatcher | null = null
 let desktopWatcher: FSWatcher | null = null
 let processWatcherProc: ChildProcess | null = null
+let monitorPaused = false
+
+/** 暂停/恢复自动捕获（手动添加对话框打开时暂停，防止用户浏览文件时被自动入库） */
+export function setMonitorPaused(paused: boolean): void {
+  monitorPaused = paused
+  console.log('[Monitor] Auto-capture', paused ? 'PAUSED' : 'RESUMED')
+}
 
 // WMI 进程创建事件监听脚本（Base64-UTF16LE 编码，通过 -EncodedCommand 传入，避免引号转义问题）
 // 只捕获由用户 Shell（Explorer/终端）直接启动的进程，过滤掉程序自己衍生的子进程
@@ -105,7 +180,8 @@ function buildWmiWatcherScript(): string {
     '      $ppid = $e.TargetInstance.ParentProcessId',
     '      $parent = Get-Process -Id $ppid -ErrorAction SilentlyContinue',
     '      if (-not $parent -or $sysSpawners -notcontains $parent.ProcessName.ToLower()) {',
-    '        Write-Output $p',
+    '        $pid2 = $e.TargetInstance.ProcessId',
+    '        Write-Output "$pid2|$p"',
     '      }',
     '    }',
     '  } catch { }',
@@ -125,7 +201,11 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
     ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
     createInterface({ input: processWatcherProc.stdout! }).on('line', (line) => {
-      const exePath = line.trim()
+      if (monitorPaused) return
+      const raw = line.trim()
+      const sepIdx = raw.indexOf('|')
+      const pid = sepIdx > 0 ? parseInt(raw.slice(0, sepIdx)) : 0
+      const exePath = sepIdx > 0 ? raw.slice(sepIdx + 1).trim() : raw
       const lower = exePath.toLowerCase()
       if (!exePath || lower === ownExe || !lower.endsWith('.exe')) return
       if (isBlockedProcess(exePath)) {
@@ -133,14 +213,32 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
         return
       }
       const lnkTitle = exeToLnkName.get(lower)
-      // file_path 始终用 exe 路径，与 .lnk 通道天然去重
-      // 有快捷方式名称时 updateTitle=true（如已存在的 "chrome" → "Google Chrome"）
       const title = lnkTitle ?? basename(exePath, extname(exePath))
       try {
-        const resource = upsertResource({ type: 'app', title, file_path: exePath, rating: 0 }, !!lnkTitle)
-        if (resource) {
-          console.log('[Monitor] Process started, auto-added:', title, lnkTitle ? '(from shortcut)' : '(exe name)')
-          onNewEntry(resource)
+        const newResource = upsertResource({ type: 'app', title, file_path: exePath, rating: 0 }, !!lnkTitle)
+        if (newResource) {
+          console.log('[Monitor] New resource auto-added:', title, pid ? `(pid ${pid})` : '')
+          onNewEntry(newResource)
+        }
+        // 无论是新资源还是已有资源，都追踪运行会话
+        if (pid && !isNaN(pid)) {
+          const trackResource = newResource ?? getResourceByPath(exePath)
+          if (trackResource) {
+            // 同一资源只追踪一个 PID（避免 Chrome/Electron 等多进程应用重复计数）
+            const alreadyTracking = [...runningSessions.values()].some(s => s.resourceId === trackResource.id)
+            if (!alreadyTracking) {
+              console.log('[Monitor] Tracking session:', trackResource.title, `(pid ${pid})`)
+              const startTime = Date.now()
+              runningSessions.set(pid, { resourceId: trackResource.id, filePath: exePath, startTime })
+              startPidCheck()
+              try {
+                const updated = recordProcessStart(trackResource.id)
+                onRunningChangeCb?.({ resourceId: trackResource.id, running: true, startTime, resource: updated ?? undefined })
+              } catch (e) {
+                console.error('[Monitor] recordProcessStart failed:', e)
+              }
+            }
+          }
         }
       } catch (e) {
         console.error('[Monitor] upsertResource failed for process:', exePath, e)
@@ -202,7 +300,55 @@ function preloadLnkNames(folders: string[]): void {
   console.log(`[Monitor] Pre-indexed ${exeToLnkName.size} named shortcuts`)
 }
 
-export function startMonitor(onNewEntry: (entry: Resource) => void): void {
+/**
+ * 启动时检查当前已运行的进程，对已入库资源标记运行状态。
+ * WMI 只能捕获新启动的进程，此函数补充检测 App 启动前已在运行的程序。
+ * 异步执行（约 3-5 秒），不阻塞主流程。
+ */
+async function checkInitialRunning(): Promise<void> {
+  try {
+    const { stdout } = await execFileAsync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      '[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; ' +
+      'Get-Process | Where-Object { $_.Path } | ForEach-Object { "$($_.Id)|$($_.Path)" }'
+    ], { timeout: 10000, windowsHide: true, encoding: 'utf8' })
+
+    const ownExe = process.execPath.toLowerCase()
+    const trackedResources = new Set<string>()
+
+    for (const line of stdout.split(/\r?\n/)) {
+      const raw = line.trim()
+      const sepIdx = raw.indexOf('|')
+      if (sepIdx < 0) continue
+      const pid = parseInt(raw.slice(0, sepIdx))
+      const exePath = raw.slice(sepIdx + 1).trim()
+      const lower = exePath.toLowerCase()
+      if (!exePath || !pid || isNaN(pid)) continue
+      if (lower === ownExe || !lower.endsWith('.exe')) continue
+      if (isBlockedProcess(exePath)) continue
+      if (runningSessions.has(pid)) continue
+
+      const resource = getResourceByPath(exePath)
+      if (!resource || trackedResources.has(resource.id)) continue
+
+      trackedResources.add(resource.id)
+      const startTime = Date.now()
+      runningSessions.set(pid, { resourceId: resource.id, filePath: exePath, startTime })
+      onRunningChangeCb?.({ resourceId: resource.id, running: true, startTime })
+      console.log('[Monitor] Already running:', resource.title, `(pid ${pid})`)
+    }
+
+    if (runningSessions.size > 0) startPidCheck()
+    if (trackedResources.size > 0) {
+      console.log(`[Monitor] Initial running: ${trackedResources.size} resource(s) detected`)
+    }
+  } catch (e) {
+    console.warn('[Monitor] checkInitialRunning failed:', e)
+  }
+}
+
+export function startMonitor(onNewEntry: (entry: Resource) => void, onRunningChange?: (event: RunningEvent) => void): void {
+  onRunningChangeCb = onRunningChange
   const recentPath = app.getPath('recent')
   const desktopPath = app.getPath('desktop')
   console.log('[Monitor] Watching Recent:', recentPath)
@@ -228,6 +374,8 @@ export function startMonitor(onNewEntry: (entry: Resource) => void): void {
   })
 
   startProcessWatcher(onNewEntry)
+  // 异步检查已运行进程（PowerShell 约 3-5 秒后返回，届时渲染层已订阅）
+  checkInitialRunning()
   console.log('[Monitor] Watchers started (Recent + Desktop + WMI)')
 }
 
@@ -330,6 +478,7 @@ export async function scanRecentFolder(): Promise<Resource[]> {
 }
 
 function handleLnkFile(lnkPath: string, onNewEntry: (entry: Resource) => void): void {
+  if (monitorPaused) return
   const resource = processLnk(lnkPath)
   if (resource) {
     console.log('[Monitor] New resource:', resource.type, resource.title)

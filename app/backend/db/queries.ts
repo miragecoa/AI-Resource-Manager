@@ -12,6 +12,10 @@ export interface Resource {
   meta?: string
   added_at: number
   updated_at: number
+  open_count: number
+  total_run_time: number
+  last_run_at: number | null
+  pinned?: number
   tags?: Tag[]
 }
 
@@ -38,6 +42,12 @@ export function getResourceById(id: string): Resource | null {
   return row ? attachTags(row) : null
 }
 
+export function getResourceByPath(filePath: string): Resource | null {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM resources WHERE file_path = ?').get(filePath) as Resource | undefined
+  return row ? attachTags(row) : null
+}
+
 export function upsertResource(
   data: Omit<Resource, 'id' | 'added_at' | 'updated_at' | 'tags'> & { id?: string },
   updateTitle = false
@@ -49,7 +59,7 @@ export function upsertResource(
   // updateTitle=true：发现快捷方式名称时，更新已有条目的标题（如 "chrome" → "Google Chrome"）
   // updateTitle=false（默认）：已存在则跳过，避免覆盖用户手动改过的名称
   const onConflict = updateTitle
-    ? 'DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at'
+    ? 'DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at WHERE resources.title != excluded.title'
     : 'DO NOTHING'
 
   const info = db.prepare(`
@@ -78,8 +88,64 @@ export function updateResource(id: string, data: Partial<Resource>): void {
     .run({ ...data, id })
 }
 
+/** 进程启动时调用：open_count +1，更新 last_run_at，返回更新后的资源 */
+export function recordProcessStart(resourceId: string): Resource | null {
+  const now = Date.now()
+  getDb().prepare(`
+    UPDATE resources SET open_count = COALESCE(open_count, 0) + 1, last_run_at = ?, updated_at = ? WHERE id = ?
+  `).run(now, now, resourceId)
+  return getResourceById(resourceId)
+}
+
+/** 进程退出时调用：total_run_time 累加本次秒数，返回更新后的资源 */
+export function recordProcessStop(resourceId: string, elapsedSeconds: number): Resource | null {
+  const now = Date.now()
+  getDb().prepare(`
+    UPDATE resources SET total_run_time = COALESCE(total_run_time, 0) + ?, updated_at = ? WHERE id = ?
+  `).run(elapsedSeconds, now, resourceId)
+  return getResourceById(resourceId)
+}
+
+export function addManualResource(data: {
+  type: string
+  title: string
+  file_path: string
+  note?: string
+}): { resource: Resource; existed: boolean } {
+  const db = getDb()
+  const existing = db.prepare('SELECT * FROM resources WHERE file_path = ?').get(data.file_path) as Resource | undefined
+  if (existing) {
+    return { resource: attachTags(existing), existed: true }
+  }
+  const id = randomUUID()
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO resources (id, type, title, file_path, cover_path, rating, note, meta, added_at, updated_at)
+    VALUES (@id, @type, @title, @file_path, NULL, 0, @note, NULL, @added_at, @updated_at)
+  `).run({ id, type: data.type, title: data.title, file_path: data.file_path, note: data.note ?? null, added_at: now, updated_at: now })
+  return { resource: getResourceById(id)!, existed: false }
+}
+
 export function removeResource(id: string): void {
   getDb().prepare('DELETE FROM resources WHERE id = ?').run(id)
+}
+
+/** 撤销忽略：将完整资源数据（含标签）写回数据库 */
+export function restoreResource(resource: Resource): Resource | null {
+  const db = getDb()
+  db.prepare(`
+    INSERT OR REPLACE INTO resources
+      (id, type, title, file_path, cover_path, rating, note, meta, added_at, updated_at, open_count, total_run_time, last_run_at)
+    VALUES
+      (@id, @type, @title, @file_path, @cover_path, @rating, @note, @meta, @added_at, @updated_at, @open_count, @total_run_time, @last_run_at)
+  `).run(resource)
+  if (Array.isArray((resource as any).tags)) {
+    for (const tag of (resource as any).tags as Array<{ id: number; name: string; source?: string }>) {
+      db.prepare('INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)').run(tag.id, tag.name)
+      db.prepare('INSERT OR IGNORE INTO resource_tags (resource_id, tag_id, source) VALUES (?, ?, ?)').run(resource.id, tag.id, tag.source ?? 'manual')
+    }
+  }
+  return getResourceById(resource.id)
 }
 
 export function isIgnored(filePath: string): boolean {
@@ -107,6 +173,30 @@ export function removeResourceByPath(filePath: string): void {
 
 export function getAllTags(): Tag[] {
   return getDb().prepare('SELECT * FROM tags ORDER BY name').all() as Tag[]
+}
+
+/** 按资源类型获取标签，附带该类型下的使用计数，按计数降序排列。
+ *  type 为空时统计所有类型。只返回至少使用过一次的标签。 */
+export function getTagsForType(type?: string): Array<{ id: number; name: string; count: number }> {
+  const db = getDb()
+  if (type) {
+    return db.prepare(`
+      SELECT t.id, t.name, COUNT(rt.resource_id) AS count
+      FROM tags t
+      JOIN resource_tags rt ON t.id = rt.tag_id
+      JOIN resources r ON rt.resource_id = r.id
+      WHERE r.type = ?
+      GROUP BY t.id
+      ORDER BY count DESC, t.name ASC
+    `).all(type) as Array<{ id: number; name: string; count: number }>
+  }
+  return db.prepare(`
+    SELECT t.id, t.name, COUNT(rt.resource_id) AS count
+    FROM tags t
+    JOIN resource_tags rt ON t.id = rt.tag_id
+    GROUP BY t.id
+    ORDER BY count DESC, t.name ASC
+  `).all() as Array<{ id: number; name: string; count: number }>
 }
 
 export function createTag(name: string): Tag {

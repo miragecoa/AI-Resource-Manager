@@ -16,6 +16,7 @@ protocol.registerSchemesAsPrivileged([
 import { initDatabase } from './db/index'
 import { registerIpcHandlers } from './ipc/index'
 import { startMonitor } from './monitor/recent-files'
+import type { RunningEvent } from './monitor/recent-files'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -160,15 +161,18 @@ function createWindow(): void {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
 
-  // local:///D:/path/to/file.jpg → 转发给 file:// 协议
-  // 绕过 http 渲染器的跨域限制
+  // local://local-file/D:/path/to/file → 转发给 file:// 协议
+  // 注意：Chromium 对 standard scheme 解析 local:///C:/path 时会把 C: 当成 hostname，
+  // 导致 request.url 变成 local://c/path（丢失盘符）。
+  // 解决方法：前端统一用 local://local-file/C:/path 格式，这里从 pathname 提取路径。
   protocol.handle('local', (request) => {
-    // request.url 形如 local:///D:/path/to/file.jpg（encodeURI 编码，: 和 / 保持原样）
-    const raw = request.url.slice('local:///'.length)
-    const target = 'file:///' + raw
-    console.log('[Protocol] →', decodeURI(raw))
-    return net.fetch(target).catch((e: Error) => {
-      console.error('[Protocol] failed:', decodeURI(raw), e?.message)
+    const url = new URL(request.url)
+    // pathname 形如 /C%3A%2FUsers%2F... (encodeURIComponent 编码)，去掉开头的 / 并解码
+    const filePath = decodeURIComponent(url.pathname.slice(1))
+    const target = 'file:///' + filePath.replace(/\\/g, '/')
+    // 转发 Range 等请求头，支持视频 seek
+    return net.fetch(target, { headers: Object.fromEntries(request.headers) }).catch((e: Error) => {
+      console.error('[Protocol] failed:', filePath, e?.message)
       return new Response('Not found', { status: 404 })
     })
   })
@@ -180,9 +184,18 @@ app.whenReady().then(() => {
   createWindow()
 
   // 启动 Recent Files 监听
-  startMonitor((entry) => {
-    mainWindow?.webContents.send('resource:new', entry)
-  })
+  startMonitor(
+    (entry) => {
+      mainWindow?.webContents.send('resource:new', entry)
+    },
+    (event: RunningEvent) => {
+      mainWindow?.webContents.send('resource:running', event)
+      // 同时推送更新后的资源数据（含最新统计字段）
+      if (event.resource) {
+        mainWindow?.webContents.send('resource:new', event.resource)
+      }
+    }
+  )
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

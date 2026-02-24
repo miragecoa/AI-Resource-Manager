@@ -22,11 +22,15 @@ const settingsStore = useSettingsStore()
 const showConsent = ref(false)
 
 let unsubscribe: (() => void) | null = null
+let unsubscribeRunning: (() => void) | null = null
 
 function startApp() {
   store.loadAll()
   unsubscribe = window.api.onNewResource((entry) => {
     store.addOrUpdate(entry as any)
+  })
+  unsubscribeRunning = window.api.onRunningChange((event) => {
+    store.setRunning(event.resourceId, event.running, event.startTime)
   })
 }
 
@@ -49,6 +53,7 @@ function onConsent() {
 
 onUnmounted(() => {
   unsubscribe?.()
+  unsubscribeRunning?.()
 })
 </script>
 

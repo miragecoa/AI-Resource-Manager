@@ -8,12 +8,15 @@ contextBridge.exposeInMainWorld('api', {
     getById: (id: string) => ipcRenderer.invoke('resources:getById', id),
     update: (id: string, data: object) => ipcRenderer.invoke('resources:update', id, data),
     remove: (id: string) => ipcRenderer.invoke('resources:remove', id),
-    ignore: (filePath: string) => ipcRenderer.invoke('resources:ignore', filePath)
+    restore: (resource: object) => ipcRenderer.invoke('resources:restore', resource),
+    ignore: (filePath: string) => ipcRenderer.invoke('resources:ignore', filePath),
+    add: (data: object) => ipcRenderer.invoke('resources:add', data)
   },
 
   // 标签
   tags: {
     getAll: () => ipcRenderer.invoke('tags:getAll'),
+    getForType: (type?: string) => ipcRenderer.invoke('tags:getForType', type),
     create: (name: string) => ipcRenderer.invoke('tags:create', name),
     remove: (id: number) => ipcRenderer.invoke('tags:remove', id),
     addToResource: (resourceId: string, tagId: number, source?: string) =>
@@ -38,7 +41,9 @@ contextBridge.exposeInMainWorld('api', {
     openPath: (filePath: string) => ipcRenderer.invoke('files:openPath', filePath),
     openInExplorer: (filePath: string) => ipcRenderer.invoke('files:openInExplorer', filePath),
     readImage: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:readImage', filePath),
-    getAppIcon: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:getAppIcon', filePath)
+    getAppIcon: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:getAppIcon', filePath),
+    saveCover: (resourceId: string, dataUrl: string): Promise<string | null> => ipcRenderer.invoke('files:saveCover', resourceId, dataUrl),
+    pickFile: (): Promise<string | null> => ipcRenderer.invoke('files:pickFile')
   },
 
   // 监听主进程推送的新资源
@@ -47,9 +52,19 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('resource:new')
   },
 
+  // 监听进程运行状态变化
+  onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => {
+    ipcRenderer.on('resource:running', (_event, data) => callback(data))
+    return () => ipcRenderer.removeAllListeners('resource:running')
+  },
+
   // 监听控制
   monitor: {
-    scanNow: () => ipcRenderer.invoke('monitor:scanNow')
+    scanNow:  () => ipcRenderer.invoke('monitor:scanNow'),
+    pause:    () => ipcRenderer.invoke('monitor:pause'),
+    resume:   () => ipcRenderer.invoke('monitor:resume'),
+    running:  (): Promise<Array<{ resourceId: string; startTime: number }>> => ipcRenderer.invoke('monitor:running'),
+    kill:     (resourceId: string): Promise<void> => ipcRenderer.invoke('monitor:kill', resourceId),
   },
 
   // 忽略列表
@@ -68,6 +83,7 @@ contextBridge.exposeInMainWorld('api', {
   app: {
     quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
     setZoom: (factor: number): void => webFrame.setZoomFactor(factor),
-    getZoom: (): number => webFrame.getZoomFactor()
+    getZoom: (): number => webFrame.getZoomFactor(),
+    getDbPath: (): Promise<string> => ipcRenderer.invoke('app:getDbPath')
   }
 })

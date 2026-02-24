@@ -60,35 +60,6 @@
         </div>
       </section>
 
-      <!-- 侧边栏 -->
-      <section class="section">
-        <h2 class="section-title">侧边栏</h2>
-        <div class="setting-card">
-          <div class="setting-label">分类显示顺序</div>
-          <div class="setting-desc">拖拽调整顺序，点击右侧图标显示或隐藏分类</div>
-          <div class="nav-order-list">
-            <div
-              v-for="(cfg, idx) in settingsStore.sidebarNav"
-              :key="cfg.type"
-              class="nav-order-item"
-              :class="{ 'is-hidden': !cfg.visible, 'is-drag-over': dragOverIdx === idx }"
-              draggable="true"
-              @dragstart="onDragStart(idx)"
-              @dragover.prevent="onDragOver(idx)"
-              @drop.prevent="onDrop(idx)"
-              @dragend="onDragEnd"
-            >
-              <span class="drag-handle" v-html="dragHandleIcon" />
-              <span class="nav-order-icon" v-html="getNavDef(cfg.type)?.svg" />
-              <span class="nav-order-label">{{ getNavDef(cfg.type)?.label }}</span>
-              <button class="vis-btn" @click="toggleVisible(idx)" :title="cfg.visible ? '隐藏' : '显示'">
-                <span v-html="cfg.visible ? eyeIcon : eyeOffIcon" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- 数据管理 -->
       <section class="section">
         <h2 class="section-title">数据管理</h2>
@@ -96,7 +67,7 @@
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-label">数据库位置</div>
-            <div class="setting-desc mono">%APPDATA%\ai-resource-manager\resources.db</div>
+            <div class="setting-desc mono">{{ dbPath }}</div>
           </div>
         </div>
       </section>
@@ -117,12 +88,13 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '../stores/settings'
-import { NAV_ITEM_DEFS } from '../config/navItems'
 
 const settingsStore = useSettingsStore()
+const dbPath = ref('')
 
 onMounted(async () => {
   await settingsStore.load()
+  dbPath.value = await window.api.app.getDbPath()
 })
 
 const zoomLevels = [
@@ -132,43 +104,6 @@ const zoomLevels = [
   { label: '150%', value: 1.5  },
   { label: '200%', value: 2.0  }
 ]
-
-// ── Sidebar nav reorder ──────────────────────────────────────────────────────
-
-let dragSrcIdx = -1
-const dragOverIdx = ref(-1)
-
-function getNavDef(type: string) {
-  return NAV_ITEM_DEFS.find(d => d.type === type)
-}
-
-function onDragStart(idx: number) {
-  dragSrcIdx = idx
-}
-function onDragOver(idx: number) {
-  dragOverIdx.value = idx
-}
-function onDragEnd() {
-  dragSrcIdx = -1
-  dragOverIdx.value = -1
-}
-function onDrop(idx: number) {
-  if (dragSrcIdx < 0 || dragSrcIdx === idx) { onDragEnd(); return }
-  const arr = settingsStore.sidebarNav.map(x => ({ ...x }))
-  const [item] = arr.splice(dragSrcIdx, 1)
-  arr.splice(idx, 0, item)
-  settingsStore.setSidebarNav(arr)
-  onDragEnd()
-}
-function toggleVisible(idx: number) {
-  const arr = settingsStore.sidebarNav.map(x => ({ ...x }))
-  arr[idx].visible = !arr[idx].visible
-  settingsStore.setSidebarNav(arr)
-}
-
-const dragHandleIcon = `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`
-const eyeIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
-const eyeOffIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
 </script>
 
 <style scoped>
@@ -317,94 +252,6 @@ const eyeOffIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
   color: #fff;
   font-weight: 600;
 }
-
-/* Sidebar nav order */
-.setting-card {
-  padding: 12px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.nav-order-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-top: 4px;
-}
-
-.nav-order-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  cursor: grab;
-  user-select: none;
-  transition: opacity 0.15s, border-color 0.15s, background 0.15s;
-}
-
-.nav-order-item:active { cursor: grabbing; }
-
-.nav-order-item.is-hidden { opacity: 0.4; }
-
-.nav-order-item.is-drag-over {
-  border-color: var(--accent);
-  background: rgba(99, 102, 241, 0.08);
-}
-
-.drag-handle {
-  width: 14px;
-  height: 14px;
-  color: var(--text-3);
-  flex-shrink: 0;
-  display: flex;
-  cursor: grab;
-}
-
-.drag-handle :deep(svg) { width: 14px; height: 14px; }
-
-.nav-order-icon {
-  width: 15px;
-  height: 15px;
-  color: var(--text-2);
-  flex-shrink: 0;
-  display: flex;
-}
-
-.nav-order-icon :deep(svg) { width: 15px; height: 15px; }
-
-.nav-order-label {
-  flex: 1;
-  font-size: 13px;
-  color: var(--text-2);
-}
-
-.vis-btn {
-  width: 26px;
-  height: 26px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: var(--text-3);
-  cursor: pointer;
-  border-radius: 4px;
-  padding: 0;
-  flex-shrink: 0;
-  transition: color 0.1s, background 0.1s;
-}
-
-.vis-btn:hover { color: var(--text); background: var(--surface-2); }
-
-.vis-btn span { width: 15px; height: 15px; display: flex; }
-.vis-btn span :deep(svg) { width: 15px; height: 15px; }
 
 /* About card */
 .about-card {

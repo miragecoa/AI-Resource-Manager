@@ -24,6 +24,9 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'frontend'),
+    server: {
+      port: 5174
+    },
     build: {
       rollupOptions: {
         input: resolve(__dirname, 'frontend/index.html')
