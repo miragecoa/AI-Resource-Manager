@@ -1,21 +1,21 @@
 import Database from 'better-sqlite3'
-import { app } from 'electron'
-import { join, dirname } from 'path'
+import { join } from 'path'
 import { mkdirSync } from 'fs'
 import { SCHEMA_SQL } from './schema'
+import { loadManifest, getProfileDir } from './profiles'
 
 let db: Database.Database
 export let dbPath = ''
 export let dataDir = ''
 
-export function initDatabase(): Database.Database {
-  // 开发模式：项目根目录/data/  打包后：exe 同级目录/data/
-  // 放在程序目录下，用户整体打包文件夹即可迁移
-  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
-  dataDir = join(appDir, 'data')
-  mkdirSync(dataDir, { recursive: true })
+export function initDatabase(profileId?: string): Database.Database {
+  const manifest = loadManifest()
+  const id = profileId || manifest.active
+  const profileDir = getProfileDir(id)
+  mkdirSync(profileDir, { recursive: true })
 
-  dbPath = join(dataDir, 'resources.db')
+  dataDir = profileDir
+  dbPath = join(profileDir, 'resources.db')
   db = new Database(dbPath)
 
   // 开启 WAL 模式（写性能更好）
@@ -38,6 +38,13 @@ export function initDatabase(): Database.Database {
 
   console.log('Database initialized at:', dbPath)
   return db
+}
+
+export function closeDatabase(): void {
+  if (db) {
+    db.close()
+    db = null as any
+  }
 }
 
 export function getDb(): Database.Database {

@@ -14,6 +14,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }
 ])
 import { initDatabase } from './db/index'
+import { ensureProfiles } from './db/profiles'
 import { registerIpcHandlers } from './ipc/index'
 import { startMonitor } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
@@ -243,6 +244,7 @@ app.whenReady().then(() => {
     }
   })
 
+  ensureProfiles()
   initDatabase()
   registerIpcHandlers()
 

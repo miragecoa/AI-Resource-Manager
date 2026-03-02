@@ -58,6 +58,12 @@ declare global {
         getZoom: () => number
         getDbPath: () => Promise<string>
       }
+      profiles: {
+        list: () => Promise<{ active: string; profiles: Array<{ id: string; name: string }> }>
+        create: (name: string) => Promise<{ id: string; name: string }>
+        delete: (id: string) => Promise<void>
+        switch: (id: string) => Promise<void>
+      }
     }
   }
 }

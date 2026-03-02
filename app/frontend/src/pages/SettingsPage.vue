@@ -83,6 +83,42 @@
       <section class="section">
         <h2 class="section-title">数据管理</h2>
 
+        <!-- 配置文件选择 -->
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">配置文件</div>
+            <div class="setting-desc">每个配置文件拥有独立的资源库和设置</div>
+          </div>
+          <div class="profile-controls">
+            <select v-model="activeProfileId" @change="onSwitchProfile" class="profile-select">
+              <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
+            </select>
+            <button class="profile-btn" @click="showCreateDialog = true" title="新建配置">+ 新建</button>
+            <button
+              class="profile-btn danger"
+              @click="onDeleteProfile"
+              :disabled="profiles.length <= 1 || activeProfileId === 'default'"
+              title="删除当前配置"
+            >删除</button>
+          </div>
+        </div>
+
+        <!-- 新建配置弹窗（内联） -->
+        <div v-if="showCreateDialog" class="setting-row create-row">
+          <input
+            v-model="newProfileName"
+            class="profile-input"
+            placeholder="输入配置名称"
+            maxlength="30"
+            @keyup.enter="onCreateProfile"
+            ref="createInput"
+          />
+          <div class="create-actions">
+            <button class="profile-btn" @click="onCreateProfile" :disabled="!newProfileName.trim()">确定</button>
+            <button class="profile-btn" @click="showCreateDialog = false; newProfileName = ''">取消</button>
+          </div>
+        </div>
+
         <div class="setting-row">
           <div class="setting-info">
             <div class="setting-label">数据库位置</div>
@@ -105,15 +141,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, nextTick, onMounted, watch } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 const dbPath = ref('')
 
+// ── 配置文件 ──
+const profiles = ref<Array<{ id: string; name: string }>>([])
+const activeProfileId = ref('')
+const showCreateDialog = ref(false)
+const newProfileName = ref('')
+const createInput = ref<HTMLInputElement | null>(null)
+
+async function loadProfiles() {
+  const data = await window.api.profiles.list()
+  profiles.value = data.profiles
+  activeProfileId.value = data.active
+}
+
+function onSwitchProfile() {
+  if (activeProfileId.value) {
+    window.api.profiles.switch(activeProfileId.value)
+  }
+}
+
+async function onCreateProfile() {
+  const name = newProfileName.value.trim()
+  if (!name) return
+  const created = await window.api.profiles.create(name)
+  profiles.value.push(created)
+  showCreateDialog.value = false
+  newProfileName.value = ''
+  // 自动切换到新配置
+  activeProfileId.value = created.id
+  window.api.profiles.switch(created.id)
+}
+
+async function onDeleteProfile() {
+  if (activeProfileId.value === 'default' || profiles.value.length <= 1) return
+  const current = profiles.value.find(p => p.id === activeProfileId.value)
+  if (!confirm(`确定删除配置「${current?.name}」？所有资源数据将被永久删除。`)) return
+  await window.api.profiles.delete(activeProfileId.value)
+  // 切换到第一个剩余配置
+  const remaining = profiles.value.filter(p => p.id !== activeProfileId.value)
+  if (remaining.length > 0) {
+    window.api.profiles.switch(remaining[0].id)
+  }
+}
+
 onMounted(async () => {
   await settingsStore.load()
   dbPath.value = await window.api.app.getDbPath()
+  await loadProfiles()
+})
+
+// 监听 showCreateDialog 打开时自动聚焦
+watch(showCreateDialog, (v) => {
+  if (v) nextTick(() => createInput.value?.focus())
 })
 
 const zoomLevels = [
@@ -270,6 +355,94 @@ const zoomLevels = [
   border-color: var(--accent);
   color: #fff;
   font-weight: 600;
+}
+
+/* Profile controls */
+.profile-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.profile-select {
+  padding: 5px 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  min-width: 100px;
+}
+
+.profile-select:focus {
+  border-color: var(--accent);
+}
+
+.profile-select option {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.profile-btn {
+  padding: 5px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.profile-btn:hover:not(:disabled) {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+
+.profile-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.profile-btn.danger:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.create-row {
+  gap: 8px;
+}
+
+.profile-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+
+.profile-input:focus {
+  border-color: var(--accent);
+}
+
+.profile-input::placeholder {
+  color: var(--text-3);
+}
+
+.create-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 /* About card */

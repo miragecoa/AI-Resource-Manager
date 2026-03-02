@@ -1,6 +1,6 @@
 <template>
   <div class="card" :class="{ 'is-selected': selected }" @dblclick="selectable ? $emit('toggle-select', resource) : $emit('open', resource)" @contextmenu.prevent="!selectable && openMenu($event)" @click="selectable ? $emit('toggle-select', resource) : undefined">
-    <div class="cover" :class="{ 'is-app': resource.type === 'app' }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
+    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
       <img v-if="thumbSrc" :src="thumbSrc" :alt="resource.title" />
       <div v-else class="cover-placeholder" style="pointer-events:none">
         <span class="type-icon" v-html="typeIcon" />
@@ -277,7 +277,7 @@ watchEffect(async () => {
     thumbSrc.value = await getCachedImage(r.file_path)
     return
   }
-  if (r.type === 'app') {
+  if (r.type === 'app' || r.type === 'game') {
     const icon = await getCachedIcon(r.file_path)
     thumbSrc.value = icon
     if (icon) {

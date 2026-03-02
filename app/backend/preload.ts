@@ -112,5 +112,17 @@ contextBridge.exposeInMainWorld('api', {
     setZoom: (factor: number): void => webFrame.setZoomFactor(factor),
     getZoom: (): number => webFrame.getZoomFactor(),
     getDbPath: (): Promise<string> => ipcRenderer.invoke('app:getDbPath')
+  },
+
+  // 配置文件（多数据库）
+  profiles: {
+    list: (): Promise<{ active: string; profiles: Array<{ id: string; name: string }> }> =>
+      ipcRenderer.invoke('profiles:list'),
+    create: (name: string): Promise<{ id: string; name: string }> =>
+      ipcRenderer.invoke('profiles:create', name),
+    delete: (id: string): Promise<void> =>
+      ipcRenderer.invoke('profiles:delete', id),
+    switch: (id: string): Promise<void> =>
+      ipcRenderer.invoke('profiles:switch', id),
   }
 })

@@ -13,6 +13,8 @@ import {
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
 import { dbPath, dataDir } from '../db/index'
+import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
+import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
 // 扫描目录时可识别的文件扩展名 → 资源类型
@@ -401,4 +403,16 @@ export function registerIpcHandlers(): void {
   // ── 应用控制 ──────────────────────────────────────────
   ipcMain.handle('app:quit', () => app.quit())
   ipcMain.handle('app:getDbPath', () => dbPath)
+
+  // ── 配置文件（多数据库） ────────────────────────────────
+  ipcMain.handle('profiles:list', () => listProfiles())
+  ipcMain.handle('profiles:create', (_e, name: string) => createProfile(name))
+  ipcMain.handle('profiles:delete', (_e, id: string) => deleteProfile(id))
+  ipcMain.handle('profiles:switch', (_e, id: string) => {
+    const m = loadManifest()
+    m.active = id
+    saveManifest(m)
+    app.relaunch()
+    app.exit(0)
+  })
 }

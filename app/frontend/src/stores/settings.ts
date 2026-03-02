@@ -10,7 +10,7 @@ export interface SidebarNavConfig {
   visible: boolean
 }
 
-const DEFAULT_SIDEBAR_NAV: SidebarNavConfig[] = NAV_ITEM_DEFS.map(d => ({ type: d.type, visible: true }))
+const DEFAULT_SIDEBAR_NAV: SidebarNavConfig[] = NAV_ITEM_DEFS.map(d => ({ type: d.type, visible: d.defaultVisible !== false }))
 
 export const useSettingsStore = defineStore('settings', () => {
   const monitorEnabled = ref(true)

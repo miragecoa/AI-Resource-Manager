@@ -70,8 +70,10 @@
               <template v-else>
                 <div
                   class="drop-zone folder-zone"
-                  :class="{ 'has-file': !!folderPath }"
+                  :class="{ 'has-file': !!folderPath, 'drag-over': isDragOver }"
                   @click="pickFolderForImport"
+                  @dragover.prevent="isDragOver = true"
+                  @dragleave.prevent="isDragOver = false"
                 >
                   <template v-if="folderPath">
                     <span class="dz-folder-big" v-html="bigFolderIcon" />
@@ -79,8 +81,8 @@
                   </template>
                   <template v-else>
                     <span class="dz-upload-icon" v-html="folderPlusIcon" />
-                    <span class="dz-text">选择文件夹</span>
-                    <span class="dz-hint">点击浏览文件夹</span>
+                    <span class="dz-text">拖放文件夹到此处</span>
+                    <span class="dz-hint">或点击浏览文件夹</span>
                   </template>
                 </div>
                 <div class="path-row">
@@ -201,9 +203,12 @@
             <div v-else-if="scanDirPath && !scanDirLoading" class="scan-center">
               <span class="scan-center-text">未找到可识别的文件</span>
             </div>
-            <div v-else class="scan-center">
+            <div v-else class="scan-center" :class="{ 'drag-over': isDragOver }"
+              @dragover.prevent="isDragOver = true"
+              @dragleave.prevent="isDragOver = false"
+            >
               <span class="dz-upload-icon" v-html="scanDirIcon" />
-              <span class="scan-center-text">选择一个目录，自动扫描其中所有可识别文件</span>
+              <span class="scan-center-text">拖放目录到此处，或点击选择目录扫描</span>
             </div>
           </div>
 
@@ -419,10 +424,31 @@ async function pickFile() {
 }
 
 function onDrop(e: DragEvent) {
-  if (mode.value !== 'file') return
   isDragOver.value = false
-  const file = e.dataTransfer?.files[0]
-  if (file) applyFile((file as any).path ?? file.name)
+  const files = e.dataTransfer?.files
+  if (!files?.length) return
+  const path = (files[0] as any).path as string
+  if (!path) return
+
+  switch (mode.value) {
+    case 'file':
+      applyFile(path)
+      break
+    case 'folder':
+      folderPath.value = path
+      if (!folderForm.value.title) {
+        folderForm.value.title = path.replace(/[\\/]$/, '').replace(/^.*[\\/]/, '')
+      }
+      break
+    case 'scan-dir':
+      scanDirPath.value = path
+      scanDirLoading.value = true
+      scanResults.value = []
+      window.api.files.scanDirectory(path)
+        .then(files => { scanResults.value = files.map(f => ({ ...f, selected: true })) })
+        .finally(() => { scanDirLoading.value = false })
+      break
+  }
 }
 
 function onPathChange() {
@@ -1151,6 +1177,13 @@ const checkIcon     = `<svg viewBox="0 0 48 48" fill="none" stroke="#10b981" str
   justify-content: center;
   gap: 12px;
   padding: 32px;
+  border-radius: 8px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.scan-center.drag-over {
+  border: 2px dashed var(--accent);
+  background: rgba(99, 102, 241, 0.06);
 }
 
 .scan-center-text {
