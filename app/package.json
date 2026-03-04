@@ -32,7 +32,7 @@
     "appId": "com.airesourcemanager.app",
     "productName": "AI资源管家",
     "icon": "resources/icon.ico",
-    "artifactName": "AI资源管家-${version}-${os}-${arch}.${ext}",
+    "artifactName": "AI-Resource-Manager-${version}-portable-${os}-${arch}.${ext}",
     "win": {
       "target": [
         "nsis",
@@ -44,7 +44,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "AI资源管家-Setup-${version}.${ext}"
+      "artifactName": "AI-Resource-Manager-Setup-${version}.${ext}"
     }
   }
 }
