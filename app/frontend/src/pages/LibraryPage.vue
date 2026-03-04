@@ -49,6 +49,10 @@
       </div>
 
       <div class="toolbar-row" v-if="!showIgnored">
+        <button class="ai-btn" @click="showAiComingSoon = true" title="AI 智能设置">
+          <span class="btn-icon" v-html="aiSvg" />
+          AI 智能设置
+        </button>
         <div class="toolbar-right">
           <div class="sort-wrap">
             <span class="sort-icon" v-html="sortSvg" />
@@ -140,7 +144,7 @@
 
           <div v-else class="grid" :style="{ '--card-min-width': cardMinWidth + 'px' }">
             <ResourceCard
-              v-for="item in store.filtered"
+              v-for="item in visibleItems"
               :key="item.id"
               :resource="item"
               :selectable="batchMode"
@@ -151,6 +155,8 @@
               @remove="removeResource"
               @ignore="ignoreResource"
             />
+            <!-- 渐进渲染哨兵：滚动到此处时加载更多卡片 -->
+            <div v-if="renderLimit < store.filtered.length" ref="sentinelRef" class="grid-sentinel" />
           </div>
         </template>
       </div>
@@ -352,6 +358,22 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- AI 智能设置 — 敬请期待 -->
+    <Teleport to="body">
+      <div v-if="showAiComingSoon" class="modal-overlay" @mousedown.self="showAiComingSoon = false">
+        <div class="ai-coming-modal">
+          <span class="ai-coming-icon" v-html="aiLargeSvg" />
+          <div class="ai-coming-title">AI 智能设置</div>
+          <div class="ai-coming-desc">
+            标一张照片的标签，AI 自动帮你把剩下几百张都打上。<br>
+            导入一堆 exe，AI 自动分辨游戏和工具，分好类、打好标签。
+          </div>
+          <div class="ai-coming-badge">即将上线</div>
+          <button class="ai-coming-close" @click="showAiComingSoon = false">知道了</button>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -370,6 +392,38 @@ import ResourceDetailPanel from '../components/ResourceDetailPanel.vue'
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
 const showAddModal = ref(false)
+const showAiComingSoon = ref(false)
+
+// ── 渐进渲染（滚动到底部时加载更多卡片） ───────────────────
+const BATCH_SIZE = 60
+const renderLimit = ref(BATCH_SIZE)
+const sentinelRef = ref<HTMLElement | null>(null)
+let sentinelObserver: IntersectionObserver | null = null
+
+const visibleItems = computed(() => store.filtered.slice(0, renderLimit.value))
+
+// 过滤条件变化时重置渲染数量
+watch(() => [store.activeType, store.searchQuery, store.activeTags], () => {
+  renderLimit.value = BATCH_SIZE
+})
+
+function setupSentinelObserver() {
+  sentinelObserver?.disconnect()
+  sentinelObserver = new IntersectionObserver((entries) => {
+    if (entries[0]?.isIntersecting && renderLimit.value < store.filtered.length) {
+      renderLimit.value = Math.min(renderLimit.value + BATCH_SIZE, store.filtered.length)
+    }
+  }, { rootMargin: '200px' })
+}
+
+// sentinelRef 会随着条件渲染出现/消失，用 watch 追踪
+watch(sentinelRef, (el) => {
+  sentinelObserver?.disconnect()
+  if (el) {
+    if (!sentinelObserver) setupSentinelObserver()
+    sentinelObserver!.observe(el)
+  }
+})
 
 // 拖放导入
 const dropOver = ref(false)
@@ -655,6 +709,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('dragover', onDocDragOver)
+  sentinelObserver?.disconnect()
 })
 
 const cardMinWidth = computed(() => Math.round(150 * settingsStore.cardZoom))
@@ -727,6 +782,8 @@ const pathSvg         = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const ignoreSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`
 const deleteSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`
 const arrowSvg        = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>`
+const aiSvg           = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.2H22l-6 4.8 2.4 7.2L12 16.4l-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg>`
+const aiLargeSvg      = `<svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M24 4l4.8 14.4H44l-12 9.6 4.8 14.4L24 32.8l-12.8 9.6 4.8-14.4-12-9.6h15.2z"/><circle cx="24" cy="20" r="3" fill="var(--accent)" opacity="0.3"/></svg>`
 
 async function openResource(resource: Resource) {
   const updated = await window.api.files.openPath(resource.file_path, resource.meta)
@@ -868,6 +925,63 @@ async function deleteIgnored(filePath: string) {
 
 .add-btn:hover { background: rgba(99, 102, 241, 0.2); }
 
+.ai-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(168, 85, 247, 0.08));
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  border-radius: 6px;
+  color: #a78bfa;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.ai-btn:hover { background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15)); }
+
+.ai-coming-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 36px 32px 28px;
+  width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.ai-coming-icon { width: 48px; height: 48px; display: flex; }
+.ai-coming-icon :deep(svg) { width: 48px; height: 48px; }
+.ai-coming-title { font-size: 18px; font-weight: 600; color: var(--text-1); }
+.ai-coming-desc { font-size: 13px; color: var(--text-3); line-height: 1.6; }
+.ai-coming-badge {
+  display: inline-block;
+  padding: 3px 14px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  border-radius: 20px;
+  font-size: 12px;
+  color: #a78bfa;
+  font-weight: 500;
+}
+.ai-coming-close {
+  margin-top: 8px;
+  padding: 7px 28px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ai-coming-close:hover { background: var(--surface-3, #252540); }
+
 .ignored-toggle {
   display: flex;
   align-items: center;
@@ -964,6 +1078,11 @@ async function deleteIgnored(filePath: string) {
   grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width, 225px), 1fr));
   gap: 12px;
   align-content: start;
+}
+
+.grid-sentinel {
+  height: 1px;
+  grid-column: 1 / -1;
 }
 
 .sort-wrap {

@@ -136,6 +136,41 @@
           <div class="about-desc">本地优先的多媒体资源管理器</div>
         </div>
       </section>
+
+      <!-- 社区 -->
+      <section class="section">
+        <h2 class="section-title">社区</h2>
+        <div class="community-links">
+          <div class="community-link qq-block">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4.5 9.5C4.5 5.36 7.86 2 12 2s7.5 3.36 7.5 7.5c0 1.5-.5 3-1.3 4.2l1.3 4.3-4.3-1.3c-1 .5-2.1.8-3.2.8-4.14 0-7.5-3.36-7.5-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="community-text">
+              <div class="community-name">QQ 群：687623885</div>
+            </div>
+          </div>
+          <div class="qr-container">
+            <img src="../assets/qq-qrcode.jpg" alt="QQ群二维码" class="qr-image" @click="showQROverlay = true" />
+          </div>
+          <Teleport to="body">
+            <div v-if="showQROverlay" class="qr-overlay" @click="showQROverlay = false">
+              <img src="../assets/qq-qrcode.jpg" alt="QQ群二维码" class="qr-overlay-image" />
+            </div>
+          </Teleport>
+          <a class="community-link" href="https://discord.gg/BKr8VMQB4R" target="_blank">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.11 13.11 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/></svg>
+            <div class="community-text">
+              <div class="community-name">Discord</div>
+              <div class="community-id">discord.gg/BKr8VMQB4R</div>
+            </div>
+          </a>
+          <a class="community-link" href="https://github.com/miragecoa/AI-Resource-Manager" target="_blank">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.49.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.56 9.56 0 0 1 12 6.84c.85.004 1.71.12 2.5.34 1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10.01 10.01 0 0 0 22 12c0-5.52-4.48-10-10-10z"/></svg>
+            <div class="community-text">
+              <div class="community-name">GitHub</div>
+              <div class="community-id">miragecoa/AI-Resource-Manager</div>
+            </div>
+          </a>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -151,6 +186,7 @@ const dbPath = ref('')
 const profiles = ref<Array<{ id: string; name: string }>>([])
 const activeProfileId = ref('')
 const showCreateDialog = ref(false)
+const showQROverlay = ref(false)
 const newProfileName = ref('')
 const createInput = ref<HTMLInputElement | null>(null)
 
@@ -471,5 +507,110 @@ const zoomLevels = [
 .about-desc {
   font-size: 13px;
   color: var(--text-3);
+}
+
+/* Community links */
+.community-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.community-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  cursor: pointer;
+}
+
+.community-link:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.community-link svg {
+  flex-shrink: 0;
+  color: var(--text-3);
+  transition: color 0.15s;
+}
+
+.community-link:hover svg {
+  color: var(--accent);
+}
+
+.community-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.community-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.community-id {
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: 'Consolas', 'Courier New', monospace;
+}
+
+.qq-block {
+  cursor: default;
+}
+
+.qq-block:hover {
+  border-color: var(--border);
+  color: var(--text-2);
+}
+
+.qq-block:hover svg {
+  color: var(--text-3);
+}
+
+.qr-container {
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.qr-image {
+  width: 200px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.qr-image:hover {
+  opacity: 0.8;
+}
+
+.qr-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.qr-overlay-image {
+  max-width: 360px;
+  max-height: 80vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 </style>
