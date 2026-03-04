@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { join } from 'path'
+import { join, dirname } from 'path'
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { randomUUID } from 'crypto'
 
