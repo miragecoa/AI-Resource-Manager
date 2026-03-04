@@ -725,17 +725,10 @@ function openInExplorer() {
   border-radius: 50%;
   background: #4ade80;
   flex-shrink: 0;
-  animation: pulse-dot 1.4s ease-in-out infinite;
 }
 
 .running-badge:hover .running-dot {
   background: #f87171;
-  animation: none;
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.4; transform: scale(0.75); }
 }
 
 /* ── 统计信息行 ── */
