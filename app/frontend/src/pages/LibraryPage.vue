@@ -70,15 +70,20 @@
 
     <!-- 批量操作工具栏 -->
     <div v-else class="toolbar batch-toolbar">
-      <div class="batch-left">
+      <div class="batch-row-1">
         <button class="batch-select-all" @click="toggleSelectAll">
           {{ selectedIds.size === store.filtered.length ? '取消全选' : '全选' }}
         </button>
         <span class="batch-count">已选 {{ selectedIds.size }} 项</span>
+        <span class="batch-spacer" />
+        <button class="batch-cancel-btn" @click="exitBatchMode">取消</button>
       </div>
-      <div class="batch-right">
+      <div class="batch-row-2">
         <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="showBatchType = true">
           <span class="btn-icon" v-html="typeSvg" />改分类
+        </button>
+        <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="openBatchTag">
+          <span class="btn-icon" v-html="tagBatchSvg" />加标签
         </button>
         <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="showBatchPath = true">
           <span class="btn-icon" v-html="pathSvg" />换路径
@@ -89,7 +94,6 @@
         <button class="batch-action-btn batch-danger" :disabled="selectedIds.size === 0" @click="showBatchDelete = true">
           <span class="btn-icon" v-html="deleteSvg" />删除
         </button>
-        <button class="batch-cancel-btn" @click="exitBatchMode">取消</button>
       </div>
     </div>
 
@@ -279,6 +283,43 @@
           <div class="batch-modal-actions">
             <button class="bm-cancel" @click="showBatchType = false">取消</button>
             <button class="bm-confirm" :disabled="!batchTargetType" @click="doBatchType">确认</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 批量加标签弹窗 -->
+    <Teleport to="body">
+      <div v-if="showBatchTag" class="modal-overlay" @mousedown.self="showBatchTag = false">
+        <div class="batch-modal">
+          <div class="batch-modal-title">批量加标签</div>
+          <div class="batch-modal-hint">为 {{ selectedIds.size }} 个资源添加标签</div>
+          <div class="batch-tag-area">
+            <span v-for="t in batchTags" :key="t.id" class="tag-chip">
+              {{ t.name }}
+              <button class="tag-remove" @click="batchTags = batchTags.filter(x => x.id !== t.id)">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+              </button>
+            </span>
+            <input
+              v-model="batchTagInput"
+              class="tag-input"
+              placeholder="输入标签名，回车添加"
+              @keydown.enter.prevent="addBatchTag"
+              @keydown.188.prevent="addBatchTag"
+            />
+          </div>
+          <div v-if="batchTagSuggestions.length" class="tag-suggestions">
+            <button
+              v-for="tag in batchTagSuggestions"
+              :key="tag.id"
+              class="sug-btn"
+              @mousedown.prevent="pickBatchTag(tag)"
+            >{{ tag.name }}<span class="sug-count">{{ tag.count }}</span></button>
+          </div>
+          <div class="batch-modal-actions">
+            <button class="bm-cancel" @click="showBatchTag = false">取消</button>
+            <button class="bm-confirm" :disabled="batchTags.length === 0" @click="doBatchTag">确认</button>
           </div>
         </div>
       </div>
@@ -539,9 +580,20 @@ const selectedIds = reactive(new Set<string>())
 
 // 弹窗控制
 const showBatchType = ref(false)
+const showBatchTag = ref(false)
 const showBatchPath = ref(false)
 const showBatchIgnore = ref(false)
 const showBatchDelete = ref(false)
+const batchTagInput = ref('')
+const batchTags = ref<Array<{ id: number; name: string }>>([])
+const batchTagAllSuggestions = ref<Array<{ id: number; name: string; count: number }>>([])
+
+const batchTagSuggestions = computed(() => {
+  const addedIds = new Set(batchTags.value.map(t => t.id))
+  const q = batchTagInput.value.trim().toLowerCase()
+  const available = batchTagAllSuggestions.value.filter(t => !addedIds.has(t.id))
+  return q ? available.filter(t => t.name.toLowerCase().includes(q)) : available.slice(0, 12)
+})
 const batchTargetType = ref<ResourceType | ''>('')
 const pathMode = ref<'drive' | 'prefix'>('drive')
 const driveFrom = ref('')
@@ -574,6 +626,7 @@ function exitBatchMode() {
   batchMode.value = false
   selectedIds.clear()
   showBatchType.value = false
+  showBatchTag.value = false
   showBatchPath.value = false
   showBatchIgnore.value = false
   showBatchDelete.value = false
@@ -601,6 +654,47 @@ async function doBatchType() {
   await store.batchUpdate([...selectedIds], { type: batchTargetType.value })
   showBatchType.value = false
   batchTargetType.value = ''
+  exitBatchMode()
+  loadTags()
+}
+
+async function openBatchTag() {
+  batchTags.value = []
+  batchTagInput.value = ''
+  batchTagAllSuggestions.value = await window.api.tags.getForType(undefined, 'count')
+  showBatchTag.value = true
+}
+
+async function addBatchTag() {
+  const name = batchTagInput.value.trim()
+  batchTagInput.value = ''
+  if (!name) return
+  const allTags = await window.api.tags.getAll()
+  let tag = allTags.find(t => t.name.toLowerCase() === name.toLowerCase())
+  if (!tag) tag = await window.api.tags.create(name)
+  if (batchTags.value.some(t => t.id === tag!.id)) return
+  batchTags.value.push({ id: tag.id, name: tag.name })
+}
+
+function pickBatchTag(tag: { id: number; name: string }) {
+  if (batchTags.value.some(t => t.id === tag.id)) return
+  batchTags.value.push({ id: tag.id, name: tag.name })
+}
+
+async function doBatchTag() {
+  if (batchTags.value.length === 0 || selectedIds.size === 0) return
+  const ids = [...selectedIds]
+  for (const resourceId of ids) {
+    for (const tag of batchTags.value) {
+      await window.api.tags.addToResource(resourceId, tag.id)
+    }
+  }
+  // 刷新 store 中选中资源的 tags
+  for (const resourceId of ids) {
+    const updated = await window.api.resources.getById(resourceId)
+    if (updated) store.addOrUpdate(updated)
+  }
+  showBatchTag.value = false
   exitBatchMode()
   loadTags()
 }
@@ -777,6 +871,7 @@ const chevronRightSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const chevronLeftSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>`
 const closeSvg        = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`
 const batchSvg        = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`
+const tagBatchSvg     = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>`
 const typeSvg         = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>`
 const pathSvg         = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>`
 const ignoreSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`
@@ -1514,18 +1609,25 @@ async function deleteIgnored(filePath: string) {
 
 .batch-toolbar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 16px;
   flex-shrink: 0;
   background: var(--surface-2);
   border-bottom: 2px solid var(--accent);
 }
 
-.batch-left {
+.batch-row-1 {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.batch-spacer { flex: 1; }
+
+.batch-row-2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .batch-select-all {
@@ -1545,13 +1647,6 @@ async function deleteIgnored(filePath: string) {
   font-size: 13px;
   color: var(--accent-2);
   font-weight: 500;
-}
-
-.batch-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
 }
 
 .batch-action-btn {
@@ -1767,4 +1862,43 @@ async function deleteIgnored(filePath: string) {
 
 .bm-danger { background: var(--danger); }
 .bm-danger:hover { background: #dc2626; }
+
+/* ── 批量加标签弹窗 ── */
+.batch-tag-area {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  min-height: 38px;
+}
+.batch-tag-area:focus-within { border-color: var(--accent); }
+
+.batch-modal .tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 6px;
+  background: var(--surface-2); color: var(--text-2); font-size: 12px;
+}
+.batch-modal .tag-remove {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  padding: 0; display: flex; align-items: center;
+}
+.batch-modal .tag-remove:hover { color: var(--danger); }
+
+.batch-modal .tag-input {
+  flex: 1; min-width: 100px; border: none; outline: none;
+  background: transparent; color: var(--text); font-size: 13px;
+}
+.batch-modal .tag-input::placeholder { color: var(--text-3); }
+
+.batch-modal .tag-suggestions {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+}
+.batch-modal .sug-btn {
+  padding: 3px 10px; border-radius: 6px; font-size: 12px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  cursor: pointer;
+}
+.batch-modal .sug-btn:hover { border-color: var(--accent); color: var(--text); }
+.batch-modal .sug-count {
+  margin-left: 4px; font-size: 10px; opacity: 0.5;
+}
 </style>
