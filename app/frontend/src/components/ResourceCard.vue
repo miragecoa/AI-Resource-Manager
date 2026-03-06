@@ -99,6 +99,9 @@
     <Teleport to="body">
       <div v-if="showMenu" class="ctx-backdrop" @mousedown="showMenu = false" />
       <div v-if="showMenu" ref="menuRef" class="context-menu" :style="menuStyle" @mouseleave="showMenu = false">
+        <button @click="$emit('select', resource); showMenu = false">
+          <span v-html="detailIcon" />查看详情
+        </button>
         <button @click="$emit('open', resource); showMenu = false">
           <span v-html="openIcon" />打开
         </button>
@@ -107,9 +110,6 @@
         </button>
         <button @click="openInExplorer">
           <span v-html="folderIcon" />在文件夹中显示
-        </button>
-        <button @click="$emit('select', resource); showMenu = false">
-          <span v-html="detailIcon" />查看详情
         </button>
         <button v-if="isRunning" @click="showKillConfirm = true; showMenu = false" class="danger">
           <span v-html="killIcon" />强制结束进程
