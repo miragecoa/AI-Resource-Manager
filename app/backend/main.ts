@@ -120,8 +120,8 @@ function createTray(): void {
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 1600,
+    height: 1000,
     minWidth: 900,
     minHeight: 600,
     show: false,
