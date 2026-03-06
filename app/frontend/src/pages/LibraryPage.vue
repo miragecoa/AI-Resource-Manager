@@ -450,6 +450,49 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- 更新提示弹窗 -->
+    <Teleport to="body">
+      <div v-if="showUpdateModal" class="modal-overlay" @mousedown.self="dismissUpdate">
+        <div class="update-modal">
+          <!-- 发现更新 -->
+          <template v-if="updatePhase === 'available'">
+            <span class="update-modal-icon" v-html="updateSvg" />
+            <div class="update-modal-title">
+              {{ pendingUpdate?.isNewVersion ? `发现新版本 v${pendingUpdate.remoteVersion}` : `v${pendingUpdate?.remoteVersion} 有更新` }}
+            </div>
+            <div class="update-modal-size">{{ ((pendingUpdate?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB</div>
+            <div class="update-modal-actions">
+              <button class="update-modal-btn secondary" @click="doSkipUpdate">跳过此版本</button>
+              <button class="update-modal-btn" @click="doDownloadUpdate">立即更新</button>
+            </div>
+          </template>
+          <!-- 下载中 -->
+          <template v-else-if="updatePhase === 'downloading'">
+            <div class="update-modal-title">正在下载更新...</div>
+            <div class="update-progress-wrap">
+              <div class="update-progress-bar">
+                <div class="update-progress-fill" :style="{ width: updatePercent + '%' }" />
+              </div>
+              <span class="update-progress-text">{{ updatePercent }}%</span>
+            </div>
+          </template>
+          <!-- 就绪 -->
+          <template v-else-if="updatePhase === 'ready'">
+            <span class="update-modal-icon done" v-html="checkSvg" />
+            <div class="update-modal-title">更新已就绪</div>
+            <div class="update-modal-size">重启应用以完成更新</div>
+            <button class="update-modal-btn" @click="doApplyUpdate">重启并更新</button>
+          </template>
+          <!-- 错误 -->
+          <template v-else-if="updatePhase === 'error'">
+            <div class="update-modal-title">更新失败</div>
+            <div class="update-modal-size" style="color: #ef4444;">请稍后重试</div>
+            <button class="update-modal-btn secondary" @click="showUpdateModal = false">关闭</button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -919,6 +962,7 @@ const arrowSvg        = `<svg viewBox="0 0 24 24" width="20" height="20" fill="n
 const aiSvg           = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.4 7.2H22l-6 4.8 2.4 7.2L12 16.4l-6.4 4.8 2.4-7.2-6-4.8h7.6z"/></svg>`
 const scanSysSvg      = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
 const checkSvg        = `<svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>`
+const updateSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
 const aiLargeSvg      = `<svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M24 4l4.8 14.4H44l-12 9.6 4.8 14.4L24 32.8l-12.8 9.6 4.8-14.4-12-9.6h15.2z"/><circle cx="24" cy="20" r="3" fill="var(--accent)" opacity="0.3"/></svg>`
 
 function openScanModal() {
@@ -946,6 +990,48 @@ function cancelScan() {
   scanGeneration++      // invalidate in-flight result
   sysScanning.value = false
   showScanModal.value = false
+}
+
+// ── 自动更新 ─────────────────────────────────────────────
+const showUpdateModal = ref(false)
+const updatePhase = ref<'available' | 'downloading' | 'ready' | 'error'>('available')
+const updatePercent = ref(0)
+const pendingUpdate = ref<any>(null)
+
+// Listen for auto-check notifications from main process
+const unsubUpdateAvailable = window.api.onUpdateAvailable((info) => {
+  pendingUpdate.value = info
+  updatePhase.value = 'available'
+  showUpdateModal.value = true
+})
+const unsubUpdateProgress = window.api.onUpdateProgress((percent) => {
+  updatePercent.value = percent
+})
+onUnmounted(() => { unsubUpdateAvailable(); unsubUpdateProgress() })
+
+async function doDownloadUpdate() {
+  updatePhase.value = 'downloading'
+  updatePercent.value = 0
+  try {
+    await window.api.updater.download()
+    updatePhase.value = 'ready'
+  } catch {
+    updatePhase.value = 'error'
+  }
+}
+
+function doSkipUpdate() {
+  window.api.updater.skip()
+  showUpdateModal.value = false
+}
+
+function doApplyUpdate() {
+  window.api.updater.apply()
+}
+
+function dismissUpdate() {
+  if (updatePhase.value === 'downloading') return  // don't dismiss during download
+  showUpdateModal.value = false
 }
 
 async function openResource(resource: Resource) {
@@ -1179,6 +1265,87 @@ async function deleteIgnored(filePath: string) {
   margin-top: 6px;
 }
 .scan-modal .spinner.lg { width: 40px; height: 40px; }
+
+/* 更新弹窗 */
+.update-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 36px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 340px;
+}
+.update-modal-icon {
+  width: 48px; height: 48px;
+  color: var(--accent);
+  display: flex;
+}
+.update-modal-icon :deep(svg) { width: 48px; height: 48px; }
+.update-modal-icon.done { color: #4ade80; }
+.update-modal-icon.done :deep(svg) { width: 48px; height: 48px; }
+.update-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+.update-modal-size {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.update-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.update-modal-btn {
+  padding: 10px 28px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.update-modal-btn:hover { opacity: 0.85; }
+.update-modal-btn.secondary {
+  background: var(--surface-3);
+  border-color: var(--border);
+  color: var(--text-2);
+}
+.update-modal-btn.secondary:hover { background: var(--border); color: var(--text); }
+.update-progress-wrap {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.update-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.update-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.update-progress-text {
+  font-size: 13px;
+  color: var(--text-2);
+  min-width: 36px;
+  text-align: right;
+}
+.update-modal .spinner.lg { width: 40px; height: 40px; }
 
 .ai-coming-modal {
   background: var(--surface);

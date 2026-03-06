@@ -22,11 +22,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const tagSort = ref<TagSortField>('lastUsed')
   const sidebarCollapsed = ref(false)
   const showFileExt = ref(true)
+  const autoUpdate = ref(true)
   const loaded = ref(false)
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -36,6 +37,7 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('tagSort'),
       window.api.settings.get('sidebarCollapsed'),
       window.api.settings.get('showFileExt'),
+      window.api.settings.get('autoUpdate'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -47,6 +49,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (tagSortVal) tagSort.value = tagSortVal as TagSortField
     if (collapsedVal) sidebarCollapsed.value = collapsedVal === 'true'
     if (fileExtVal !== null && fileExtVal !== undefined) showFileExt.value = fileExtVal !== 'false'
+    autoUpdate.value = autoUpdateVal !== 'false'
 
     if (navVal) {
       try {
@@ -110,5 +113,10 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('showFileExt', String(enabled))
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt }
+  async function setAutoUpdate(enabled: boolean) {
+    autoUpdate.value = enabled
+    await window.api.settings.set('autoUpdate', String(enabled))
+  }
+
+  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate }
 })

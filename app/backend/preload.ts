@@ -111,7 +111,24 @@ contextBridge.exposeInMainWorld('api', {
     quit: (): Promise<void> => ipcRenderer.invoke('app:quit'),
     setZoom: (factor: number): void => webFrame.setZoomFactor(factor),
     getZoom: (): number => webFrame.getZoomFactor(),
-    getDbPath: (): Promise<string> => ipcRenderer.invoke('app:getDbPath')
+    getDbPath: (): Promise<string> => ipcRenderer.invoke('app:getDbPath'),
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion')
+  },
+
+  // 自动更新
+  updater: {
+    check:    (): Promise<any> => ipcRenderer.invoke('updater:check'),
+    download: (): Promise<any> => ipcRenderer.invoke('updater:download'),
+    apply:    (): Promise<void> => ipcRenderer.invoke('updater:apply'),
+    skip:     (): Promise<void> => ipcRenderer.invoke('updater:skip'),
+  },
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    ipcRenderer.on('updater:update-available', (_e, info) => callback(info))
+    return () => ipcRenderer.removeAllListeners('updater:update-available')
+  },
+  onUpdateProgress: (callback: (percent: number) => void) => {
+    ipcRenderer.on('updater:progress', (_e, percent) => callback(percent))
+    return () => ipcRenderer.removeAllListeners('updater:progress')
   },
 
   // 配置文件（多数据库）

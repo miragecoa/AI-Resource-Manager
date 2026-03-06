@@ -127,12 +127,43 @@
         </div>
       </section>
 
+      <!-- 软件更新 -->
+      <section class="section">
+        <h2 class="section-title">软件更新</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">自动检查更新</div>
+            <div class="setting-desc">启动时自动检查 GitHub Releases 上的新版本</div>
+          </div>
+          <button class="toggle" :class="{ on: settingsStore.autoUpdate }" @click="settingsStore.setAutoUpdate(!settingsStore.autoUpdate)">
+            <span class="toggle-thumb" />
+          </button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">当前版本 v{{ appVersion }}</div>
+            <div class="setting-desc" v-if="updateCheckStatus === 'checking'">正在检查更新…</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'up-to-date'" style="color: #4ade80;">已是最新版本</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'available'">
+              {{ updateCheckInfo?.isNewVersion ? `发现新版本 v${updateCheckInfo.remoteVersion}` : `v${updateCheckInfo?.remoteVersion} 有更新` }}
+              ({{ ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB)
+            </div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading'">正在下载… {{ updateDownloadPercent }}%</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">更新已就绪，重启即可完成</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">操作失败，请稍后重试</div>
+          </div>
+          <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">下载并更新</button>
+          <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">重启并更新</button>
+          <button v-else-if="updateCheckStatus !== 'downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">检查更新</button>
+        </div>
+      </section>
+
       <!-- 关于 -->
       <section class="section">
         <h2 class="section-title">关于</h2>
         <div class="about-card">
           <div class="about-name">AI资源管家</div>
-          <div class="about-version">v0.1.0 — 免费版</div>
+          <div class="about-version">v{{ appVersion }} — 免费版</div>
           <div class="about-desc">本地优先的多媒体资源管理器</div>
         </div>
       </section>
@@ -176,11 +207,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { useSettingsStore } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 const dbPath = ref('')
+const appVersion = ref('0.1.0')
+const updateCheckStatus = ref<'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error'>('idle')
+const updateCheckInfo = ref<any>(null)
+const updateDownloadPercent = ref(0)
+
+async function manualCheckUpdate() {
+  updateCheckStatus.value = 'checking'
+  try {
+    const info = await window.api.updater.check()
+    updateCheckInfo.value = info
+    updateCheckStatus.value = info.hasUpdate ? 'available' : 'up-to-date'
+  } catch {
+    updateCheckStatus.value = 'error'
+  }
+}
+
+async function settingsDownloadAndApply() {
+  updateCheckStatus.value = 'downloading'
+  updateDownloadPercent.value = 0
+  try {
+    await window.api.updater.download()
+    updateCheckStatus.value = 'ready'
+  } catch {
+    updateCheckStatus.value = 'error'
+  }
+}
+
+function settingsApplyUpdate() {
+  window.api.updater.apply()
+}
 
 // ── 配置文件 ──
 const profiles = ref<Array<{ id: string; name: string }>>([])
@@ -226,9 +287,15 @@ async function onDeleteProfile() {
   }
 }
 
+const unsubProgress = window.api.onUpdateProgress((percent) => {
+  updateDownloadPercent.value = percent
+})
+onUnmounted(() => { unsubProgress() })
+
 onMounted(async () => {
   await settingsStore.load()
   dbPath.value = await window.api.app.getDbPath()
+  appVersion.value = await window.api.app.getVersion()
   await loadProfiles()
 })
 
@@ -449,6 +516,18 @@ const zoomLevels = [
 .profile-btn.danger:hover:not(:disabled) {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.update-action-btn {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+.update-action-btn:hover:not(:disabled) {
+  opacity: 0.85;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
 }
 
 .create-row {

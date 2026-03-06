@@ -18,6 +18,7 @@ import { ensureProfiles } from './db/profiles'
 import { registerIpcHandlers } from './ipc/index'
 import { startMonitor } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
+import { initAutoUpdater } from './updater'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -278,6 +279,9 @@ app.whenReady().then(() => {
       }
     }
   )
+
+  // 自动更新检查
+  initAutoUpdater(mainWindow!)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -13,6 +13,7 @@ import {
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
 import { dbPath, dataDir } from '../db/index'
+import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 
@@ -406,6 +407,22 @@ export function registerIpcHandlers(): void {
   // ── 应用控制 ──────────────────────────────────────────
   ipcMain.handle('app:quit', () => app.quit())
   ipcMain.handle('app:getDbPath', () => dbPath)
+  ipcMain.handle('app:getVersion', () => app.getVersion())
+
+  // ── 自动更新 ──────────────────────────────────────────
+  ipcMain.handle('updater:check', () => {
+    return checkForUpdate()
+  })
+  ipcMain.handle('updater:download', () => {
+    const win = BrowserWindow.getAllWindows()[0] || null
+    return downloadUpdate(win)
+  })
+  ipcMain.handle('updater:apply', () => {
+    applyAndRestart()
+  })
+  ipcMain.handle('updater:skip', () => {
+    skipUpdate()
+  })
 
   // ── 配置文件（多数据库） ────────────────────────────────
   ipcMain.handle('profiles:list', () => listProfiles())

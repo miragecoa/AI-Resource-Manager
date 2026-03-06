@@ -1,0 +1,237 @@
+import { app, BrowserWindow } from 'electron'
+import { net } from 'electron'
+import { dirname, join } from 'path'
+import { existsSync, mkdirSync, writeFileSync, createWriteStream, unlinkSync, statSync } from 'fs'
+import { spawn } from 'child_process'
+import { getSetting, setSetting } from './db/queries'
+
+const REPO = 'miragecoa/AI-Resource-Manager'
+const ASSET_PATTERN = /^AI-Resource-Manager-.*-portable-win-x64\.zip$/
+const CHECK_INTERVAL = 4 * 60 * 60 * 1000  // 4 hours
+
+export interface UpdateInfo {
+  hasUpdate: boolean
+  currentVersion: string
+  remoteVersion: string
+  isNewVersion: boolean        // true = new semver, false = same version re-upload
+  downloadUrl: string
+  assetSize: number
+  assetUpdatedAt: string
+}
+
+let latestUpdateInfo: UpdateInfo | null = null
+let downloadedZipPath: string | null = null
+
+// ── Version compare ──────────────────────────────────────
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na > nb) return 1
+    if (na < nb) return -1
+  }
+  return 0
+}
+
+// ── Check for updates ────────────────────────────────────
+
+export async function checkForUpdate(): Promise<UpdateInfo> {
+  const currentVersion = app.getVersion()
+  const resp = await net.fetch(
+    `https://api.github.com/repos/${REPO}/releases?per_page=5`,
+    { headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
+  )
+  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`)
+
+  const releases = await resp.json() as any[]
+  if (!releases.length) return noUpdate(currentVersion)
+
+  // Find latest release with a matching portable asset
+  for (const release of releases) {
+    const tag = (release.tag_name || '').replace(/^v/, '')
+    const asset = (release.assets || []).find((a: any) => ASSET_PATTERN.test(a.name))
+    if (!asset) continue
+
+    const isNewVersion = compareVersions(tag, currentVersion) > 0
+    const storedTimestamp = getSetting('update_lastAssetTimestamp')
+
+    // 首次运行：记录当前 timestamp，不报更新
+    if (!isNewVersion && tag === currentVersion && !storedTimestamp) {
+      setSetting('update_lastAssetTimestamp', asset.updated_at)
+      return noUpdate(currentVersion)
+    }
+
+    const isReUpload = !isNewVersion && tag === currentVersion && !!storedTimestamp && asset.updated_at !== storedTimestamp
+
+    if (isNewVersion || isReUpload) {
+      latestUpdateInfo = {
+        hasUpdate: true,
+        currentVersion,
+        remoteVersion: tag,
+        isNewVersion,
+        downloadUrl: asset.browser_download_url,
+        assetSize: asset.size,
+        assetUpdatedAt: asset.updated_at
+      }
+      return latestUpdateInfo
+    }
+
+    // If we reach the current version with same timestamp, no update
+    if (tag === currentVersion && asset.updated_at === storedTimestamp) {
+      return noUpdate(currentVersion)
+    }
+  }
+
+  return noUpdate(currentVersion)
+}
+
+function noUpdate(currentVersion: string): UpdateInfo {
+  return {
+    hasUpdate: false,
+    currentVersion,
+    remoteVersion: currentVersion,
+    isNewVersion: false,
+    downloadUrl: '',
+    assetSize: 0,
+    assetUpdatedAt: ''
+  }
+}
+
+// ── Download update ──────────────────────────────────────
+
+export async function downloadUpdate(mainWindow: BrowserWindow | null): Promise<string> {
+  if (!latestUpdateInfo?.hasUpdate) throw new Error('No update available')
+
+  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
+  const tempDir = join(appDir, '.update-temp')
+  if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true })
+  const zipPath = join(tempDir, 'update.zip')
+
+  // Clean previous download
+  if (existsSync(zipPath)) unlinkSync(zipPath)
+
+  const resp = await net.fetch(latestUpdateInfo.downloadUrl, {
+    headers: { 'User-Agent': 'AI-Resource-Manager-Updater' }
+  })
+  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
+
+  const totalSize = latestUpdateInfo.assetSize
+  let received = 0
+
+  // Stream download with progress
+  const reader = resp.body!.getReader()
+  const ws = createWriteStream(zipPath)
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    ws.write(Buffer.from(value))
+    received += value.byteLength
+    if (totalSize > 0 && mainWindow) {
+      const percent = Math.round((received / totalSize) * 100)
+      mainWindow.webContents.send('updater:progress', percent)
+    }
+  }
+  ws.end()
+  await new Promise<void>((resolve, reject) => {
+    ws.on('finish', resolve)
+    ws.on('error', reject)
+  })
+
+  // Verify size
+  const dlSize = statSync(zipPath).size
+  if (totalSize > 0 && Math.abs(dlSize - totalSize) > 1024) {
+    unlinkSync(zipPath)
+    throw new Error(`Size mismatch: expected ${totalSize}, got ${dlSize}`)
+  }
+
+  // Save timestamp so we know this version/asset was processed
+  setSetting('update_lastAssetTimestamp', latestUpdateInfo.assetUpdatedAt)
+
+  downloadedZipPath = zipPath
+  return zipPath
+}
+
+// ── Apply and restart ────────────────────────────────────
+
+export function applyAndRestart(): void {
+  if (!downloadedZipPath || !existsSync(downloadedZipPath)) {
+    throw new Error('No downloaded update to apply')
+  }
+
+  const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
+  const exeName = app.isPackaged ? require('path').basename(process.execPath) : 'AI资源管家.exe'
+  const pid = process.pid
+  const batPath = join(dirname(downloadedZipPath), 'update.bat')
+
+  const script = `@echo off
+chcp 65001 >nul
+echo Waiting for app to exit...
+:wait
+tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul
+if not errorlevel 1 (
+  timeout /t 1 /nobreak >nul
+  goto wait
+)
+echo Extracting update...
+tar -xf "${downloadedZipPath}" -C "${appDir}"
+echo Cleaning up...
+del "${downloadedZipPath}"
+echo Starting app...
+start "" "${join(appDir, exeName)}"
+del "%~f0"
+`
+
+  writeFileSync(batPath, script, 'utf8')
+
+  // Spawn detached — survives our process exit
+  const child = spawn('cmd.exe', ['/c', batPath], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true
+  })
+  child.unref()
+
+  app.quit()
+}
+
+// ── Skip version ─────────────────────────────────────────
+
+export function skipUpdate(): void {
+  if (!latestUpdateInfo) return
+  // Store both version and timestamp to uniquely identify what was skipped
+  setSetting('update_skippedVersion', latestUpdateInfo.remoteVersion)
+  setSetting('update_skippedTimestamp', latestUpdateInfo.assetUpdatedAt)
+}
+
+// ── Auto-update scheduler ────────────────────────────────
+
+export function initAutoUpdater(mainWindow: BrowserWindow): void {
+  const doCheck = async () => {
+    try {
+      const autoUpdate = getSetting('autoUpdate')
+      if (autoUpdate === 'false') return
+
+      const info = await checkForUpdate()
+      if (!info.hasUpdate) return
+
+      // Check if user skipped this exact version+timestamp
+      const skippedVer = getSetting('update_skippedVersion')
+      const skippedTs = getSetting('update_skippedTimestamp')
+      if (skippedVer === info.remoteVersion && skippedTs === info.assetUpdatedAt) return
+
+      // Notify renderer about available update
+      mainWindow.webContents.send('updater:update-available', info)
+    } catch (e) {
+      console.warn('[Updater] Auto-check failed:', e)
+    }
+  }
+
+  // First check after 10s
+  setTimeout(doCheck, 10_000)
+  // Then every 4 hours
+  setInterval(doCheck, CHECK_INTERVAL)
+}

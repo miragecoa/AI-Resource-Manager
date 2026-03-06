@@ -57,7 +57,24 @@ declare global {
         setZoom: (factor: number) => void
         getZoom: () => number
         getDbPath: () => Promise<string>
+        getVersion: () => Promise<string>
       }
+      updater: {
+        check: () => Promise<{
+          hasUpdate: boolean
+          currentVersion: string
+          remoteVersion: string
+          isNewVersion: boolean
+          downloadUrl: string
+          assetSize: number
+          assetUpdatedAt: string
+        }>
+        download: () => Promise<void>
+        apply: () => Promise<void>
+        skip: () => Promise<void>
+      }
+      onUpdateAvailable: (callback: (info: any) => void) => () => void
+      onUpdateProgress: (callback: (percent: number) => void) => () => void
       profiles: {
         list: () => Promise<{ active: string; profiles: Array<{ id: string; name: string }> }>
         create: (name: string) => Promise<{ id: string; name: string }>
