@@ -1,5 +1,5 @@
-import { ipcMain, shell, app, nativeImage, dialog, BrowserWindow } from 'electron'
-import { mkdirSync, writeFileSync, readdirSync, existsSync, statSync } from 'fs'
+import { ipcMain, shell, app, nativeImage, dialog, BrowserWindow, net } from 'electron'
+import { mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, statSync } from 'fs'
 import { execFile, exec } from 'child_process'
 import { readdir } from 'fs/promises'
 import { join, dirname, extname, basename } from 'path'
@@ -172,6 +172,9 @@ export function registerIpcHandlers(): void {
     } else if (m?.lnk_args) {
       // 带快捷方式参数启动：等同双击快捷方式
       exec(`"${filePath}" ${m.lnk_args}`, { cwd: m.lnk_cwd || undefined })
+    } else if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+      // 网页资源：用默认浏览器打开
+      shell.openExternal(filePath).catch(() => {})
     } else {
       shell.openPath(filePath).catch(() => {})
     }
@@ -443,4 +446,64 @@ export function registerIpcHandlers(): void {
     app.relaunch()
     app.exit(0)
   })
+
+  // ── 网页资源 ────────────────────────────────────────────
+  ipcMain.handle('webpage:fetchFavicon', async (_e, url: string) => {
+    try {
+      const domain = new URL(url).hostname
+      const resp = await net.fetch(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`)
+      if (!resp.ok) return null
+      const buf = Buffer.from(await resp.arrayBuffer())
+      if (buf.length < 100) return null  // Too small = default blank icon
+      const contentType = resp.headers.get('content-type') || 'image/png'
+      return `data:${contentType};base64,${buf.toString('base64')}`
+    } catch { return null }
+  })
+
+  ipcMain.handle('webpage:importChromeBookmarks', () => {
+    const localAppData = process.env.LOCALAPPDATA || ''
+    const chromeBase = join(localAppData, 'Google', 'Chrome', 'User Data')
+    if (!existsSync(chromeBase)) return []
+
+    const results: Array<{ name: string; url: string; folder: string }> = []
+
+    // Collect from Default + Profile N
+    const profiles = ['Default']
+    try {
+      for (const d of readdirSync(chromeBase)) {
+        if (d.startsWith('Profile ')) profiles.push(d)
+      }
+    } catch { /* ignore */ }
+
+    for (const profile of profiles) {
+      const bookmarksPath = join(chromeBase, profile, 'Bookmarks')
+      if (!existsSync(bookmarksPath)) continue
+      try {
+        const data = JSON.parse(readFileSync(bookmarksPath, 'utf8'))
+        const roots = data.roots || {}
+        for (const key of ['bookmark_bar', 'other', 'synced']) {
+          if (roots[key]) flattenBookmarks(roots[key], '', results)
+        }
+        break  // Use first profile that has bookmarks
+      } catch { continue }
+    }
+    return results
+  })
+}
+
+function flattenBookmarks(
+  node: any,
+  parentFolder: string,
+  out: Array<{ name: string; url: string; folder: string }>
+): void {
+  if (!node) return
+  const folder = parentFolder ? `${parentFolder}/${node.name}` : (node.name || '')
+  if (node.type === 'url' && node.url) {
+    out.push({ name: node.name || '', url: node.url, folder })
+  }
+  if (node.children) {
+    for (const child of node.children) {
+      flattenBookmarks(child, folder, out)
+    }
+  }
 }

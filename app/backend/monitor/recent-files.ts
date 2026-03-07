@@ -77,6 +77,8 @@ const BLOCKED_EXE_NAMES = new Set([
   'git', 'updater',
   'onedrive', 'onedriveupdater', 'filecoauth',  // OneDrive 后台进程
   'conda', 'pip',      // Python 包管理工具（conda/pip 本身不是用户资源）
+  'ealocalhostsvc', 'eacefsubprocess', 'eadesktop', 'ealaunchhelper',  // EA App 后台
+  'igoproxy32', 'igoproxy64',  // 输入法代理
 ])
 
 // 系统文件扩展名黑名单
@@ -87,7 +89,23 @@ const BLOCKED_EXTS = new Set(['.dll', '.sys', '.tmp', '.lnk', '.ini', '.dat', '.
 const exeToLnkName = new Map<string, string>()
 const exeToLnkPath = new Map<string, string>()
 
-/** 判断一个进程路径是否应跳过（专用于进程扫描，比 .lnk 过滤更严格） */
+/**
+ * 检查 exe 是否有自定义应用图标（排除 Windows 默认通用图标）。
+ * Windows 默认 exe 图标的 32x32 PNG ≈ 389 bytes；
+ * 有自定义图标的应用 PNG ≥ 567 bytes。阈值取 500 bytes。
+ * 辅助/后台进程通常没有自定义图标，通过此检查可自动过滤掉。
+ */
+const GENERIC_ICON_THRESHOLD = 500  // PNG bytes；低于此值视为默认通用图标
+async function hasAppIcon(exePath: string): Promise<boolean> {
+  try {
+    const icon = await app.getFileIcon(exePath, { size: 'large' })
+    if (icon.isEmpty()) return false
+    return icon.toPNG().length > GENERIC_ICON_THRESHOLD
+  } catch {
+    return false
+  }
+}
+
 function isBlockedProcess(exePath: string): boolean {
   const lower = exePath.toLowerCase()
   if (BLOCKED_PROCESS_PATHS.some(p => lower.startsWith(p))) return true
@@ -236,7 +254,7 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
       '-NoProfile', '-NonInteractive', '-EncodedCommand', buildWmiWatcherScript()
     ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
 
-    createInterface({ input: processWatcherProc.stdout! }).on('line', (line) => {
+    createInterface({ input: processWatcherProc.stdout! }).on('line', async (line) => {
       if (monitorPaused) return
       const raw = line.trim()
       const sepIdx = raw.indexOf('|')
@@ -248,10 +266,18 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
         console.log('[Monitor] Process skipped (blocked):', exePath)
         return
       }
+
+      // 已入库的资源直接走追踪逻辑；新进程需先检查图标（无图标 = 辅助进程，跳过）
+      const existingResource = getResourceByPath(exePath)
+      if (!existingResource && !await hasAppIcon(exePath)) {
+        console.log('[Monitor] Process skipped (no icon):', exePath)
+        return
+      }
+
       const lnkTitle = exeToLnkName.get(lower)
       const title = lnkTitle ?? basename(exePath, extname(exePath))
       try {
-        const newResource = upsertResource({ type: 'app', title, file_path: exePath, rating: 0 }, !!lnkTitle)
+        const newResource = existingResource ? null : upsertResource({ type: 'app', title, file_path: exePath, rating: 0 }, !!lnkTitle)
         if (newResource) {
           const upgraded = trySteamUpgrade(exePath)
           const finalResource = upgraded ?? newResource
@@ -260,7 +286,7 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
         }
         // 无论是新资源还是已有资源，都追踪运行会话
         if (pid && !isNaN(pid)) {
-          const trackResource = newResource ?? getResourceByPath(exePath)
+          const trackResource = newResource ?? existingResource ?? getResourceByPath(exePath)
           if (trackResource) {
             // 同一资源只追踪一个 PID（避免 Chrome/Electron 等多进程应用重复计数）
             const alreadyTracking = [...runningSessions.values()].some(s => s.resourceId === trackResource.id)
@@ -523,6 +549,8 @@ export async function scanRecentFolder(): Promise<Resource[]> {
     const ext = extname(lower)
     const type = EXT_MAP[ext]
     if (!type) continue
+    // exe 类型：新进程先检查图标，无图标的跳过
+    if (type === 'app' && !getResourceByPath(exePath) && !await hasAppIcon(exePath)) continue
     const title = basename(exePath, ext)
     try {
       const resource = upsertResource({ type, title, file_path: exePath, rating: 0 })
@@ -599,6 +627,9 @@ export async function scanProcesses(): Promise<Resource[]> {
     if (lower === ownExe) continue
     if (!lower.endsWith('.exe')) continue
     if (isBlockedProcess(exePath)) continue
+
+    // 新进程先检查图标，无图标的跳过（辅助/后台进程通常没有图标）
+    if (!getResourceByPath(exePath) && !await hasAppIcon(exePath)) continue
 
     const title = basename(exePath, extname(exePath))
     try {

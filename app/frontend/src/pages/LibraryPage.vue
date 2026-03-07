@@ -147,7 +147,14 @@
           <div v-else-if="store.filtered.length === 0" class="empty-state">
             <span class="empty-icon" v-html="emptyIcon" />
             <div class="empty-text">暂无资源</div>
-            <div class="empty-hint">打开图片、视频或程序后，AI资源管家会自动记录</div>
+            <div v-if="store.activeType === 'webpage'" class="empty-hint">
+              收藏网页链接，或一键导入 Chrome 书签
+              <button class="chrome-import-btn" @click="importChromeBookmarks" :disabled="chromeImporting">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
+                {{ chromeImporting ? '导入中...' : '导入 Chrome 书签' }}
+              </button>
+            </div>
+            <div v-else class="empty-hint">打开图片、视频或程序后，AI资源管家会自动记录</div>
           </div>
 
           <div v-else class="grid" :style="{ '--card-min-width': cardMinWidth + 'px' }">
@@ -165,6 +172,13 @@
             />
             <!-- 渐进渲染哨兵：滚动到此处时加载更多卡片 -->
             <div v-if="renderLimit < store.filtered.length" ref="sentinelRef" class="grid-sentinel" />
+          </div>
+          <!-- 网页分类底部导入按钮 -->
+          <div v-if="store.activeType === 'webpage' && store.filtered.length > 0" class="webpage-import-footer">
+            <button class="chrome-import-btn" @click="importChromeBookmarks" :disabled="chromeImporting">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
+              {{ chromeImporting ? '导入中...' : '导入 Chrome 书签' }}
+            </button>
           </div>
         </template>
       </div>
@@ -516,6 +530,37 @@ const showScanModal = ref(false)
 const sysScanning = ref(false)
 const sysScanResult = ref<number | null>(null)
 let scanGeneration = 0  // used to discard stale results on cancel
+
+// ── Chrome 书签导入 ──────────────────────────────────────
+const chromeImporting = ref(false)
+async function importChromeBookmarks() {
+  chromeImporting.value = true
+  try {
+    const bookmarks = await window.api.webpage.importChromeBookmarks()
+    if (!bookmarks.length) {
+      alert('未找到 Chrome 书签')
+      return
+    }
+    const items = bookmarks.map(b => ({
+      type: 'webpage',
+      title: b.name || new URL(b.url).hostname,
+      file_path: b.url,
+    }))
+    const { added, skipped } = await window.api.resources.batchAdd(items)
+    // Fetch favicons for newly added resources
+    for (const resource of added) {
+      window.api.webpage.fetchFavicon(resource.file_path).then(icon => {
+        if (icon) window.api.files.saveCover(resource.id, icon)
+      }).catch(() => {})
+    }
+    await store.loadAll()
+    alert(`已导入 ${added.length} 个书签${skipped > 0 ? `，${skipped} 个已存在` : ''}`)
+  } catch (e: any) {
+    alert('导入失败: ' + (e?.message ?? ''))
+  } finally {
+    chromeImporting.value = false
+  }
+}
 
 // ── 渐进渲染（滚动到底部时加载更多卡片） ───────────────────
 const BATCH_SIZE = 60
@@ -2210,5 +2255,30 @@ async function deleteIgnored(filePath: string) {
 .batch-modal .sug-btn:hover { border-color: var(--accent); color: var(--text); }
 .batch-modal .sug-count {
   margin-left: 4px; font-size: 10px; opacity: 0.5;
+}
+
+/* ── Chrome 导入 ───────────────────────────────────────── */
+.chrome-import-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  margin-top: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all .15s;
+  pointer-events: auto;
+}
+.chrome-import-btn:hover { border-color: var(--accent); color: var(--accent-2); }
+.chrome-import-btn:disabled { opacity: .5; cursor: not-allowed; }
+.chrome-import-btn svg { flex-shrink: 0; }
+.webpage-import-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 12px;
 }
 </style>

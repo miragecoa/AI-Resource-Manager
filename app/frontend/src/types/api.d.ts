@@ -75,6 +75,10 @@ declare global {
       }
       onUpdateAvailable: (callback: (info: any) => void) => () => void
       onUpdateProgress: (callback: (percent: number) => void) => () => void
+      webpage: {
+        fetchFavicon: (url: string) => Promise<string | null>
+        importChromeBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>
+      }
       profiles: {
         list: () => Promise<{ active: string; profiles: Array<{ id: string; name: string }> }>
         create: (name: string) => Promise<{ id: string; name: string }>
