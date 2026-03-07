@@ -44,6 +44,9 @@
       "!frontend/**",
       "!*.ts"
     ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*.node"
+    ],
     "win": {
       "target": [
         "nsis",
