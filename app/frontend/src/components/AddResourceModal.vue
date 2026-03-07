@@ -124,9 +124,9 @@
               <div class="field-row align-start">
                 <label class="field-label">标签</label>
                 <div class="tags-area">
-                  <div v-if="allTags.length" class="tag-chips">
+                  <div v-if="filteredTags.length" class="tag-chips">
                     <button
-                      v-for="tag in allTags"
+                      v-for="tag in filteredTags"
                       :key="tag.id"
                       class="tag-chip"
                       :class="{ selected: selectedTagIds.includes(tag.id) }"
@@ -135,11 +135,12 @@
                       {{ tag.name }}<span v-if="tag.count" class="tag-count">{{ tag.count }}</span>
                     </button>
                   </div>
+                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">无匹配标签</div>
                   <div class="new-tag-row">
                     <input
                       v-model="newTagInput"
                       class="new-tag-input"
-                      placeholder="新建标签，回车确认..."
+                      placeholder="搜索或新建标签，回车确认..."
                       @keydown.enter.prevent="createAndAddTag"
                     />
                   </div>
@@ -257,6 +258,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { match as pinyinMatch } from 'pinyin-pro'
 import type { ResourceType } from '../stores/resources'
 import { useResourceStore } from '../stores/resources'
 
@@ -319,6 +321,13 @@ const form = ref({ file_path: '', title: '', type: 'app' as ResourceType, note: 
 const selectedTagIds = ref<number[]>([])
 const newTagInput = ref('')
 const allTags = ref<{ id: number; name: string; count: number }[]>([])
+const filteredTags = computed(() => {
+  const q = newTagInput.value.trim().toLowerCase()
+  if (!q) return allTags.value
+  return allTags.value.filter(t =>
+    t.name.toLowerCase().includes(q) || pinyinMatch(t.name, q) !== null
+  )
+})
 const errorMsg = ref('')
 const submitting = ref(false)
 const isDragOver = ref(false)
@@ -986,6 +995,11 @@ const checkIcon     = `<svg viewBox="0 0 48 48" fill="none" stroke="#10b981" str
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+.tag-chips-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 4px 0;
 }
 
 .tag-chip {

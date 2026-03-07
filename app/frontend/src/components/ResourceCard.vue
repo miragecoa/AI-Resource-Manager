@@ -56,7 +56,7 @@
       </div>
       <div class="tags">
         <template v-if="resource.tags?.length">
-          <span v-for="tag in resource.tags.slice(0, 3)" :key="tag.id" class="tag">{{ tag.name }}</span>
+          <span v-for="tag in resource.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
         </template>
         <span v-else class="tag tag-unclassified">未分类</span>
       </div>
