@@ -148,7 +148,7 @@
               {{ updateCheckInfo?.isNewVersion ? `发现新版本 v${updateCheckInfo.remoteVersion}` : `v${updateCheckInfo?.remoteVersion} 有更新` }}
               ({{ ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB)
             </div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading'">正在下载… {{ updateDownloadPercent }}%</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">正在下载… {{ updateDownloadPercent }}%</div>
             <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">更新已就绪，重启即可完成</div>
             <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">操作失败，请稍后重试</div>
           </div>
@@ -157,6 +157,7 @@
             <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">重启并更新</button>
             <button v-else-if="updateCheckStatus !== 'downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">检查更新</button>
             <button class="profile-btn" @click="openGitHubRelease">手动更新</button>
+            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">强制拉取</button>
           </div>
         </div>
       </section>
@@ -250,6 +251,15 @@ function settingsApplyUpdate() {
 
 function openGitHubRelease() {
   window.api.app.openUrl('https://github.com/miragecoa/AI-Resource-Manager/releases')
+}
+
+async function forceUpdateLatest() {
+  updateCheckStatus.value = 'force-downloading'
+  try {
+    await window.api.updater.forceUpdate()
+  } catch {
+    updateCheckStatus.value = 'error'
+  }
 }
 
 // ── 配置文件 ──

@@ -14,7 +14,7 @@ import {
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
 import { dbPath, dataDir } from '../db/index'
-import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate } from '../updater'
+import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 
@@ -459,6 +459,9 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('updater:skip', () => {
     skipUpdate()
+  })
+  ipcMain.handle('updater:forceUpdate', () => {
+    return forceUpdate()
   })
 
   // ── 配置文件（多数据库） ────────────────────────────────
