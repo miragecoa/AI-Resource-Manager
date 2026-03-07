@@ -5,7 +5,7 @@
 <h1 align="center">AI 资源管家</h1>
 
 <p align="center">
-  <b>装上它，电脑自动记录你用过的所有文件</b>
+  <b>装上 AI 资源管家，什么都不用管，正常用电脑。过几天回来看——你的资源库已经建好了。</b>
 </p>
 
 <p align="center">
@@ -111,8 +111,7 @@
 
 前往 [Releases](../../releases) 页面下载最新版本：
 
-- **安装版**（推荐）：`AI资源管家-Setup-x.x.x.exe`
-- **便携版**：`AI资源管家-x.x.x-portable.exe`
+- **便携版**（免安装）：`AI-Resource-Manager-x.x.x-portable-win-x64.zip`，解压即用
 
 > 系统要求：Windows 10 及以上
 
