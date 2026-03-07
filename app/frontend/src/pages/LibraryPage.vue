@@ -35,6 +35,16 @@
               step="0.05"
               @input="onCardZoomChange"
             />
+            <input
+              type="number"
+              class="zoom-number"
+              :value="Math.round(settingsStore.cardZoom * 100)"
+              min="25"
+              max="300"
+              step="5"
+              @change="onCardZoomInput"
+            />
+            <span class="zoom-unit">%</span>
           </div>
 
           <button
@@ -1060,6 +1070,12 @@ function onCardZoomChange(e: Event) {
   settingsStore.setCardZoom(val)
 }
 
+function onCardZoomInput(e: Event) {
+  const raw = parseInt((e.target as HTMLInputElement).value, 10)
+  const clamped = Math.min(300, Math.max(25, isNaN(raw) ? 75 : raw))
+  settingsStore.setCardZoom(clamped / 100)
+}
+
 function onSortChange(e: Event) {
   settingsStore.setResourceSort((e.target as HTMLSelectElement).value as ResourceSortField)
 }
@@ -1717,6 +1733,29 @@ async function deleteIgnored(filePath: string) {
 .zoom-slider::-webkit-slider-thumb:hover {
   background: var(--accent-2);
   transform: scale(1.2);
+}
+
+.zoom-number {
+  width: 42px;
+  padding: 2px 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.zoom-number::-webkit-inner-spin-button,
+.zoom-number::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.zoom-number:focus { border-color: var(--accent); }
+
+.zoom-unit {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-left: -2px;
 }
 
 /* ── 已忽略文件列表 ── */
