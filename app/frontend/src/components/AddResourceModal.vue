@@ -138,9 +138,10 @@
                   <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">无匹配标签</div>
                   <div class="new-tag-row">
                     <input
-                      v-model="newTagInput"
+                      :value="newTagInput"
                       class="new-tag-input"
                       placeholder="搜索或新建标签，回车确认..."
+                      @input="newTagInput = ($event.target as HTMLInputElement).value"
                       @keydown.enter.prevent="createAndAddTag"
                     />
                   </div>
