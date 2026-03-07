@@ -20,6 +20,73 @@
           </button>
         </div>
 
+        <!-- ====== 网页模式 ====== -->
+        <template v-if="mode === 'webpage'">
+          <div class="modal-body">
+            <div class="left-col">
+              <div class="web-favicon-preview">
+                <img v-if="webFavicon" :src="webFavicon" class="web-favicon-img" />
+                <div v-else-if="webFaviconLoading" class="web-favicon-placeholder">
+                  <span style="opacity:.5">获取中...</span>
+                </div>
+                <div v-else class="web-favicon-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <span style="margin-top:8px;font-size:12px;opacity:.4">输入 URL 自动获取图标</span>
+                </div>
+              </div>
+            </div>
+            <div class="right-col">
+              <div class="field-row">
+                <label class="field-label">URL</label>
+                <input v-model="webForm.url" class="field-input" placeholder="https://example.com" />
+              </div>
+              <div class="field-row">
+                <label class="field-label">名称</label>
+                <input v-model="webForm.title" class="field-input" placeholder="可选，留空自动用域名" />
+              </div>
+
+              <div class="field-row align-start">
+                <label class="field-label">标签</label>
+                <div class="tags-area">
+                  <div v-if="filteredTags.length" class="tag-chips">
+                    <button
+                      v-for="tag in filteredTags"
+                      :key="tag.id"
+                      class="tag-chip"
+                      :class="{ selected: selectedTagIds.includes(tag.id) }"
+                      @click="toggleTag(tag.id)"
+                    >
+                      {{ tag.name }}<span v-if="tag.count" class="tag-count">{{ tag.count }}</span>
+                    </button>
+                  </div>
+                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">无匹配标签</div>
+                  <div class="new-tag-row">
+                    <input
+                      :value="newTagInput"
+                      class="new-tag-input"
+                      placeholder="搜索或新建标签，回车确认..."
+                      @input="newTagInput = ($event.target as HTMLInputElement).value"
+                      @keydown.enter.prevent="createAndAddTag"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <span v-if="errorMsg" class="error-msg">{{ errorMsg }}</span>
+            <div class="footer-actions">
+              <button class="btn-cancel" @click="close">取消</button>
+              <button
+                class="btn-add"
+                :disabled="!canSubmitCurrent || submitting"
+                @click="submitCurrent"
+              >{{ submitting ? '添加中…' : '添加到库' }}</button>
+            </div>
+          </div>
+        </template>
+
         <!-- ====== 单个文件 / 文件夹 共用左右布局 ====== -->
         <template v-if="mode === 'file' || mode === 'folder'">
           <div class="modal-body">
@@ -275,13 +342,14 @@ const emit = defineEmits<{
 const store = useResourceStore()
 
 // ── 模式 ─────────────────────────────────────────────────
-const mode = ref<'file' | 'folder' | 'scan-dir' | 'scan-sys'>('file')
+const mode = ref<'file' | 'folder' | 'scan-dir' | 'scan-sys' | 'webpage'>('file')
 
 const modeTabs = [
   { key: 'file' as const, label: '单个文件', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>` },
   { key: 'folder' as const, label: '文件夹', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>` },
   { key: 'scan-dir' as const, label: '扫描目录', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="12" y1="11" x2="12" y2="17"/></svg>` },
   { key: 'scan-sys' as const, label: '系统扫描', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>` },
+  { key: 'webpage' as const, label: '网页', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>` },
 ]
 
 // ── 类型映射 ────────────────────────────────────────────
@@ -364,16 +432,53 @@ const folderBasename = computed(() => folderPath.value.replace(/[\\/]$/, '').rep
 const currentForm = computed(() => mode.value === 'folder' ? folderForm.value : form.value)
 
 const activeFormType = computed(() => {
+  if (mode.value === 'webpage') return 'webpage'
   if (mode.value === 'folder') return folderForm.value.type
   return form.value.type
 })
 
 const canSubmit = computed(() => form.value.file_path.trim() !== '' && form.value.title.trim() !== '')
 const canSubmitFolder = computed(() => folderPath.value.trim() !== '' && folderForm.value.title.trim() !== '')
-const canSubmitCurrent = computed(() => mode.value === 'folder' ? canSubmitFolder.value : canSubmit.value)
+
+// ── 网页模式状态 ─────────────────────────────────────────
+const webForm = ref({ url: '', title: '' })
+const webFavicon = ref<string | null>(null)
+const webFaviconLoading = ref(false)
+let webFaviconTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => webForm.value.url, (url) => {
+  if (webFaviconTimer) clearTimeout(webFaviconTimer)
+  webFavicon.value = null
+  if (!url.trim()) return
+  webFaviconTimer = setTimeout(async () => {
+    let u = url.trim()
+    if (!u.startsWith('http://') && !u.startsWith('https://')) u = 'https://' + u
+    try { new URL(u) } catch { return }
+    webFaviconLoading.value = true
+    try {
+      webFavicon.value = await window.api.webpage.fetchFavicon(u)
+    } finally { webFaviconLoading.value = false }
+    // Auto-fill title from domain if empty
+    if (!webForm.value.title.trim()) {
+      try { webForm.value.title = new URL(u).hostname.replace(/^www\./, '') } catch { /* ignore */ }
+    }
+  }, 500)
+})
+
+const canSubmitWebpage = computed(() => {
+  const u = webForm.value.url.trim()
+  return u.startsWith('http://') || u.startsWith('https://') || u.includes('.')
+})
+
+const canSubmitCurrent = computed(() => {
+  if (mode.value === 'folder') return canSubmitFolder.value
+  if (mode.value === 'webpage') return canSubmitWebpage.value
+  return canSubmit.value
+})
 
 function submitCurrent() {
   if (mode.value === 'folder') submitFolder()
+  else if (mode.value === 'webpage') submitWebpage()
   else submitFile()
 }
 
@@ -491,6 +596,41 @@ async function submitFile() {
       errorMsg.value = '此文件已在库中'
       submitting.value = false
       return
+    }
+    for (const tagId of selectedTagIds.value) {
+      await window.api.tags.addToResource(resource.id, tagId)
+    }
+    store.addOrUpdate(resource as any)
+    emit('added', resource)
+    close()
+  } catch (e: any) {
+    errorMsg.value = e?.message ?? '添加失败'
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function submitWebpage() {
+  if (!canSubmitWebpage.value || submitting.value) return
+  submitting.value = true
+  errorMsg.value = ''
+  try {
+    let url = webForm.value.url.trim()
+    if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url
+    const title = webForm.value.title.trim() || new URL(url).hostname.replace(/^www\./, '')
+    const { resource, existed } = await window.api.resources.add({
+      type: 'webpage',
+      title,
+      file_path: url,
+    })
+    if (existed) {
+      errorMsg.value = '此网页已在库中'
+      submitting.value = false
+      return
+    }
+    // Save favicon as cover
+    if (webFavicon.value) {
+      await window.api.files.saveCover(resource.id, webFavicon.value)
     }
     for (const tagId of selectedTagIds.value) {
       await window.api.tags.addToResource(resource.id, tagId)
@@ -773,6 +913,29 @@ const checkIcon     = `<svg viewBox="0 0 48 48" fill="none" stroke="#10b981" str
   padding: 14px;
   gap: 8px;
   border-right: 1px solid var(--border);
+}
+
+/* ── 网页 favicon 预览 ──────────────────────────────── */
+.web-favicon-preview {
+  flex: 1;
+  min-height: 0;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.web-favicon-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+.web-favicon-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-3);
 }
 
 /* ── 拖放区 ─────────────────────────────────────────── */

@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { match as pinyinMatch } from 'pinyin-pro'
 import { useSettingsStore } from './settings'
 
-export type ResourceType = 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel' | 'folder' | 'other'
+export type ResourceType = 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel' | 'folder' | 'webpage' | 'other'
 
 export interface Resource {
   id: string

@@ -132,6 +132,13 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('updater:progress')
   },
 
+  // 网页资源
+  webpage: {
+    fetchFavicon: (url: string): Promise<string | null> => ipcRenderer.invoke('webpage:fetchFavicon', url),
+    importChromeBookmarks: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
+      ipcRenderer.invoke('webpage:importChromeBookmarks'),
+  },
+
   // 配置文件（多数据库）
   profiles: {
     list: (): Promise<{ active: string; profiles: Array<{ id: string; name: string }> }> =>
