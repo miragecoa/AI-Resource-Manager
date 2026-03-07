@@ -59,7 +59,9 @@
             <div class="field-row">
               <label class="field-label">类型</label>
               <div class="meta-inline">
-                <span class="type-badge">{{ typeLabel }}</span>
+                <select class="type-select" :value="resource.type" @change="onTypeChange">
+                  <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                </select>
                 <span class="meta-date">添加于 {{ formatDate(resource.added_at) }}</span>
               </div>
             </div>
@@ -300,7 +302,21 @@ async function doIgnore() {
 // ─── Helpers ───────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
   image: '图片', game: '游戏', app: '应用程序',
-  video: '视频', comic: '漫画', music: '音乐', novel: '小说'
+  video: '视频', comic: '漫画', music: '音乐', novel: '小说',
+  webpage: '网页'
+}
+const typeOptions = [
+  { label: '游戏', value: 'game' },
+  { label: '应用程序', value: 'app' },
+  { label: '图片', value: 'image' },
+  { label: '视频', value: 'video' },
+  { label: '漫画', value: 'comic' },
+  { label: '音乐', value: 'music' },
+  { label: '小说', value: 'novel' },
+  { label: '网页', value: 'webpage' },
+]
+function onTypeChange(e: Event) {
+  saveField('type', (e.target as HTMLSelectElement).value)
 }
 const TYPE_ICONS: Record<string, string> = {
   image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
@@ -570,15 +586,20 @@ const imageSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
   flex: 1;
 }
 
-.type-badge {
+.type-select {
   font-size: 11px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 2px 6px;
   border-radius: 4px;
   background: rgba(99, 102, 241, 0.15);
   color: var(--accent-2);
   border: 1px solid rgba(99, 102, 241, 0.2);
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
 }
+.type-select:focus { border-color: var(--accent); }
+.type-select option { background: var(--surface); color: var(--text); }
 
 .meta-date {
   font-size: 12px;
