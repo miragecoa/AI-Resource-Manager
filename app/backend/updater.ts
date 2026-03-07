@@ -170,14 +170,19 @@ export function applyAndRestart(): void {
   const pid = process.pid
 
   // Build PowerShell command — single-quoted paths are literal in PS
+  const logPath = join(dirname(downloadedZipPath), 'update.log')
   const cmd = [
-    '$ErrorActionPreference="SilentlyContinue"',
+    `$log = '${logPath}'`,
+    `"$(Get-Date) - Waiting for PID ${pid}" | Out-File $log`,
     `while(Get-Process -Id ${pid} -EA SilentlyContinue){Start-Sleep 1}`,
-    'Start-Sleep 2',
-    `Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force`,
-    `Remove-Item '${downloadedZipPath}' -Force`,
-    `Remove-Item (Split-Path '${downloadedZipPath}') -Recurse -Force`,
+    '"$(Get-Date) - Process exited, waiting 3s..." | Out-File $log -Append',
+    'Start-Sleep 3',
+    `"$(Get-Date) - Extracting..." | Out-File $log -Append`,
+    `try { Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force -EA Stop; "$(Get-Date) - Extract OK" | Out-File $log -Append } catch { "$(Get-Date) - Extract FAILED: $_" | Out-File $log -Append }`,
+    `Remove-Item '${downloadedZipPath}' -Force -EA SilentlyContinue`,
+    `"$(Get-Date) - Starting app..." | Out-File $log -Append`,
     `Start-Process '${exePath}'`,
+    `"$(Get-Date) - Done" | Out-File $log -Append`,
   ].join('; ')
 
   // Encode as UTF-16LE Base64 → avoids .ps1 file, execution policy, and encoding issues
