@@ -146,6 +146,21 @@ function followDownload(url: string, totalSize: number): Promise<string> {
   })
 }
 
+/** 强制拉取最新 Release（无视版本号），下载并应用 */
+export async function forceUpdate(): Promise<void> {
+  const resp = await net.fetch(
+    `https://api.github.com/repos/${REPO}/releases?per_page=1`,
+    { headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
+  )
+  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`)
+  const releases = await resp.json() as any[]
+  if (!releases.length) throw new Error('No releases found')
+  const asset = (releases[0].assets || []).find((a: any) => ASSET_PATTERN.test(a.name))
+  if (!asset) throw new Error('No matching asset in latest release')
+  downloadedZipPath = await followDownload(asset.browser_download_url, asset.size)
+  applyAndRestart()
+}
+
 export async function downloadUpdate(_mainWindow: BrowserWindow | null): Promise<string> {
   if (!latestUpdateInfo?.hasUpdate) throw new Error('No update available')
 

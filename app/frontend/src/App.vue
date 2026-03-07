@@ -77,8 +77,11 @@ onMounted(async () => {
   }
 })
 
-function onConsent() {
+async function onConsent(mode: 'auto' | 'manual') {
   showConsent.value = false
+  if (mode === 'auto') {
+    await window.api.settings.set('pending_first_scan', '1')
+  }
   startApp()
 }
 

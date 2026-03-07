@@ -977,6 +977,17 @@ onMounted(async () => {
   document.addEventListener('dragover', onDocDragOver)
   loadTags()
   ignoredPaths.value = await window.api.ignoredPaths.getAll()
+
+  // 首次启动（自动收录模式）：自动扫描 + 导入 Chrome 书签
+  const pending = await window.api.settings.get('pending_first_scan')
+  if (pending === '1') {
+    await window.api.settings.set('pending_first_scan', '')
+    // 系统扫描
+    showScanModal.value = true
+    doSystemScan()
+    // Chrome 书签导入
+    importChromeBookmarks()
+  }
 })
 
 onUnmounted(() => {

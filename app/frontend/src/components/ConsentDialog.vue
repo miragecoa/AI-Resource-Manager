@@ -50,7 +50,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const emit = defineEmits<{ (e: 'consent'): void }>()
+const emit = defineEmits<{ (e: 'consent', mode: 'auto' | 'manual'): void }>()
 
 const mode = ref<'auto' | 'manual'>('auto')
 
@@ -65,7 +65,7 @@ async function start() {
   if (mode.value === 'manual') {
     await window.api.settings.set('monitorEnabled', 'false')
   }
-  emit('consent')
+  emit('consent', mode.value)
 }
 
 async function quit() {

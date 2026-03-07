@@ -124,7 +124,8 @@ contextBridge.exposeInMainWorld('api', {
     check:    (): Promise<any> => ipcRenderer.invoke('updater:check'),
     download: (): Promise<any> => ipcRenderer.invoke('updater:download'),
     apply:    (): Promise<void> => ipcRenderer.invoke('updater:apply'),
-    skip:     (): Promise<void> => ipcRenderer.invoke('updater:skip'),
+    skip:        (): Promise<void> => ipcRenderer.invoke('updater:skip'),
+    forceUpdate: (): Promise<void> => ipcRenderer.invoke('updater:forceUpdate'),
   },
   onUpdateAvailable: (callback: (info: any) => void) => {
     ipcRenderer.on('updater:update-available', (_e, info) => callback(info))
