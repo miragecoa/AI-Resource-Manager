@@ -16,9 +16,8 @@
 
 ---
 
-<!-- 主截图：替换为实际截图路径 -->
 <p align="center">
-  <img src="docs/screenshots/hero.png" width="800" alt="主界面截图">
+  <img src="docs/library.png" width="800" alt="主界面截图">
 </p>
 
 ---
@@ -98,15 +97,13 @@
 
 ## 截图
 
-<!-- 替换为实际截图 -->
-
 | 主界面 | 详情面板 | 手动添加 |
 |:---:|:---:|:---:|
-| ![主界面](docs/screenshots/library.png) | ![详情](docs/screenshots/detail.png) | ![添加](docs/screenshots/add.png) |
+| ![主界面](docs/library.png) | ![详情](docs/detail.png) | ![添加](docs/add.png) |
 
-| 标签过滤 | 设置页 | 忽略列表 |
+| 拖拽导入 | 标签过滤 | 忽略列表 |
 |:---:|:---:|:---:|
-| ![标签](docs/screenshots/tags.png) | ![设置](docs/screenshots/settings.png) | ![忽略](docs/screenshots/ignored.png) |
+| ![拖拽导入](docs/drag-import.png) | ![标签](docs/tags.png) | ![忽略](docs/ignored.png) |
 
 ---
 
