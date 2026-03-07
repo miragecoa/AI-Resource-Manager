@@ -2,7 +2,9 @@ import { app, BrowserWindow } from 'electron'
 import { net } from 'electron'
 import { dirname, join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, unlinkSync, statSync } from 'fs'
-import { spawn } from 'child_process'
+import { spawn, execFile } from 'child_process'
+import { get as httpsGet } from 'https'
+import { get as httpGet } from 'http'
 import { getSetting, setSetting } from './db/queries'
 
 const REPO = 'miragecoa/AI-Resource-Manager'
@@ -94,58 +96,60 @@ function noUpdate(currentVersion: string): UpdateInfo {
 
 // ── Download update ──────────────────────────────────────
 
-export async function downloadUpdate(mainWindow: BrowserWindow | null): Promise<string> {
-  if (!latestUpdateInfo?.hasUpdate) throw new Error('No update available')
-
+function followDownload(url: string, totalSize: number): Promise<string> {
   const appDir = app.isPackaged ? dirname(process.execPath) : app.getAppPath()
   const tempDir = join(appDir, '.update-temp')
   if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true })
   const zipPath = join(tempDir, 'update.zip')
-
-  // Clean previous download
   if (existsSync(zipPath)) unlinkSync(zipPath)
 
-  const resp = await net.fetch(latestUpdateInfo.downloadUrl, {
-    headers: { 'User-Agent': 'AI-Resource-Manager-Updater' }
+  return new Promise((resolve, reject) => {
+    const getter = url.startsWith('https') ? httpsGet : httpGet
+    getter(url, { headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }, (res) => {
+      // Follow redirects (GitHub 302 → CDN)
+      if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+        return followDownload(res.headers.location, totalSize).then(resolve, reject)
+      }
+      if (res.statusCode !== 200) return reject(new Error(`Download failed: ${res.statusCode}`))
+
+      const contentLen = Number(res.headers['content-length']) || totalSize
+      let received = 0
+      let lastProgressTime = 0
+      const ws = createWriteStream(zipPath)
+
+      res.on('data', (chunk: Buffer) => {
+        ws.write(chunk)
+        received += chunk.length
+        const now = Date.now()
+        if (contentLen > 0 && now - lastProgressTime >= 200) {
+          lastProgressTime = now
+          const percent = Math.round((received / contentLen) * 100)
+          BrowserWindow.getAllWindows()[0]?.webContents.send('updater:progress', percent)
+        }
+      })
+
+      res.on('end', () => {
+        BrowserWindow.getAllWindows()[0]?.webContents.send('updater:progress', 100)
+        ws.end(() => {
+          const dlSize = statSync(zipPath).size
+          if (contentLen > 0 && Math.abs(dlSize - contentLen) > 1024) {
+            unlinkSync(zipPath)
+            return reject(new Error(`Size mismatch: expected ${contentLen}, got ${dlSize}`))
+          }
+          resolve(zipPath)
+        })
+      })
+
+      res.on('error', reject)
+      ws.on('error', reject)
+    }).on('error', reject)
   })
-  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
+}
 
-  // Prefer Content-Length from actual response (after redirect) over API size
-  const totalSize = Number(resp.headers.get('content-length')) || latestUpdateInfo.assetSize
-  let received = 0
-  let lastProgressTime = 0
+export async function downloadUpdate(_mainWindow: BrowserWindow | null): Promise<string> {
+  if (!latestUpdateInfo?.hasUpdate) throw new Error('No update available')
 
-  // Stream download with progress
-  const reader = resp.body!.getReader()
-  const ws = createWriteStream(zipPath)
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    ws.write(Buffer.from(value))
-    received += value.byteLength
-    // Throttle progress events to avoid flooding IPC
-    const now = Date.now()
-    if (totalSize > 0 && now - lastProgressTime >= 200) {
-      lastProgressTime = now
-      const percent = Math.round((received / totalSize) * 100)
-      BrowserWindow.getAllWindows()[0]?.webContents.send('updater:progress', percent)
-    }
-  }
-  // Send final 100%
-  BrowserWindow.getAllWindows()[0]?.webContents.send('updater:progress', 100)
-  ws.end()
-  await new Promise<void>((resolve, reject) => {
-    ws.on('finish', resolve)
-    ws.on('error', reject)
-  })
-
-  // Verify size
-  const dlSize = statSync(zipPath).size
-  if (totalSize > 0 && Math.abs(dlSize - totalSize) > 1024) {
-    unlinkSync(zipPath)
-    throw new Error(`Size mismatch: expected ${totalSize}, got ${dlSize}`)
-  }
+  const zipPath = await followDownload(latestUpdateInfo.downloadUrl, latestUpdateInfo.assetSize)
 
   // Save timestamp so we know this version/asset was processed
   setSetting('update_lastAssetTimestamp', latestUpdateInfo.assetUpdatedAt)
@@ -170,7 +174,7 @@ export function applyAndRestart(): void {
     '$ErrorActionPreference="SilentlyContinue"',
     `while(Get-Process -Id ${pid} -EA SilentlyContinue){Start-Sleep 1}`,
     'Start-Sleep 2',
-    `tar -xf '${downloadedZipPath}' -C '${appDir}'`,
+    `Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force`,
     `Remove-Item '${downloadedZipPath}' -Force`,
     `Remove-Item (Split-Path '${downloadedZipPath}') -Recurse -Force`,
     `Start-Process '${exePath}'`,
