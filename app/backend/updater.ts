@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { net } from 'electron'
 import { dirname, join } from 'path'
-import { existsSync, mkdirSync, createWriteStream, unlinkSync, statSync } from 'fs'
+import { existsSync, mkdirSync, createWriteStream, unlinkSync, statSync, writeFileSync } from 'fs'
 import { spawn, execFile } from 'child_process'
 import { get as httpsGet } from 'https'
 import { get as httpGet } from 'http'
@@ -169,30 +169,26 @@ export function applyAndRestart(): void {
   const exePath = app.isPackaged ? process.execPath : join(appDir, 'AI资源管家.exe')
   const pid = process.pid
 
-  // Build PowerShell command with visible console for debugging
   const cmd = [
-    `Write-Host "=== AI Resource Manager Updater ===" -ForegroundColor Cyan`,
-    `Write-Host "Waiting for PID ${pid} to exit..."`,
+    `$host.UI.RawUI.WindowTitle='AI Resource Manager Updater'`,
+    `Write-Host 'Waiting for app to exit...' -ForegroundColor Cyan`,
     `while(Get-Process -Id ${pid} -EA SilentlyContinue){Start-Sleep 1}`,
-    `Write-Host "Process exited. Waiting 3s for file handles..."`,
-    'Start-Sleep 3',
-    `Write-Host "Extracting: ${downloadedZipPath}"`,
-    `Write-Host "Target: ${appDir}"`,
-    `try { Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force -EA Stop; Write-Host "Extract OK!" -ForegroundColor Green } catch { Write-Host "Extract FAILED: $_" -ForegroundColor Red }`,
+    'Start-Sleep 2',
+    `Write-Host 'Extracting update...'`,
+    `try { Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force -EA Stop; Write-Host 'OK' -ForegroundColor Green } catch { Write-Host "FAILED: $_" -ForegroundColor Red; Read-Host 'Press Enter to exit'; exit 1 }`,
     `Remove-Item '${downloadedZipPath}' -Force -EA SilentlyContinue`,
-    `Write-Host "Starting app..."`,
     `Start-Process '${exePath}'`,
-    `Write-Host "Done! This window will close in 5s..." -ForegroundColor Green`,
-    'Start-Sleep 5',
   ].join('; ')
 
   // Encode as UTF-16LE Base64 → avoids encoding issues with Chinese paths
   const encoded = Buffer.from(cmd, 'utf16le').toString('base64')
 
-  spawn('powershell.exe', [
-    '-NoExit',
-    '-EncodedCommand', encoded
-  ], {
+  // Write a .cmd launcher — Electron is a GUI app, so spawn() alone
+  // won't create a visible console window. Using `start` via .cmd fixes this.
+  const batPath = join(dirname(downloadedZipPath), 'update.cmd')
+  writeFileSync(batPath, `@powershell.exe -EncodedCommand ${encoded}\n`)
+
+  spawn('cmd.exe', ['/c', 'start', '""', batPath], {
     detached: true,
     stdio: 'ignore',
   }).unref()
