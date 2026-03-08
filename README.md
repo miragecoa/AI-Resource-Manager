@@ -197,7 +197,7 @@ Electron 29 + Vue 3 + TypeScript + SQLite (better-sqlite3) + electron-vite
 
 ## 开源协议
 
-[MIT License](LICENSE) — 自由使用、修改、分发。
+[AGPL-3.0 License](LICENSE) — 代码开源可用，修改后须开源。商业授权请联系作者。
 
 ---
 
