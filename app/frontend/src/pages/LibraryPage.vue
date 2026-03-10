@@ -1129,24 +1129,54 @@ function onTagSortChange(e: Event) {
 
 watch(() => store.activeType, loadTags)
 
-// 实时计算当前分类下无标签的资源数，插入虚拟"未分类"条目（id=0）
+// 实时统计当前展示资源列表（store.filtered）中各标签的数量
+const tagCounts = computed(() => {
+  const counts = new Map<number, number>()
+  for (const item of store.filtered) {
+    if (item.tags) {
+      for (const t of item.tags) {
+        counts.set(t.id, (counts.get(t.id) || 0) + 1)
+      }
+    }
+  }
+  return counts
+})
+
+// 实时计算当前过滤结果下无标签的资源数
 const untaggedCount = computed(() => {
-  const type = store.activeType === 'all' ? undefined : store.activeType
-  return store.items
-    .filter(r => !type || r.type === type)
-    .filter(r => !r.tags?.length)
-    .length
+  let c = 0
+  for (const item of store.filtered) {
+    if (!item.tags || item.tags.length === 0) c++
+  }
+  return c
 })
 
 const availableTags = computed(() => {
   let tags = dbTags.value
+
+  // 1. 根据当前筛选出来的列表（store.filtered），实时更新各标签的剩余数量
+  tags = tags.map(t => ({
+    ...t,
+    count: tagCounts.value.get(t.id) || 0
+  }))
+
+  // 2. 如果处于筛选状态（有选择标签，或者输入了搜索词），隐藏无关标签（即 count = 0 且未被选中的）
+  // 达到“层层递进”的体验
+  if (store.activeTags.length > 0 || store.searchQuery.trim().length > 0) {
+    tags = tags.filter(t => t.count > 0 || store.activeTags.includes(t.id))
+  }
+
+  // 3. 标签面板顶部的输入框过滤（按名字全拼或拼音首字母匹配）
   if (tagSearch.value) {
-    const q = tagSearch.value.toLowerCase()
+    const q = tagSearch.value.trim().toLowerCase()
     tags = tags.filter(t => t.name.toLowerCase().includes(q) || pinyinMatch(t.name, q) !== null)
   }
-  if (!tagSearch.value && untaggedCount.value > 0) {
+
+  // 4. 追加“未分类”虚拟项（如果有符合条件的项，或它已被勾选）
+  if (!tagSearch.value && (untaggedCount.value > 0 || store.activeTags.includes(0))) {
     return [{ id: 0, name: '未分类', count: untaggedCount.value }, ...tags]
   }
+
   return tags
 })
 
