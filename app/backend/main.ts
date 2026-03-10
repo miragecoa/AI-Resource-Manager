@@ -7,7 +7,7 @@ import { execFile } from 'child_process'
 
 // Windows 终端默认使用 GBK 编码，切换到 UTF-8 (65001) 让中文日志正常显示
 if (process.platform === 'win32') {
-  execFile('cmd.exe', ['/c', 'chcp', '65001'], { windowsHide: true }, () => {})
+  execFile('cmd.exe', ['/c', 'chcp', '65001'], { windowsHide: true }, () => { })
 }
 
 // 必须在 app ready 之前声明自定义 scheme（用于本地文件预览）
@@ -150,7 +150,7 @@ function createWindow(): void {
   })
 
   // 最大化/还原事件转发给渲染进程（用于更新自定义标题栏按钮图标）
-  mainWindow.on('maximize',   () => mainWindow?.webContents.send('window:maximizeChange', true))
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window:maximizeChange', true))
   mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window:maximizeChange', false))
 
   // 窗口移动/缩放后保存位置（防抖 500ms）
@@ -284,10 +284,15 @@ app.whenReady().then(() => {
   initDatabase()
   registerIpcHandlers()
 
-  // 首次运行默认开启开机自启
-  if (!getSetting('autoStartInitialized')) {
-    app.setLoginItemSettings({ openAtLogin: true })
+  // ── 开机自启动（便携版适配 · 测试版：每次启动强制设置） ──
+  {
+    const exePath = process.execPath
+    console.log('[AutoStart] Forcing registration, exe:', exePath)
+    app.setLoginItemSettings({ openAtLogin: true, path: exePath })
     setSetting('autoStartInitialized', 'true')
+    // 验证
+    const verify = app.getLoginItemSettings()
+    console.log('[AutoStart] Verify openAtLogin:', verify.openAtLogin)
   }
 
   createTray()
