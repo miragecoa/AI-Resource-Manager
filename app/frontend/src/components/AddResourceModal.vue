@@ -362,7 +362,10 @@ const EXT_TYPE_MAP: Record<string, ResourceType> = {
   '.ogg': 'music', '.m4a': 'music', '.wma': 'music', '.ape': 'music',
   '.exe': 'app', '.lnk': 'app', '.msi': 'app',
   '.cbz': 'comic', '.cbr': 'comic', '.cb7': 'comic',
-  '.epub': 'novel', '.pdf': 'novel', '.txt': 'novel', '.mobi': 'novel',
+  '.epub': 'novel', '.mobi': 'novel',
+  '.doc': 'document', '.docx': 'document', '.xls': 'document', '.xlsx': 'document',
+  '.ppt': 'document', '.pptx': 'document', '.pdf': 'document', '.txt': 'document',
+  '.csv': 'document', '.rtf': 'document',
 }
 
 const TYPE_ICONS: Record<string, string> = {
@@ -373,6 +376,7 @@ const TYPE_ICONS: Record<string, string> = {
   comic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="3" width="8" height="11" rx="1"/><rect x="13" y="3" width="8" height="11" rx="1"/><rect x="3" y="16" width="8" height="5" rx="1"/><rect x="13" y="16" width="8" height="5" rx="1"/></svg>`,
   music: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
   novel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
 }
 
 const TYPES = [
@@ -382,7 +386,8 @@ const TYPES = [
   { value: 'video', label: '视频' },
   { value: 'music', label: '音乐' },
   { value: 'comic', label: '漫画' },
-  { value: 'novel', label: '小说/文档' },
+  { value: 'novel', label: '小说' },
+  { value: 'document', label: '文档' },
 ]
 
 // ── 单个文件模式状态 ────────────────────────────────────
@@ -630,7 +635,8 @@ async function submitWebpage() {
     }
     // Save favicon as cover
     if (webFavicon.value) {
-      await window.api.files.saveCover(resource.id, webFavicon.value)
+      const coverPath = await window.api.files.saveCover(resource.id, webFavicon.value)
+      if (coverPath) (resource as any).cover_path = coverPath
     }
     for (const tagId of selectedTagIds.value) {
       await window.api.tags.addToResource(resource.id, tagId)
@@ -738,7 +744,7 @@ function relativePath(fullPath: string): string {
 function typeLabel(type: string): string {
   const map: Record<string, string> = {
     game: '游戏', app: '应用', image: '图片', video: '视频',
-    music: '音乐', comic: '漫画', novel: '小说'
+    music: '音乐', comic: '漫画', novel: '小说', document: '文档'
   }
   return map[type] ?? type
 }

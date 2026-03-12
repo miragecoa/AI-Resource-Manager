@@ -37,6 +37,11 @@ const EXT_MAP: Record<string, Resource['type']> = {
   '.ape': 'music', '.wma': 'music',
   // 小说/电子书（txt/pdf 不加：太泛，误判率高）
   '.epub': 'novel', '.mobi': 'novel', '.azw3': 'novel', '.azw': 'novel',
+  // 文档
+  '.doc': 'document', '.docx': 'document', '.xls': 'document', '.xlsx': 'document',
+  '.ppt': 'document', '.pptx': 'document', '.csv': 'document',
+  '.odt': 'document', '.ods': 'document', '.odp': 'document',
+  '.pdf': 'document', '.txt': 'document', '.rtf': 'document',
   // 可执行（游戏/应用，后续异步区分）
   '.exe': 'app'
 }

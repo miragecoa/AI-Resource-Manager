@@ -287,7 +287,10 @@ app.whenReady().then(() => {
   // ── 开机自启动（便携版适配） ──────────────────────────
   // 首次运行默认开启；每次启动验证注册表路径与当前 exe 一致（便携版移动文件夹后自动修正）
   // 仅在用户没有显式关闭时执行生效
-  {
+  if (!app.isPackaged) {
+    // 开发环境下强行清理 electron.exe 的启动项，避免开机白板窗口
+    app.setLoginItemSettings({ openAtLogin: false, path: process.execPath })
+  } else {
     const userDisabled = getSetting('autoStartDisabled') === 'true'
     const exePath = process.execPath
     if (!userDisabled) {

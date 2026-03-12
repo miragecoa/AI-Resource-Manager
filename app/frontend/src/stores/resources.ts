@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { match as pinyinMatch } from 'pinyin-pro'
 import { useSettingsStore } from './settings'
 
-export type ResourceType = 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel' | 'folder' | 'webpage' | 'other'
+export type ResourceType = 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel' | 'folder' | 'document' | 'webpage' | 'other'
 
 export interface Resource {
   id: string
@@ -28,6 +28,7 @@ export const useResourceStore = defineStore('resources', () => {
   const activeType = ref<ResourceType | 'all'>('all')
   const searchQuery = ref('')
   const activeTags = ref<number[]>([])
+  const excludedTags = ref<number[]>([])
   const loading = ref(false)
 
   // 运行中状态：resourceId → startTime(ms)
@@ -69,11 +70,18 @@ export const useResourceStore = defineStore('resources', () => {
       })
     }
 
-    if (activeTags.value.length > 0) {
+    if (activeTags.value.length > 0 || excludedTags.value.length > 0) {
       const hasUnclassified = activeTags.value.includes(0)
       const realTagIds = activeTags.value.filter(id => id !== 0)
+      const excludeUnclassified = excludedTags.value.includes(0)
+      const realExcludeIds = excludedTags.value.filter(id => id !== 0)
       list = list.filter((r) => {
-        // id=0 代表"未分类"：资源没有任何标签
+        // 排除逻辑：含有任一排除标签的资源不显示
+        if (excludeUnclassified && (!r.tags || r.tags.length === 0)) return false
+        if (realExcludeIds.length > 0 && r.tags?.some(t => realExcludeIds.includes(t.id))) return false
+        // 如果没有正选标签，通过排除后的都显示
+        if (activeTags.value.length === 0) return true
+        // 正选逻辑
         if (hasUnclassified && (!r.tags || r.tags.length === 0)) return true
         if (realTagIds.length > 0) {
           return realTagIds.every((tagId) => r.tags?.some((t) => t.id === tagId))
@@ -113,6 +121,7 @@ export const useResourceStore = defineStore('resources', () => {
     music: items.value.filter((r) => r.type === 'music').length,
     novel: items.value.filter((r) => r.type === 'novel').length,
     folder: items.value.filter((r) => r.type === 'folder').length,
+    document: items.value.filter((r) => r.type === 'document').length,
     webpage: items.value.filter((r) => r.type === 'webpage').length,
     other: items.value.filter((r) => r.type === 'other').length
   }))
@@ -175,7 +184,7 @@ export const useResourceStore = defineStore('resources', () => {
   }
 
   return {
-    items, activeType, searchQuery, activeTags, loading,
+    items, activeType, searchQuery, activeTags, excludedTags, loading,
     runningMap, clockTick, setRunning,
     filtered, counts,
     loadAll, addOrUpdate, remove, ignore, batchIgnore,

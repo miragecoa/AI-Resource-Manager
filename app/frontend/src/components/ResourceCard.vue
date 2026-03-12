@@ -1,6 +1,6 @@
 <template>
   <div class="card" :class="{ 'is-selected': selected }" @dblclick="selectable ? $emit('toggle-select', resource) : $emit('open', resource)" @contextmenu.prevent="!selectable && openMenu($event)" @click="selectable ? $emit('toggle-select', resource) : undefined">
-    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
+    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' || resource.type === 'document' }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
       <img v-if="thumbSrc" :src="thumbSrc" :alt="resource.title" />
       <div v-else class="cover-placeholder" style="pointer-events:none">
         <span class="type-icon" v-html="typeIcon" />
@@ -308,6 +308,18 @@ watchEffect(async () => {
     }
     return
   }
+  if (r.type === 'document') {
+    // 优先尝试 OS Shell 缩略图（PDF、已预览过的 Office 文件有效）
+    let thumb = await getCachedImage(r.file_path)
+    // fallback：获取系统文件图标（Word/Excel/PPT 等应用图标）
+    if (!thumb) thumb = await getCachedIcon(r.file_path)
+    thumbSrc.value = thumb
+    if (thumb && !r.cover_path && !_savedCovers.has(r.id)) {
+      _savedCovers.add(r.id)
+      window.api.files.saveCover(r.id, thumb).catch(() => {})
+    }
+    return
+  }
   thumbSrc.value = null
 })
 
@@ -319,6 +331,7 @@ const TYPE_ICONS: Record<string, string> = {
   comic: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="8" height="11" rx="1"/><rect x="13" y="3" width="8" height="11" rx="1"/><rect x="3" y="16" width="8" height="5" rx="1"/><rect x="13" y="16" width="8" height="5" rx="1"/></svg>`,
   music: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
   novel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
+  document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
   webpage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
   other: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
@@ -328,7 +341,7 @@ const typeIcon = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.ap
 
 const UNPLAYED_LABELS: Record<string, string> = {
   game: '未游玩', app: '未运行', video: '未观看',
-  image: '未查看', comic: '未阅读', music: '未收听', novel: '未阅读', folder: '未打开', other: '未使用'
+  image: '未查看', comic: '未阅读', music: '未收听', novel: '未阅读', document: '未查看', folder: '未打开', other: '未使用'
 }
 const unplayedLabel = computed(() => UNPLAYED_LABELS[props.resource.type] ?? '未使用')
 

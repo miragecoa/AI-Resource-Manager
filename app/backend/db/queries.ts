@@ -4,7 +4,7 @@ import { getDb } from './index'
 
 export interface Resource {
   id: string
-  type: 'image' | 'game' | 'app' | 'video'
+  type: 'image' | 'game' | 'app' | 'video' | 'comic' | 'music' | 'novel' | 'folder' | 'document' | 'webpage' | 'other'
   title: string
   file_path: string
   cover_path?: string
@@ -50,7 +50,7 @@ export function getResourceByPath(filePath: string): Resource | null {
 }
 
 export function upsertResource(
-  data: Omit<Resource, 'id' | 'added_at' | 'updated_at' | 'tags'> & { id?: string },
+  data: Omit<Resource, 'id' | 'added_at' | 'updated_at' | 'tags' | 'open_count' | 'total_run_time' | 'last_run_at'> & { id?: string; open_count?: number; total_run_time?: number; last_run_at?: number | null },
   updateTitle = false
 ): Resource | null {
   const db = getDb()
