@@ -317,7 +317,7 @@
                 <option value="count">数量最多</option>
                 <option value="name">名称</option>
               </select>
-              <button v-if="store.activeTags.length" class="clear-tags-btn" @click="store.activeTags.splice(0)">
+              <button v-if="store.activeTags.length || store.excludedTags.length" class="clear-tags-btn" @click="store.activeTags.splice(0); store.excludedTags.splice(0)">
                 清除
               </button>
             </div>
@@ -328,8 +328,10 @@
               v-for="tag in availableTags"
               :key="tag.id"
               class="tag-chip"
-              :class="{ active: store.activeTags.includes(tag.id) }"
+              :class="{ active: store.activeTags.includes(tag.id), excluded: store.excludedTags.includes(tag.id) }"
               @click="toggleTag(tag.id)"
+              @contextmenu.prevent="toggleExcludeTag(tag.id)"
+              :title="`左键：包含\n右键：排除`"
             >
               <span class="tag-chip-name">{{ tag.name }}</span>
               <span class="tag-chip-count">{{ tag.count }}</span>
@@ -1008,7 +1010,10 @@ const typeOptions: Array<{ label: string; value: ResourceType }> = [
   { label: '视频', value: 'video' },
   { label: '漫画', value: 'comic' },
   { label: '音乐', value: 'music' },
-  { label: '小说', value: 'novel' }
+  { label: '小说', value: 'novel' },
+  { label: '文档', value: 'document' },
+  { label: '文件夹', value: 'folder' },
+  { label: '其他', value: 'other' }
 ]
 
 function enterBatchMode() {
@@ -1186,8 +1191,8 @@ const availableTags = computed(() => {
 
   // 2. 如果处于筛选状态（有选择标签，或者输入了搜索词），隐藏无关标签（即 count = 0 且未被选中的）
   // 达到“层层递进”的体验
-  if (store.activeTags.length > 0 || store.searchQuery.trim().length > 0) {
-    tags = tags.filter(t => t.count > 0 || store.activeTags.includes(t.id))
+  if (store.activeTags.length > 0 || store.excludedTags.length > 0 || store.searchQuery.trim().length > 0) {
+    tags = tags.filter(t => t.count > 0 || store.activeTags.includes(t.id) || store.excludedTags.includes(t.id))
   }
 
   // 3. 标签面板顶部的输入框过滤（按名字全拼或拼音首字母匹配）
@@ -1197,7 +1202,7 @@ const availableTags = computed(() => {
   }
 
   // 4. 追加“未分类”虚拟项（如果有符合条件的项，或它已被勾选）
-  if (!tagSearch.value && (untaggedCount.value > 0 || store.activeTags.includes(0))) {
+  if (!tagSearch.value && (untaggedCount.value > 0 || store.activeTags.includes(0) || store.excludedTags.includes(0))) {
     return [{ id: 0, name: '未分类', count: untaggedCount.value }, ...tags]
   }
 
@@ -1205,14 +1210,39 @@ const availableTags = computed(() => {
 })
 
 function toggleTag(id: number) {
+  const exIdx = store.excludedTags.indexOf(id)
+  if (exIdx >= 0) {
+    store.excludedTags.splice(exIdx, 1)
+    return
+  }
+
   const idx = store.activeTags.indexOf(id)
   if (idx >= 0) {
     store.activeTags.splice(idx, 1)
-  } else {
-    store.activeTags.push(id)
-    // 记录点击时间，用于"最近使用"排序
-    window.api.tags.touch(id).then(() => loadTags()).catch(() => {})
+    return
   }
+
+  // 无选择状态下，左键正选
+  store.activeTags.push(id)
+  if (id !== 0) window.api.tags.touch(id).then(() => loadTags()).catch(() => {})
+}
+
+function toggleExcludeTag(id: number) {
+  const acIdx = store.activeTags.indexOf(id)
+  if (acIdx >= 0) {
+    store.activeTags.splice(acIdx, 1)
+    return
+  }
+
+  const idx = store.excludedTags.indexOf(id)
+  if (idx >= 0) {
+    store.excludedTags.splice(idx, 1)
+    return
+  }
+
+  // 无选择状态下，右键反选
+  store.excludedTags.push(id)
+  if (id !== 0) window.api.tags.touch(id).then(() => loadTags()).catch(() => {})
 }
 
 // 全局 dragover 监听：当光标移出 view-area 但仍在窗口内时，取消 fallback 计时器
@@ -1291,7 +1321,7 @@ function getBasename(filePath: string): string {
 
 const LIST_TYPE_LABELS: Record<string, string> = {
   image: '图片', game: '游戏', app: '应用程序', video: '视频',
-  comic: '漫画', music: '音乐', novel: '小说', webpage: '网页',
+  comic: '漫画', music: '音乐', novel: '小说', document: '文档', webpage: '网页',
   folder: '文件夹', other: '其他'
 }
 function listTypeLabel(type: string) { return LIST_TYPE_LABELS[type] ?? type }
@@ -1301,6 +1331,7 @@ const LIST_TYPE_ICONS: Record<string, string> = {
   game:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11.5" r=".6" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".6" fill="currentColor"/><path d="M21 12c0 5-2.5 8-9 8S3 17 3 12 5.5 4 12 4s9 3 9 8z"/></svg>`,
   app:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/><circle cx="7" cy="7" r=".8" fill="currentColor"/><circle cx="10" cy="7" r=".8" fill="currentColor"/></svg>`,
   video: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3V10z"/></svg>`,
+  document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
   webpage: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
 }
 function listTypeIcon(type: string) { return LIST_TYPE_ICONS[type] ?? LIST_TYPE_ICONS.app }
@@ -2403,6 +2434,21 @@ async function deleteIgnored(filePath: string) {
 .tag-chip.active .tag-chip-count {
   background: rgba(99, 102, 241, 0.18);
   color: var(--accent-2);
+}
+
+.tag-chip.excluded {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.tag-chip.excluded .tag-chip-name {
+  color: #ef4444;
+  text-decoration: line-through;
+}
+
+.tag-chip.excluded .tag-chip-count {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
 }
 
 .no-tags {

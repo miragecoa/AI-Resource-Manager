@@ -28,7 +28,10 @@ const SCAN_EXT_TYPES: Record<string, string> = {
   '.ogg': 'music', '.m4a': 'music', '.wma': 'music', '.ape': 'music',
   '.exe': 'app', '.lnk': 'app', '.msi': 'app',
   '.cbz': 'comic', '.cbr': 'comic', '.cb7': 'comic',
-  '.epub': 'novel', '.pdf': 'novel', '.mobi': 'novel',
+  '.epub': 'novel', '.mobi': 'novel',
+  '.doc': 'document', '.docx': 'document', '.xls': 'document', '.xlsx': 'document',
+  '.ppt': 'document', '.pptx': 'document', '.pdf': 'document', '.txt': 'document',
+  '.csv': 'document', '.rtf': 'document',
 }
 
 const appIconCache = new Map<string, string | null>()
@@ -439,7 +442,9 @@ export function registerIpcHandlers(): void {
   // ── 开机自启 ──────────────────────────────────────────
   ipcMain.handle('loginItem:get', () => app.getLoginItemSettings().openAtLogin)
   ipcMain.handle('loginItem:set', (_e, enable: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: enable, path: process.execPath })
+    if (app.isPackaged) {
+      app.setLoginItemSettings({ openAtLogin: enable, path: process.execPath })
+    }
     // 记录用户的手动选择，防止自动修正逻辑覆盖
     setSetting('autoStartDisabled', enable ? 'false' : 'true')
     setSetting('autoStartInitialized', 'true')

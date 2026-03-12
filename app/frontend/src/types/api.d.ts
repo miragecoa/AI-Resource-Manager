@@ -11,6 +11,12 @@ declare global {
         restore: (resource: import('../stores/resources').Resource) => Promise<import('../stores/resources').Resource | null>
         ignore: (filePath: string) => Promise<void>
         add: (data: { type: string; title: string; file_path: string; note?: string }) => Promise<{ resource: import('../stores/resources').Resource; existed: boolean }>
+        batchRemove: (ids: string[]) => Promise<number>
+        batchUpdate: (ids: string[], data: Partial<import('../stores/resources').Resource>) => Promise<import('../stores/resources').Resource[]>
+        batchReplacePath: (oldPrefix: string, newPrefix: string) => Promise<{ count: number; resources: import('../stores/resources').Resource[] }>
+        batchIgnore: (filePaths: string[]) => Promise<number>
+        batchAdd: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => Promise<{ added: import('../stores/resources').Resource[]; existing: import('../stores/resources').Resource[] }>
+        getPresetApps: () => Promise<Array<{ type: string; title: string; file_path: string; tags: string[] }>>
       }
       tags: {
         getAll: () => Promise<Array<{ id: number; name: string }>>
@@ -29,11 +35,16 @@ declare global {
       }
       files: {
         openPath: (filePath: string, meta?: string) => Promise<import('../stores/resources').Resource | null>
+        openAsAdmin: (filePath: string) => Promise<import('../stores/resources').Resource | null>
         openInExplorer: (filePath: string) => Promise<void>
         readImage: (filePath: string) => Promise<string | null>
         getAppIcon: (filePath: string) => Promise<string | null>
         saveCover: (resourceId: string, dataUrl: string) => Promise<string | null>
         pickFile: () => Promise<string | null>
+        pickImage: () => Promise<string | null>
+        pickFolder: () => Promise<string | null>
+        pickMultipleFiles: () => Promise<string[] | null>
+        scanDirectory: (dirPath: string) => Promise<Array<{ path: string; name: string; type: string }>>
       }
       onNewResource: (callback: (entry: object) => void) => () => void
       onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => () => void
@@ -58,6 +69,7 @@ declare global {
         getZoom: () => number
         getDbPath: () => Promise<string>
         getVersion: () => Promise<string>
+        openUrl: (url: string) => Promise<void>
       }
       updater: {
         check: () => Promise<{
