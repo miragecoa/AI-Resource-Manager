@@ -600,11 +600,10 @@
       </div>
     </Teleport>
 
-    <!-- 更新提示弹窗 -->
+    <!-- 更新提示弹窗（仅发现更新 / 错误时显示） -->
     <Teleport to="body">
       <div v-if="showUpdateModal" class="modal-overlay" @mousedown.self="dismissUpdate">
         <div class="update-modal">
-          <!-- 发现更新 -->
           <template v-if="updatePhase === 'available'">
             <span class="update-modal-icon" v-html="updateSvg" />
             <div class="update-modal-title">
@@ -613,27 +612,9 @@
             <div class="update-modal-size">{{ ((pendingUpdate?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB</div>
             <div class="update-modal-actions">
               <button class="update-modal-btn secondary" @click="doSkipUpdate">跳过此版本</button>
-              <button class="update-modal-btn" @click="doDownloadUpdate">立即更新</button>
+              <button class="update-modal-btn" @click="doDownloadUpdate">后台下载</button>
             </div>
           </template>
-          <!-- 下载中 -->
-          <template v-else-if="updatePhase === 'downloading'">
-            <div class="update-modal-title">正在下载更新...</div>
-            <div class="update-progress-wrap">
-              <div class="update-progress-bar">
-                <div class="update-progress-fill" :style="{ width: updatePercent + '%' }" />
-              </div>
-              <span class="update-progress-text">{{ updatePercent }}%</span>
-            </div>
-          </template>
-          <!-- 就绪 -->
-          <template v-else-if="updatePhase === 'ready'">
-            <span class="update-modal-icon done" v-html="checkSvg" />
-            <div class="update-modal-title">更新已就绪</div>
-            <div class="update-modal-size">重启应用以完成更新</div>
-            <button class="update-modal-btn" @click="doApplyUpdate">重启并更新</button>
-          </template>
-          <!-- 错误 -->
           <template v-else-if="updatePhase === 'error'">
             <div class="update-modal-title">更新失败</div>
             <div class="update-modal-size" style="color: #ef4444;">请稍后重试</div>
@@ -641,6 +622,22 @@
           </template>
         </div>
       </div>
+    </Teleport>
+
+    <!-- 后台下载进度（右下角悬浮） -->
+    <Teleport to="body">
+      <Transition name="update-float">
+        <div v-if="updatePhase === 'downloading' || updatePhase === 'ready'" class="update-float">
+          <div class="update-float-info">
+            <span>{{ updatePhase === 'ready' ? '更新已就绪' : '正在后台下载更新' }}</span>
+            <span v-if="updatePhase === 'downloading'" class="update-float-pct">{{ updatePercent }}%</span>
+            <button v-if="updatePhase === 'ready'" class="update-float-btn" @click="doApplyUpdate">重启安装</button>
+          </div>
+          <div v-if="updatePhase === 'downloading'" class="update-progress-bar" style="height:4px;margin-top:2px">
+            <div class="update-progress-fill" :style="{ width: updatePercent + '%' }" />
+          </div>
+        </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
@@ -1486,11 +1483,13 @@ onUnmounted(() => { unsubUpdateAvailable(); unsubUpdateProgress() })
 async function doDownloadUpdate() {
   updatePhase.value = 'downloading'
   updatePercent.value = 0
+  showUpdateModal.value = false  // 关闭弹窗，转入后台
   try {
     await window.api.updater.download()
     updatePhase.value = 'ready'
   } catch {
     updatePhase.value = 'error'
+    showUpdateModal.value = true  // 失败时重新弹出
   }
 }
 
@@ -1504,7 +1503,6 @@ function doApplyUpdate() {
 }
 
 function dismissUpdate() {
-  if (updatePhase.value === 'downloading') return  // don't dismiss during download
   showUpdateModal.value = false
 }
 
@@ -1774,6 +1772,52 @@ async function deleteIgnored(filePath: string) {
 .scan-modal .spinner.lg { width: 40px; height: 40px; }
 
 /* 更新弹窗 */
+/* 右下角后台下载悬浮条 */
+.update-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  min-width: 240px;
+  max-width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+.update-float-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--text);
+  gap: 10px;
+}
+.update-float-pct {
+  color: var(--text-3);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.update-float-btn {
+  padding: 4px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+.update-float-btn:hover { opacity: 0.85; }
+.update-float-enter-active, .update-float-leave-active { transition: all 0.25s ease; }
+.update-float-enter-from, .update-float-leave-to { opacity: 0; transform: translateY(10px); }
+
 .update-modal {
   background: var(--surface);
   border: 1px solid var(--border);
