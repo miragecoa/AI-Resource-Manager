@@ -1478,19 +1478,21 @@ const unsubUpdateAvailable = window.api.onUpdateAvailable((info) => {
 const unsubUpdateProgress = window.api.onUpdateProgress((percent) => {
   updatePercent.value = percent
 })
-onUnmounted(() => { unsubUpdateAvailable(); unsubUpdateProgress() })
+const unsubDownloadDone = window.api.onDownloadDone(() => {
+  updatePhase.value = 'ready'
+})
+const unsubDownloadError = window.api.onDownloadError(() => {
+  updatePhase.value = 'error'
+  showUpdateModal.value = true
+})
+onUnmounted(() => { unsubUpdateAvailable(); unsubUpdateProgress(); unsubDownloadDone(); unsubDownloadError() })
 
-async function doDownloadUpdate() {
+function doDownloadUpdate() {
   updatePhase.value = 'downloading'
   updatePercent.value = 0
   showUpdateModal.value = false  // 关闭弹窗，转入后台
-  try {
-    await window.api.updater.download()
-    updatePhase.value = 'ready'
-  } catch {
-    updatePhase.value = 'error'
-    showUpdateModal.value = true  // 失败时重新弹出
-  }
+  // Fire-and-forget: download runs in main process; done/error arrive as events
+  window.api.updater.download()
 }
 
 function doSkipUpdate() {

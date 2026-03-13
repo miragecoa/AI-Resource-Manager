@@ -87,6 +87,8 @@ declare global {
       }
       onUpdateAvailable: (callback: (info: any) => void) => () => void
       onUpdateProgress: (callback: (percent: number) => void) => () => void
+      onDownloadDone: (callback: () => void) => () => void
+      onDownloadError: (callback: (msg: string) => void) => () => void
       webpage: {
         fetchFavicon: (url: string) => Promise<string | null>
         importChromeBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>

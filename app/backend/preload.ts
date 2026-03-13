@@ -137,6 +137,14 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.on('updater:progress', (_e, percent) => callback(percent))
     return () => ipcRenderer.removeAllListeners('updater:progress')
   },
+  onDownloadDone: (callback: () => void) => {
+    ipcRenderer.on('updater:download-done', () => callback())
+    return () => ipcRenderer.removeAllListeners('updater:download-done')
+  },
+  onDownloadError: (callback: (msg: string) => void) => {
+    ipcRenderer.on('updater:download-error', (_e, msg) => callback(msg))
+    return () => ipcRenderer.removeAllListeners('updater:download-error')
+  },
 
   // 网页资源
   webpage: {

@@ -491,8 +491,12 @@ export function registerIpcHandlers(): void {
     return checkForUpdate()
   })
   ipcMain.handle('updater:download', () => {
+    // Fire-and-forget: return immediately so IPC doesn't block progress events
     const win = BrowserWindow.getAllWindows()[0] || null
-    return downloadUpdate(win)
+    downloadUpdate(win)
+      .then(() => { win?.webContents.send('updater:download-done') })
+      .catch((err: any) => { win?.webContents.send('updater:download-error', err?.message ?? 'Download failed') })
+    return null
   })
   ipcMain.handle('updater:apply', () => {
     applyAndRestart()
