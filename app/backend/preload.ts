@@ -151,6 +151,8 @@ contextBridge.exposeInMainWorld('api', {
     fetchFavicon: (url: string): Promise<string | null> => ipcRenderer.invoke('webpage:fetchFavicon', url),
     importChromeBookmarks: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
       ipcRenderer.invoke('webpage:importChromeBookmarks'),
+    importBrowserBookmarks: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
+      ipcRenderer.invoke('webpage:importBrowserBookmarks'),
   },
 
   // 配置文件（多数据库）

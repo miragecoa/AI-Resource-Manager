@@ -535,33 +535,45 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('webpage:importChromeBookmarks', () => {
     const localAppData = process.env.LOCALAPPDATA || ''
-    const chromeBase = join(localAppData, 'Google', 'Chrome', 'User Data')
-    if (!existsSync(chromeBase)) return []
-
-    const results: Array<{ name: string; url: string; folder: string }> = []
-
-    // Collect from Default + Profile N
-    const profiles = ['Default']
-    try {
-      for (const d of readdirSync(chromeBase)) {
-        if (d.startsWith('Profile ')) profiles.push(d)
-      }
-    } catch { /* ignore */ }
-
-    for (const profile of profiles) {
-      const bookmarksPath = join(chromeBase, profile, 'Bookmarks')
-      if (!existsSync(bookmarksPath)) continue
-      try {
-        const data = JSON.parse(readFileSync(bookmarksPath, 'utf8'))
-        const roots = data.roots || {}
-        for (const key of ['bookmark_bar', 'other', 'synced']) {
-          if (roots[key]) flattenBookmarks(roots[key], '', results)
-        }
-        break  // Use first profile that has bookmarks
-      } catch { continue }
-    }
-    return results
+    return readBrowserBookmarks(join(localAppData, 'Google', 'Chrome', 'User Data'))
   })
+
+  ipcMain.handle('webpage:importBrowserBookmarks', () => {
+    const localAppData = process.env.LOCALAPPDATA || ''
+    const chrome = readBrowserBookmarks(join(localAppData, 'Google', 'Chrome', 'User Data'))
+    const edge   = readBrowserBookmarks(join(localAppData, 'Microsoft', 'Edge', 'User Data'))
+    // Merge, deduplicate by URL
+    const seen = new Set(chrome.map(b => b.url))
+    const merged = [...chrome]
+    for (const b of edge) {
+      if (!seen.has(b.url)) { merged.push(b); seen.add(b.url) }
+    }
+    return merged
+  })
+}
+
+function readBrowserBookmarks(baseDir: string): Array<{ name: string; url: string; folder: string }> {
+  if (!existsSync(baseDir)) return []
+  const results: Array<{ name: string; url: string; folder: string }> = []
+  const profiles = ['Default']
+  try {
+    for (const d of readdirSync(baseDir)) {
+      if (d.startsWith('Profile ')) profiles.push(d)
+    }
+  } catch { /* ignore */ }
+  for (const profile of profiles) {
+    const bookmarksPath = join(baseDir, profile, 'Bookmarks')
+    if (!existsSync(bookmarksPath)) continue
+    try {
+      const data = JSON.parse(readFileSync(bookmarksPath, 'utf8'))
+      const roots = data.roots || {}
+      for (const key of ['bookmark_bar', 'other', 'synced']) {
+        if (roots[key]) flattenBookmarks(roots[key], '', results)
+      }
+      break  // Use first profile that has bookmarks
+    } catch { continue }
+  }
+  return results
 }
 
 function flattenBookmarks(

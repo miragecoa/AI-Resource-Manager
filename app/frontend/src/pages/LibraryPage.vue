@@ -170,10 +170,10 @@
             <span class="empty-icon" v-html="emptyIcon" />
             <div class="empty-text">暂无资源</div>
             <div v-if="store.activeType === 'webpage'" class="empty-hint">
-              收藏网页链接，或一键导入 Chrome 书签
-              <button class="import-footer-btn" @click="importChromeBookmarks" :disabled="chromeImporting">
+              收藏网页链接，或一键导入 Chrome/Edge 书签
+              <button class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
-                {{ chromeImporting ? '导入中...' : '导入 Chrome 书签' }}
+                {{ browserImporting ? '导入中...' : '导入 Chrome/Edge 书签' }}
               </button>
             </div>
             <div v-else-if="store.activeType === 'app'" class="empty-hint">
@@ -283,9 +283,9 @@
               class="import-footer"
               :class="{ visible: footerVisible }"
             >
-              <button v-if="store.activeType === 'webpage'" class="import-footer-btn" @click="importChromeBookmarks" :disabled="chromeImporting">
+              <button v-if="store.activeType === 'webpage'" class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
-                {{ chromeImporting ? '导入中...' : '导入 Chrome 书签' }}
+                {{ browserImporting ? '导入中...' : '导入 Chrome/Edge 书签' }}
               </button>
               <button v-if="store.activeType === 'app'" class="import-footer-btn" @click="addPresetApps" :disabled="presetAdding">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -686,13 +686,13 @@ watch(gridScrollRef, (el, oldEl) => {
     })
   }
 })
-const chromeImporting = ref(false)
-async function importChromeBookmarks() {
-  chromeImporting.value = true
+const browserImporting = ref(false)
+async function importBrowserBookmarks() {
+  browserImporting.value = true
   try {
-    const bookmarks = await window.api.webpage.importChromeBookmarks()
+    const bookmarks = await window.api.webpage.importBrowserBookmarks()
     if (!bookmarks.length) {
-      alert('未找到 Chrome 书签')
+      alert('未找到浏览器书签（Chrome / Edge）')
       return
     }
     const items = bookmarks.map(b => ({
@@ -716,7 +716,7 @@ async function importChromeBookmarks() {
       if (tagNames.length) assignments.push({ resourceId: resource.id, tagNames })
     }
     if (assignments.length) {
-      await window.api.tags.batchAssign(assignments, 'chrome-import')
+      await window.api.tags.batchAssign(assignments, 'browser-import')
     }
 
     // 标签关联完成后刷新列表
@@ -728,7 +728,6 @@ async function importChromeBookmarks() {
         if (!icon) return
         const coverPath = await window.api.files.saveCover(resource.id, icon)
         if (!coverPath) return
-        // 从 store 取最新版本（含标签），只更新 cover_path
         const current = store.items.find(r => r.id === resource.id)
         store.addOrUpdate({ ...(current || resource), cover_path: coverPath })
       }).catch(() => {})
@@ -736,7 +735,7 @@ async function importChromeBookmarks() {
   } catch (e: any) {
     alert('导入失败: ' + (e?.message ?? ''))
   } finally {
-    chromeImporting.value = false
+    browserImporting.value = false
   }
 }
 
@@ -1265,8 +1264,8 @@ onMounted(async () => {
     // 系统扫描
     showScanModal.value = true
     doSystemScan()
-    // Chrome 书签导入 + 常用工具
-    importChromeBookmarks()
+    // 浏览器书签导入（Chrome + Edge）+ 常用工具
+    importBrowserBookmarks()
     addPresetApps()
   }
 })

@@ -92,6 +92,7 @@ declare global {
       webpage: {
         fetchFavicon: (url: string) => Promise<string | null>
         importChromeBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>
+        importBrowserBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>
       }
       profiles: {
         list: () => Promise<{ active: string; profiles: Array<{ id: string; name: string }> }>
