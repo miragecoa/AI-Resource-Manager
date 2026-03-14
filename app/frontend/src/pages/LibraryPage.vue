@@ -80,18 +80,9 @@
             <span class="btn-icon" v-html="scanSysSvg" />
             <span class="btn-text">系统扫描</span>
           </button>
-          <div class="sort-wrap">
-            <span class="sort-icon" v-html="sortSvg" />
-            <select class="sort-select" :value="settingsStore.resourceSort" @change="onSortChange">
-              <option value="lastUsed">最近使用</option>
-              <option value="recentlyAdded">最近添加</option>
-              <option value="name">名称</option>
-              <option value="openCount">打开次数</option>
-              <option value="totalTime">累计时长</option>
-            </select>
-          </div>
         </div>
       </div>
+
     </div>
 
     <!-- 批量操作工具栏 -->
@@ -162,6 +153,38 @@
 
         <!-- 普通库视图 -->
         <template v-else>
+          <!-- 排序栏 -->
+          <div v-if="!store.loading && store.filtered.length > 0" class="sort-bar">
+            <span class="sort-bar-count">共 {{ listSortedFiltered.length }} 个</span>
+            <div class="sort-bar-spacer" />
+            <div class="sort-bar-right">
+              <!-- 高级筛选下拉 -->
+              <div class="qf-wrap">
+                <button class="qf-trigger" :class="{ active: quickFilters.length > 0 }" @click.stop="showQfDropdown = !showQfDropdown">
+                  <span class="sort-icon" v-html="sortSvg" />
+                  筛选
+                  <span class="qf-badge" v-if="quickFilters.length > 0">{{ quickFilters.length }}</span>
+                  <span class="type-filter-caret" v-html="chevronDownSvg" :class="{ open: showQfDropdown }" />
+                </button>
+                <div v-if="showQfDropdown" class="qf-dropdown" @click.stop>
+                  <label v-for="qf in quickFilterDefs" :key="qf.key" class="type-filter-item">
+                    <input type="checkbox" :value="qf.key" v-model="quickFilters" />
+                    <span class="tfi-label">{{ qf.label }}</span>
+                  </label>
+                  <div v-if="quickFilters.length > 0" class="type-filter-footer">
+                    <button class="tfi-clear-btn" @click="quickFilters = []">清除</button>
+                  </div>
+                </div>
+              </div>
+              <span class="sort-icon" v-html="sortSvg" />
+              <select class="sort-select-inline" :value="settingsStore.resourceSort" @change="onSortChange">
+                <option value="lastUsed">最近使用</option>
+                <option value="recentlyAdded">最近添加</option>
+                <option value="modifiedAt">修改时间</option>
+              </select>
+            </div>
+          </div>
+
           <div v-if="store.loading" class="empty-state">
             <div class="spinner" />
           </div>
@@ -207,10 +230,50 @@
             <div v-else class="list-view" :style="{ '--list-zoom': settingsStore.cardZoom }">
               <div class="list-header" :style="colStyle">
                 <span class="lh-thumb"></span>
-                <span class="lh-name">名称</span><div class="col-resizer" @mousedown="startColResize('name', $event)" />
-                <span class="lh-type">类型</span><div class="col-resizer" @mousedown="startColResize('type', $event)" />
-                <span class="lh-date">修改日期</span><div class="col-resizer" @mousedown="startColResize('date', $event)" />
-                <span class="lh-count">打开次数</span><div class="col-resizer" @mousedown="startColResize('count', $event)" />
+                <span class="lh-name sortable-col" :class="{ active: listSortCol === 'name' }" @click="onColSort('name')" title="点击排序">
+                  名称<span class="sort-arrow" v-show="listSortCol === 'name'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                </span><div class="col-resizer" @mousedown="startColResize('name', $event)" />
+                <span class="lh-type type-filter-col" :class="{ 'filter-active': activeFilterCount > 0 }" @click.stop="toggleTypeFilter($event)" title="点击过滤类型/后缀">
+                  类型
+                  <span class="type-filter-badge" v-if="activeFilterCount > 0">{{ activeFilterCount }}</span>
+                  <span class="type-filter-caret" v-html="chevronDownSvg" :class="{ open: showTypeFilter }" />
+                </span><div class="col-resizer" @mousedown="startColResize('type', $event)" />
+                <!-- 类型 + 后缀 过滤下拉 -->
+                <div v-if="showTypeFilter" class="type-filter-dropdown" :style="{ top: typeFilterPos.top + 'px', left: typeFilterPos.left + 'px' }" @click.stop>
+                  <!-- 顶部：排序 + 清除 -->
+                  <div class="tfi-sort-row">
+                    <span class="tfi-sort-label">排序</span>
+                    <button class="tfi-sort-btn" :class="{ active: typeSortDir === 'asc' }" @click="typeSortDir = typeSortDir === 'asc' ? null : 'asc'">
+                      <span v-html="arrowUpSvg" />升序
+                    </button>
+                    <button class="tfi-sort-btn" :class="{ active: typeSortDir === 'desc' }" @click="typeSortDir = typeSortDir === 'desc' ? null : 'desc'">
+                      <span v-html="arrowDownSvg" />降序
+                    </button>
+                    <button v-if="activeFilterCount > 0" class="tfi-clear-btn tfi-clear-inline" @click="typeFilterArr = []; extFilterArr = []; typeSortDir = null">清除</button>
+                  </div>
+                  <!-- 类型 section -->
+                  <div class="tfi-section-label tfi-section-sep">类型</div>
+                  <label v-for="t in availableTypes" :key="t.value" class="type-filter-item">
+                    <input type="checkbox" :value="t.value" v-model="typeFilterArr" />
+                    <span class="tfi-label">{{ t.label }}</span>
+                    <span class="tfi-count">{{ t.count }}</span>
+                  </label>
+                  <!-- 后缀 section -->
+                  <template v-if="availableExts.length > 0">
+                    <div class="tfi-section-label tfi-section-sep">后缀</div>
+                    <label v-for="e in availableExts" :key="e.ext" class="type-filter-item">
+                      <input type="checkbox" :value="e.ext" v-model="extFilterArr" />
+                      <span class="tfi-label tfi-ext">{{ e.ext }}</span>
+                      <span class="tfi-count">{{ e.count }}</span>
+                    </label>
+                  </template>
+                </div>
+                <span class="lh-date sortable-col" :class="{ active: listSortCol === 'date' }" @click="onColSort('date')" title="点击排序">
+                  修改日期<span class="sort-arrow" v-show="listSortCol === 'date'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                </span><div class="col-resizer" @mousedown="startColResize('date', $event)" />
+                <span class="lh-count sortable-col" :class="{ active: listSortCol === 'count' }" @click="onColSort('count')" title="点击排序">
+                  打开次数<span class="sort-arrow" v-show="listSortCol === 'count'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                </span><div class="col-resizer" @mousedown="startColResize('count', $event)" />
                 <span class="lh-tags">标签</span>
               </div>
               <div
@@ -232,7 +295,10 @@
                   <input v-if="batchMode" type="checkbox" :checked="selectedIds.has(item.id)" class="lr-checkbox" />
                   {{ item.title }}
                 </span>
-                <span class="lr-type">{{ listTypeLabel(item.type) }}</span>
+                <span class="lr-type">
+                  <span class="lr-type-icon" v-html="listTypeIcon(item.type)" />
+                  <span class="lr-type-ext">{{ getFileExt(item.file_path) || listTypeLabel(item.type) }}</span>
+                </span>
                 <span class="lr-date">{{ formatListDate(item.updated_at) }}</span>
                 <span class="lr-count">{{ item.open_count }}次</span>
                 <span class="lr-tags">
@@ -782,7 +848,139 @@ const renderLimit = ref(BATCH_SIZE)
 const sentinelRef = ref<HTMLElement | null>(null)
 let sentinelObserver: IntersectionObserver | null = null
 
-const visibleItems = computed(() => store.filtered.slice(0, renderLimit.value))
+// ── 列表视图：本地列点击排序 ───────────────────
+const listSortCol = ref<'name'|'type'|'date'|'count'|null>(null)
+const listSortDesc = ref(false)
+
+// ── 列表视图：类型 + 后缀过滤 ───────────────────────
+const typeFilterArr = ref<string[]>([])
+const extFilterArr  = ref<string[]>([])
+const typeSortDir   = ref<'asc' | 'desc' | null>(null)
+const showTypeFilter = ref(false)
+const typeFilterPos = ref({ top: 0, left: 0 })
+
+const activeFilterCount = computed(() =>
+  typeFilterArr.value.length + extFilterArr.value.length + (typeSortDir.value ? 1 : 0)
+)
+
+function getFileExt(filePath: string): string {
+  if (!filePath || filePath.startsWith('http')) return ''
+  const name = filePath.replace(/^.*[\\/]/, '')
+  const dot = name.lastIndexOf('.')
+  if (dot <= 0) return ''
+  return name.slice(dot).toLowerCase()
+}
+
+const availableTypes = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const item of store.filtered) {
+    counts[item.type] = (counts[item.type] || 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([value, count]) => ({ value, label: listTypeLabel(value), count }))
+    .sort((a, b) => b.count - a.count)
+})
+
+const availableExts = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const item of store.filtered) {
+    const ext = getFileExt(item.file_path)
+    if (ext) counts[ext] = (counts[ext] || 0) + 1
+  }
+  return Object.entries(counts)
+    .map(([ext, count]) => ({ ext, count }))
+    .sort((a, b) => b.count - a.count)
+})
+
+function toggleTypeFilter(e: MouseEvent) {
+  if (showTypeFilter.value) { showTypeFilter.value = false; return }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  typeFilterPos.value = { top: rect.bottom + 4, left: rect.left }
+  showTypeFilter.value = true
+}
+
+function onDocCloseTypeFilter() { showTypeFilter.value = false; showQfDropdown.value = false }
+
+const arrowUpSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
+const arrowDownSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>'
+const chevronDownSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+
+function onColSort(col: 'name'|'type'|'date'|'count') {
+  if (listSortCol.value !== col) {
+    // 新列：设置默认方向（日期/次数默认降序）
+    listSortCol.value = col
+    listSortDesc.value = (col === 'date' || col === 'count')
+    return
+  }
+  // 同一列：在默认方向 → 反向 → 重置 之间循环
+  const defaultDesc = (col === 'date' || col === 'count')
+  if (listSortDesc.value === defaultDesc) {
+    listSortDesc.value = !defaultDesc // 切换到反向
+  } else {
+    listSortCol.value = null          // 重置
+    listSortDesc.value = false
+  }
+}
+
+const listSortedFiltered = computed(() => {
+  // 快速筛选（全视图通用）
+  let base = store.filtered
+  if (quickFilters.value.length > 0) {
+    base = base.filter(item => quickFilters.value.every(key => {
+      if (key === 'neverOpened') return item.open_count === 0
+      if (key === 'untagged')    return !item.tags || item.tags.length === 0
+      if (key === 'hasTag')      return item.tags && item.tags.length > 0
+      return true
+    }))
+  }
+
+  // 类型 + 后缀 过滤（列表视图专用）
+  if (settingsStore.viewMode === 'list') {
+    const typeSet = new Set(typeFilterArr.value)
+    const extSet  = new Set(extFilterArr.value)
+    if (typeSet.size > 0 || extSet.size > 0) {
+      base = base.filter(item =>
+        (typeSet.size === 0 || typeSet.has(item.type)) &&
+        (extSet.size  === 0 || extSet.has(getFileExt(item.file_path)))
+      )
+    }
+  }
+
+  // 是否有任何列表视图专属排序
+  const hasListSort = settingsStore.viewMode === 'list' && (typeSortDir.value || listSortCol.value)
+  if (!hasListSort) return base
+
+  const typeDir = typeSortDir.value === 'asc' ? 1 : typeSortDir.value === 'desc' ? -1 : 0
+
+  return base.slice().sort((a, b) => {
+    // 置顶 / 运行中始终最前
+    const aScore = (a.pinned ? 2 : 0) + (store.runningMap.has(a.id) ? 1 : 0)
+    const bScore = (b.pinned ? 2 : 0) + (store.runningMap.has(b.id) ? 1 : 0)
+    if (aScore !== bScore) return bScore - aScore
+
+    // 主键：类型升降序（面板设置）
+    if (typeDir !== 0) {
+      const typeCmp = typeDir * listTypeLabel(a.type).localeCompare(listTypeLabel(b.type), 'zh-CN')
+      if (typeCmp !== 0) return typeCmp
+      // 同类型 / 同后缀内按名称 A→Z（升序）或 Z→A（降序）
+      return typeDir * a.title.localeCompare(b.title, 'zh-CN')
+    }
+
+    // 次键：列头点击排序
+    if (listSortCol.value) {
+      let cmp = 0
+      if (listSortCol.value === 'name')  cmp = a.title.localeCompare(b.title, 'zh-CN')
+      else if (listSortCol.value === 'type')  cmp = listTypeLabel(a.type).localeCompare(listTypeLabel(b.type), 'zh-CN')
+      else if (listSortCol.value === 'date')  cmp = a.updated_at - b.updated_at
+      else if (listSortCol.value === 'count') cmp = a.open_count - b.open_count
+      return listSortDesc.value ? -cmp : cmp
+    }
+
+    return 0
+  })
+})
+
+const visibleItems = computed(() => listSortedFiltered.value.slice(0, renderLimit.value))
 
 // 过滤条件变化时重置渲染数量
 watch(() => [store.activeType, store.searchQuery, store.activeTags], () => {
@@ -1250,10 +1448,53 @@ function onDocDragOver(e: Event) {
   }
 }
 
+// ── 快速筛选（sort bar）───────────────────────
+const quickFilterDefs = [
+  { key: 'neverOpened', label: '从未打开' },
+  { key: 'untagged',    label: '未分类'   },
+  { key: 'hasTag',      label: '有标签'   },
+] as const
+type QuickFilterKey = typeof quickFilterDefs[number]['key']
+const quickFilters = ref<QuickFilterKey[]>([])
+const showQfDropdown = ref(false)
+function toggleQuickFilter(key: QuickFilterKey) {
+  const idx = quickFilters.value.indexOf(key)
+  if (idx >= 0) quickFilters.value.splice(idx, 1)
+  else quickFilters.value.push(key)
+}
+
+// ── 列表视图状态持久化 ───────────────────────
+const LIST_STATE_KEY = 'listViewState'
+async function saveListViewState() {
+  await window.api.settings.set(LIST_STATE_KEY, JSON.stringify({
+    typeFilter:   typeFilterArr.value,
+    extFilter:    extFilterArr.value,
+    typeSortDir:  typeSortDir.value,
+    listSortCol:  listSortCol.value,
+    listSortDesc: listSortDesc.value,
+    quickFilters: quickFilters.value,
+  }))
+}
+watch([typeFilterArr, extFilterArr, typeSortDir, listSortCol, listSortDesc, quickFilters], saveListViewState, { deep: true })
+
 onMounted(async () => {
   settingsStore.load()
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('dragover', onDocDragOver)
+  document.addEventListener('click', onDocCloseTypeFilter)
+  // 恢复列表视图状态
+  const raw = await window.api.settings.get(LIST_STATE_KEY)
+  if (raw) {
+    try {
+      const s = JSON.parse(raw)
+      if (Array.isArray(s.typeFilter))  typeFilterArr.value  = s.typeFilter
+      if (Array.isArray(s.extFilter))   extFilterArr.value   = s.extFilter
+      if (s.typeSortDir)                typeSortDir.value    = s.typeSortDir
+      if (s.listSortCol)                listSortCol.value    = s.listSortCol
+      if (typeof s.listSortDesc === 'boolean') listSortDesc.value = s.listSortDesc
+      if (Array.isArray(s.quickFilters)) quickFilters.value = s.quickFilters
+    } catch { /* ignore */ }
+  }
   loadTags()
   ignoredPaths.value = await window.api.ignoredPaths.getAll()
 
@@ -1273,6 +1514,7 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('dragover', onDocDragOver)
+  document.removeEventListener('click', onDocCloseTypeFilter)
   sentinelObserver?.disconnect()
 })
 
@@ -1292,6 +1534,15 @@ function onCardZoomInput(e: Event) {
 function onSortChange(e: Event) {
   settingsStore.setResourceSort((e.target as HTMLSelectElement).value as ResourceSortField)
 }
+
+const sortOptions: Array<{ value: ResourceSortField; label: string }> = [
+  { value: 'lastUsed',       label: '最近使用' },
+  { value: 'recentlyAdded', label: '最近添加' },
+  { value: 'name',           label: '名称'     },
+  { value: 'openCount',      label: '打开次数' },
+  { value: 'totalTime',      label: '累计时长' },
+  { value: 'modifiedAt',     label: '修改时间' },
+]
 
 const showIgnored = ref(false)
 const ignoredPaths = ref<string[]>([])
@@ -2083,7 +2334,7 @@ async function deleteIgnored(filePath: string) {
   position: sticky;
   top: 0;
   background: var(--bg);
-  z-index: 1;
+  z-index: 20;
   user-select: none;
 }
 .list-row {
@@ -2115,9 +2366,131 @@ async function deleteIgnored(filePath: string) {
 .lh-count, .lr-count { width: var(--col-count, 70px); flex-shrink: 0; text-align: center; font-size: 12px; }
 .lh-tags, .lr-tags { width: var(--col-tags, 200px); flex-shrink: 1; min-width: 0; display: flex; gap: 4px; overflow: hidden; }
 
+.sortable-col {
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  transition: color 0.15s;
+}
+.sortable-col:hover { color: var(--text); }
+.sortable-col.active { color: var(--accent-1); font-weight: 500; }
+.lh-count.sortable-col { justify-content: center; } /* keep count centered */
+.sort-arrow { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; margin-left: 2px; flex-shrink: 0; }
+.sort-arrow :deep(svg) { width: 14px; height: 14px; stroke: currentColor; }
+
+/* ── 类型列过滤 ── */
+.type-filter-col {
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  gap: 3px;
+  user-select: none;
+  transition: color 0.15s;
+  position: relative;
+}
+.type-filter-col:hover { color: var(--text); }
+.type-filter-col.filter-active { color: var(--accent-1); font-weight: 500; }
+.type-filter-badge {
+  font-size: 10px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  line-height: 16px;
+  flex-shrink: 0;
+}
+.type-filter-caret { display: inline-flex; align-items: center; flex-shrink: 0; transition: transform 0.15s; }
+.type-filter-caret.open { transform: rotate(180deg); }
+.type-filter-caret :deep(svg) { width: 12px; height: 12px; }
+
+.type-filter-dropdown {
+  position: fixed;
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  min-width: 160px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+.type-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-2);
+  transition: background 0.1s;
+}
+.type-filter-item:hover { background: var(--surface-2); }
+.type-filter-item input[type="checkbox"] { accent-color: var(--accent); flex-shrink: 0; }
+.tfi-label { flex: 1; }
+.tfi-count { font-size: 11px; color: var(--text-3); }
+.type-filter-footer {
+  border-top: 1px solid var(--border);
+  padding: 6px 14px 4px;
+  margin-top: 4px;
+}
+.tfi-clear-btn {
+  font-size: 11px;
+  color: var(--accent-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.tfi-clear-btn:hover { color: var(--text); }
+.tfi-clear-inline { margin-left: auto; }
+/* 排序行 */
+.tfi-sort-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 4px;
+}
+.tfi-sort-label {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.tfi-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tfi-sort-btn :deep(svg) { width: 11px; height: 11px; }
+.tfi-sort-btn:hover { background: var(--surface-2); color: var(--text); }
+.tfi-sort-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.tfi-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  padding: 4px 14px 2px;
+}
+.tfi-section-sep { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+.tfi-ext { font-family: monospace; font-size: 12px; }
+
 .lr-name { display: flex; align-items: center; gap: 6px; }
 .lr-checkbox { accent-color: var(--accent); }
-.lr-type { font-size: 12px; color: var(--text-3); }
+.lr-type { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.lr-type-icon { display: flex; flex-shrink: 0; }
+.lr-type-icon :deep(svg) { width: 13px; height: 13px; stroke: currentColor; }
+.lr-type-ext { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lr-tag {
   font-size: 11px;
   padding: 1px 6px;
@@ -2167,6 +2540,79 @@ async function deleteIgnored(filePath: string) {
   transition: border-color .15s;
 }
 .sort-select:focus { border-color: var(--accent); }
+
+/* ── 排序栏（内容区顶部）── */
+.sort-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.sort-bar-count {
+  font-size: 11px;
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+.sort-bar-spacer { flex: 1; }
+.sort-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+/* 高级筛选下拉 */
+.qf-wrap { position: relative; }
+.qf-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-3);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.qf-trigger:hover { background: var(--surface-2); color: var(--text); }
+.qf-trigger.active { border-color: var(--accent); color: var(--accent); }
+.qf-badge {
+  font-size: 10px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 4px;
+  line-height: 15px;
+}
+.qf-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  min-width: 130px;
+  padding: 6px 0;
+}
+.sort-select-inline {
+  padding: 2px 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-2);
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+  transition: border-color .15s;
+}
+.sort-select-inline:focus { border-color: var(--accent); }
 
 .zoom-slider-wrap {
   display: flex;

@@ -100,6 +100,7 @@ export const useResourceStore = defineStore('resources', () => {
       name:          (a, b) => a.title.localeCompare(b.title, 'zh-CN'),
       openCount:     (a, b) => b.open_count - a.open_count,
       totalTime:     (a, b) => b.total_run_time - a.total_run_time,
+      modifiedAt:    (a, b) => b.updated_at - a.updated_at,
     }
     const userSort = SORT_FN[sortField] ?? SORT_FN.lastUsed
 

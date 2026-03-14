@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { NAV_ITEM_DEFS } from '../config/navItems'
 
-export type ResourceSortField = 'lastUsed' | 'recentlyAdded' | 'name' | 'openCount' | 'totalTime'
+export type ResourceSortField = 'lastUsed' | 'recentlyAdded' | 'name' | 'openCount' | 'totalTime' | 'modifiedAt'
 export type TagSortField = 'lastUsed' | 'count' | 'name'
 
 export interface SidebarNavConfig {
