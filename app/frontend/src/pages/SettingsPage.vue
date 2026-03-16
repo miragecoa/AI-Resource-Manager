@@ -154,6 +154,55 @@
         </div>
       </section>
 
+      <!-- 更新日志 -->
+      <section class="section">
+        <h2 class="section-title">更新日志</h2>
+        <div class="changelog-wrap">
+          <div v-if="changelogStatus === 'loading'" class="changelog-empty">加载中…</div>
+          <div v-else-if="changelogStatus === 'error'" class="changelog-empty">加载失败，请检查网络</div>
+          <template v-else>
+            <!-- 最新版本 -->
+            <div
+              v-if="changelog.length > 0"
+              class="changelog-item"
+              :class="{ expanded: expandedChangelog === 0 }"
+              @click="expandedChangelog = expandedChangelog === 0 ? -1 : 0"
+            >
+              <div class="changelog-header">
+                <span class="changelog-tag">v{{ changelog[0].tag }}</span>
+                <span class="changelog-date">{{ formatDate(changelog[0].publishedAt) }}</span>
+                <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="changelog-body" v-if="expandedChangelog === 0">{{ changelog[0].body || '（无详细说明）' }}</div>
+            </div>
+            <!-- 更早版本（折叠组） -->
+            <div v-if="changelog.length > 1" class="changelog-item changelog-older" :class="{ expanded: showOlderChangelog }" @click="showOlderChangelog = !showOlderChangelog">
+              <div class="changelog-header">
+                <span class="changelog-older-label">查看更早版本</span>
+                <span class="changelog-date">v{{ changelog[1].tag }} 及更早</span>
+                <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <template v-if="showOlderChangelog">
+                <div
+                  v-for="(rel, i) in changelog.slice(1)"
+                  :key="rel.tag"
+                  class="changelog-sub-item"
+                  :class="{ expanded: expandedChangelog === i + 1 }"
+                  @click.stop="expandedChangelog = expandedChangelog === i + 1 ? -1 : i + 1"
+                >
+                  <div class="changelog-header">
+                    <span class="changelog-tag">v{{ rel.tag }}</span>
+                    <span class="changelog-date">{{ formatDate(rel.publishedAt) }}</span>
+                    <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                  <div class="changelog-body" v-if="expandedChangelog === i + 1">{{ rel.body || '（无详细说明）' }}</div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </section>
+
       <!-- 软件更新 -->
       <section class="section">
         <h2 class="section-title">软件更新</h2>
@@ -249,6 +298,19 @@ const lastUpdateTime = ref('')
 const updateCheckStatus = ref<'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error'>('idle')
 const updateCheckInfo = ref<any>(null)
 const updateDownloadPercent = ref(0)
+
+// ── Changelog ──
+interface ReleaseNote { tag: string; name: string; body: string; publishedAt: string }
+const changelog = ref<ReleaseNote[]>([])
+const changelogStatus = ref<'loading' | 'ok' | 'error'>('loading')
+const expandedChangelog = ref(0)
+const showOlderChangelog = ref(false)
+
+function formatDate(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 
 async function manualCheckUpdate() {
   updateCheckStatus.value = 'checking'
@@ -356,6 +418,13 @@ onMounted(async () => {
     lastUpdateTime.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   }
   await loadProfiles()
+
+  try {
+    changelog.value = await window.api.updater.getChangelog()
+    changelogStatus.value = 'ok'
+  } catch {
+    changelogStatus.value = 'error'
+  }
 })
 
 // 监听 showCreateDialog 打开时自动聚焦
@@ -726,6 +795,102 @@ function applyZoom() {
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+/* Changelog */
+.changelog-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.changelog-empty {
+  padding: 14px;
+  font-size: 13px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.changelog-item {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.changelog-item:hover {
+  border-color: var(--text-3);
+}
+
+.changelog-item.expanded {
+  border-color: var(--accent);
+}
+
+.changelog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+}
+
+.changelog-tag {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-2);
+  font-family: 'Consolas', 'Courier New', monospace;
+  flex-shrink: 0;
+}
+
+.changelog-date {
+  font-size: 12px;
+  color: var(--text-3);
+  flex: 1;
+}
+
+.changelog-chevron {
+  color: var(--text-3);
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+
+.changelog-item.expanded .changelog-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.changelog-body {
+  padding: 10px 14px 14px;
+  font-size: 13px;
+  color: var(--text-2);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  border-top: 1px solid var(--border);
+}
+
+.changelog-older-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+
+.changelog-sub-item {
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.changelog-sub-item:hover {
+  background: var(--surface-3);
+}
+
+.changelog-sub-item.expanded > .changelog-header .changelog-chevron {
+  transform: rotate(180deg);
+  color: var(--accent);
 }
 
 /* About card */

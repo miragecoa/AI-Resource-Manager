@@ -211,6 +211,30 @@ export function applyAndRestart(): void {
   app.quit()
 }
 
+// ── Changelog ────────────────────────────────────────────
+
+export interface ReleaseNote {
+  tag: string
+  name: string
+  body: string
+  publishedAt: string
+}
+
+export async function getChangelog(): Promise<ReleaseNote[]> {
+  const resp = await net.fetch(
+    `https://api.github.com/repos/${REPO}/releases?per_page=15`,
+    { headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
+  )
+  if (!resp.ok) throw new Error(`GitHub API error: ${resp.status}`)
+  const releases = await resp.json() as any[]
+  return releases.map((r: any) => ({
+    tag: (r.tag_name || '').replace(/^v/, ''),
+    name: r.name || r.tag_name || '',
+    body: (r.body || '').trim(),
+    publishedAt: r.published_at || '',
+  }))
+}
+
 // ── Skip version ─────────────────────────────────────────
 
 export function skipUpdate(): void {

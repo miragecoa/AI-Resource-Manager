@@ -14,7 +14,7 @@ import {
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
 import { dbPath, dataDir } from '../db/index'
-import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate } from '../updater'
+import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate, getChangelog } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
@@ -506,6 +506,9 @@ export function registerIpcHandlers(): void {
   })
   ipcMain.handle('updater:forceUpdate', () => {
     return forceUpdate()
+  })
+  ipcMain.handle('updater:changelog', () => {
+    return getChangelog()
   })
 
   // ── 配置文件（多数据库） ────────────────────────────────

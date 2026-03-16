@@ -123,11 +123,13 @@ contextBridge.exposeInMainWorld('api', {
 
   // 自动更新
   updater: {
-    check:    (): Promise<any> => ipcRenderer.invoke('updater:check'),
-    download: (): Promise<any> => ipcRenderer.invoke('updater:download'),
-    apply:    (): Promise<void> => ipcRenderer.invoke('updater:apply'),
+    check:       (): Promise<any> => ipcRenderer.invoke('updater:check'),
+    download:    (): Promise<any> => ipcRenderer.invoke('updater:download'),
+    apply:       (): Promise<void> => ipcRenderer.invoke('updater:apply'),
     skip:        (): Promise<void> => ipcRenderer.invoke('updater:skip'),
     forceUpdate: (): Promise<void> => ipcRenderer.invoke('updater:forceUpdate'),
+    getChangelog: (): Promise<Array<{ tag: string; name: string; body: string; publishedAt: string }>> =>
+      ipcRenderer.invoke('updater:changelog'),
   },
   onUpdateAvailable: (callback: (info: any) => void) => {
     ipcRenderer.on('updater:update-available', (_e, info) => callback(info))
