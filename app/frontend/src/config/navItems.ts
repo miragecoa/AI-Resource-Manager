@@ -14,7 +14,7 @@ export const NAV_ITEM_DEFS: NavItemDef[] = [
   {
     type: 'game',
     label: '游戏',
-    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11.5" r=".6" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".6" fill="currentColor"/><path d="M21 12c0 5-2.5 8-9 8S3 17 3 12 5.5 4 12 4s9 3 9 8z"/></svg>`
+    svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4c6.5 0 9 3 9 8s-2.5 8-9 8-9-3-9-8 2.5-8 9-8z"/><circle cx="8.5" cy="12" r=".6" fill="currentColor"/><circle cx="15.5" cy="12" r=".6" fill="currentColor"/></svg>`
   },
   {
     type: 'app',

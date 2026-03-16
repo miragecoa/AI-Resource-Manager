@@ -59,6 +59,11 @@ declare global {
         getAll: () => Promise<string[]>
         remove: (filePath: string) => Promise<void>
       }
+      blockedDirs: {
+        getAll: () => Promise<string[]>
+        add: (dirPath: string) => Promise<void>
+        remove: (dirPath: string) => Promise<void>
+      }
       loginItem: {
         get: () => Promise<boolean>
         set: (enable: boolean) => Promise<void>

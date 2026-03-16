@@ -8,7 +8,15 @@
           <rect x="3" y="14" width="7" height="7" rx="1.5" />
           <rect x="14" y="14" width="7" height="7" rx="1.5" />
         </svg>
-        <span class="logo-text">AI资源管家</span>
+        <input
+          v-if="editing"
+          class="logo-input"
+          :value="settingsStore.appTitle"
+          @change="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
+          @blur="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
+          maxlength="20"
+        />
+        <span v-else class="logo-text">{{ settingsStore.appTitle }}</span>
         <button
           class="edit-btn"
           :class="{ active: editing }"
@@ -224,6 +232,21 @@ const chevronRightSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.logo-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-3);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  outline: none;
   letter-spacing: -0.01em;
 }
 

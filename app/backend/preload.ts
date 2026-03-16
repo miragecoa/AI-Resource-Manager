@@ -93,6 +93,13 @@ contextBridge.exposeInMainWorld('api', {
     remove: (filePath: string): Promise<void> => ipcRenderer.invoke('ignoredPaths:remove', filePath)
   },
 
+  // 黑名单目录
+  blockedDirs: {
+    getAll: (): Promise<string[]> => ipcRenderer.invoke('blockedDirs:getAll'),
+    add: (dirPath: string): Promise<void> => ipcRenderer.invoke('blockedDirs:add', dirPath),
+    remove: (dirPath: string): Promise<void> => ipcRenderer.invoke('blockedDirs:remove', dirPath),
+  },
+
   // 开机自启
   loginItem: {
     get: (): Promise<boolean> => ipcRenderer.invoke('loginItem:get'),

@@ -55,6 +55,10 @@ export const SCHEMA_SQL = `
     path TEXT PRIMARY KEY
   );
 
+  CREATE TABLE IF NOT EXISTS blocked_dirs (
+    path TEXT PRIMARY KEY
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT

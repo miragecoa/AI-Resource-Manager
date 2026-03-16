@@ -25,11 +25,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const autoUpdate = ref(true)
   const viewMode = ref<'grid' | 'list'>('grid')
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
+  const appTitle = ref('AI资源管家')
   const loaded = ref(false)
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeVal, listColVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeVal, listColVal, appTitleVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -42,6 +43,7 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('autoUpdate'),
       window.api.settings.get('viewMode'),
       window.api.settings.get('listColumns'),
+      window.api.settings.get('appTitle'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -56,6 +58,7 @@ export const useSettingsStore = defineStore('settings', () => {
     autoUpdate.value = autoUpdateVal !== 'false'
     if (viewModeVal === 'list') viewMode.value = 'list'
     if (listColVal) { try { listColumns.value = { ...listColumns.value, ...JSON.parse(listColVal) } } catch {} }
+    if (appTitleVal) appTitle.value = appTitleVal
 
     if (navVal) {
       try {
@@ -134,5 +137,10 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('listColumns', JSON.stringify(cols))
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, viewMode, listColumns, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setViewMode, setListColumns }
+  async function setAppTitle(title: string) {
+    appTitle.value = title || 'AI资源管家'
+    await window.api.settings.set('appTitle', appTitle.value)
+  }
+
+  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, viewMode, listColumns, appTitle, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setViewMode, setListColumns, setAppTitle }
 })

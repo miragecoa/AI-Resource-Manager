@@ -1,47 +1,73 @@
 <template>
   <div class="overlay">
     <div class="card">
-      <!-- Icon -->
-      <div class="icon-wrap">
-        <span class="icon" v-html="appIcon" />
+      <!-- Left column -->
+      <div class="col-left">
+        <div class="icon-wrap">
+          <span class="icon" v-html="appIcon" />
+        </div>
+
+        <h1 class="title">AI资源管家</h1>
+        <p class="subtitle">你的本地媒体资源助手</p>
+
+        <div class="divider" />
+
+        <!-- 模式选择 -->
+        <div class="modes">
+          <button class="mode" :class="{ selected: mode === 'auto' }" @click="mode = 'auto'">
+            <span class="mode-icon" v-html="autoIcon" />
+            <div class="mode-body">
+              <div class="mode-title">自动收录 <span class="badge">推荐</span></div>
+              <div class="mode-desc">打开文件时自动入库，无需手动操作</div>
+            </div>
+            <span class="mode-check" :class="{ visible: mode === 'auto' }" v-html="checkIcon" />
+          </button>
+
+          <button class="mode" :class="{ selected: mode === 'manual' }" @click="mode = 'manual'">
+            <span class="mode-icon" v-html="manualIcon" />
+            <div class="mode-body">
+              <div class="mode-title">手动管理</div>
+              <div class="mode-desc">由我来决定哪些文件要添加</div>
+            </div>
+            <span class="mode-check" :class="{ visible: mode === 'manual' }" v-html="checkIcon" />
+          </button>
+        </div>
+
+        <!-- 隐私说明 -->
+        <p class="privacy">
+          <span class="privacy-icon" v-html="lockIcon" />
+          所有数据仅存储在本机，绝不上传。可随时在设置中切换模式。
+        </p>
+
+        <!-- 操作按钮 -->
+        <div class="actions">
+          <button class="btn-quit" @click="quit">退出</button>
+          <button class="btn-start" @click="start">开始使用</button>
+        </div>
       </div>
 
-      <h1 class="title">AI资源管家</h1>
-      <p class="subtitle">你的本地媒体资源助手</p>
-
-      <div class="divider" />
-
-      <!-- 模式选择 -->
-      <div class="modes">
-        <button class="mode" :class="{ selected: mode === 'auto' }" @click="mode = 'auto'">
-          <span class="mode-icon" v-html="autoIcon" />
-          <div class="mode-body">
-            <div class="mode-title">自动收录 <span class="badge">推荐</span></div>
-            <div class="mode-desc">打开文件时自动入库，无需手动操作</div>
+      <!-- Right column: 隐私目录 -->
+      <div class="col-right">
+        <div class="right-header">
+          <span class="right-title-icon" v-html="lockIcon" />
+          <div>
+            <div class="right-title">排除隐私目录</div>
+            <div class="right-hint">选填 · 如私人照片、工作合同等</div>
           </div>
-          <span class="mode-check" :class="{ visible: mode === 'auto' }" v-html="checkIcon" />
-        </button>
+        </div>
+        <div class="right-desc">以下目录中的文件不会被自动收录</div>
 
-        <button class="mode" :class="{ selected: mode === 'manual' }" @click="mode = 'manual'">
-          <span class="mode-icon" v-html="manualIcon" />
-          <div class="mode-body">
-            <div class="mode-title">手动管理</div>
-            <div class="mode-desc">由我来决定哪些文件要添加</div>
+        <div class="blocked-list">
+          <div v-if="blockedDirs.length === 0" class="blocked-empty">暂无，点击下方添加</div>
+          <div v-for="dir in blockedDirs" :key="dir" class="blocked-row">
+            <span class="blocked-path">{{ dir }}</span>
+            <button class="blocked-remove" @click="removeDir(dir)" title="移除">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
           </div>
-          <span class="mode-check" :class="{ visible: mode === 'manual' }" v-html="checkIcon" />
-        </button>
-      </div>
+        </div>
 
-      <!-- 隐私说明 -->
-      <p class="privacy">
-        <span class="privacy-icon" v-html="lockIcon" />
-        所有数据仅存储在本机，绝不上传。可随时在设置中切换模式。
-      </p>
-
-      <!-- 操作按钮 -->
-      <div class="actions">
-        <button class="btn-quit" @click="quit">退出</button>
-        <button class="btn-start" @click="start">开始使用</button>
+        <button class="blocked-add" @click="addDir">+ 添加目录</button>
       </div>
     </div>
   </div>
@@ -53,12 +79,25 @@ import { ref } from 'vue'
 const emit = defineEmits<{ (e: 'consent', mode: 'auto' | 'manual'): void }>()
 
 const mode = ref<'auto' | 'manual'>('auto')
+const blockedDirs = ref<string[]>([])
 
 const appIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const autoIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const manualIcon= `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`
 const checkIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`
 const lockIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`
+
+async function addDir() {
+  const dir = await window.api.files.pickFolder()
+  if (!dir || blockedDirs.value.includes(dir)) return
+  await window.api.blockedDirs.add(dir)
+  blockedDirs.value.push(dir)
+}
+
+async function removeDir(dir: string) {
+  await window.api.blockedDirs.remove(dir)
+  blockedDirs.value = blockedDirs.value.filter(d => d !== dir)
+}
 
 async function start() {
   await window.api.settings.set('consent_given', '1')
@@ -89,11 +128,19 @@ async function quit() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 36px 32px 28px;
-  width: 400px;
+  width: 620px;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Left column */
+.col-left {
+  flex: 1;
+  padding: 36px 28px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  border-right: 1px solid var(--border);
 }
 
 .icon-wrap {
@@ -244,6 +291,7 @@ async function quit() {
   display: flex;
   gap: 10px;
   width: 100%;
+  margin-top: auto;
 }
 
 .btn-quit {
@@ -279,4 +327,118 @@ async function quit() {
 }
 
 .btn-start:hover { opacity: 0.88; }
+
+/* Right column */
+.col-right {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface-2);
+}
+
+.right-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.right-title-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-2);
+}
+.right-title-icon :deep(svg) { width: 16px; height: 16px; }
+
+.right-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.right-hint {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+
+.right-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.4;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.blocked-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 60px;
+  overflow-y: auto;
+}
+
+.blocked-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 8px 0;
+}
+
+.blocked-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.blocked-path {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-2);
+  font-family: 'Consolas', 'Courier New', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blocked-remove {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  border-radius: 3px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.blocked-remove:hover { color: #ef4444; }
+
+.blocked-add {
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  text-align: center;
+}
+.blocked-add:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 </style>

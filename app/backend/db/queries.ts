@@ -171,6 +171,34 @@ export function removeResourceByPath(filePath: string): void {
   getDb().prepare('DELETE FROM resources WHERE file_path = ?').run(filePath)
 }
 
+// ── 黑名单目录 ───────────────────────────────────────────
+
+let _blockedDirsCache: string[] | null = null
+
+export function getBlockedDirs(): string[] {
+  if (_blockedDirsCache) return _blockedDirsCache
+  _blockedDirsCache = (getDb().prepare('SELECT path FROM blocked_dirs ORDER BY path').all() as { path: string }[])
+    .map(r => r.path)
+  return _blockedDirsCache
+}
+
+export function addBlockedDir(dirPath: string): void {
+  const normalized = dirPath.replace(/[/\\]+$/, '')
+  getDb().prepare('INSERT OR IGNORE INTO blocked_dirs (path) VALUES (?)').run(normalized)
+  _blockedDirsCache = null
+}
+
+export function removeBlockedDir(dirPath: string): void {
+  getDb().prepare('DELETE FROM blocked_dirs WHERE path = ?').run(dirPath)
+  _blockedDirsCache = null
+}
+
+export function isBlockedDir(filePath: string): boolean {
+  const dirs = getBlockedDirs()
+  const lower = filePath.toLowerCase()
+  return dirs.some(d => lower.startsWith(d.toLowerCase() + '\\') || lower.startsWith(d.toLowerCase() + '/'))
+}
+
 /** 返回所有 type='app' 的资源（用于启动时 Steam 批量迁移扫描） */
 export function getAllAppResources(): Resource[] {
   const db = getDb()

@@ -5,7 +5,7 @@ import { isUNC } from '../utils/fs-safe'
 import { spawn, execFile, ChildProcess } from 'child_process'
 import { promisify } from 'util'
 import { createInterface } from 'readline'
-import { upsertResource, isIgnored, recordProcessStart, recordProcessStop, getResourceByPath, upgradeSteamGame, getAllAppResources } from '../db/queries'
+import { upsertResource, isIgnored, isBlockedDir, recordProcessStart, recordProcessStop, getResourceByPath, upgradeSteamGame, getAllAppResources } from '../db/queries'
 import type { Resource } from '../db/queries'
 import { detectSteamGame } from './steam-detector'
 
@@ -118,6 +118,7 @@ function isBlockedProcess(exePath: string): boolean {
   const exeName = basename(lower, '.exe')
   if (BLOCKED_EXE_NAMES.has(exeName)) return true
   if (isIgnored(exePath)) return true
+  if (isBlockedDir(exePath)) return true
   return false
 }
 
@@ -566,6 +567,7 @@ export async function scanRecentFolder(): Promise<Resource[]> {
     // 注册表启动项只过滤系统目录，不过滤路径段（\cef\ 等对启动项无意义）
     if (BLOCKED_PROCESS_PATHS.some(p => lower.startsWith(p))) continue
     if (isIgnored(exePath)) continue
+    if (isBlockedDir(exePath)) continue
     const ext = extname(lower)
     const type = EXT_MAP[ext]
     if (!type) continue
@@ -712,6 +714,10 @@ function processLnk(lnkPath: string): Resource | null {
 
   if (isIgnored(target)) {
     console.log('[Monitor] Ignored path:', target)
+    return null
+  }
+  if (isBlockedDir(target)) {
+    console.log('[Monitor] Blocked dir:', target)
     return null
   }
 

@@ -10,7 +10,8 @@ import {
   getAllTags, getTagsForType, createTag, removeTag, touchTag, addTagToResource, removeTagFromResource,
   searchResources, getSetting, setSetting,
   addIgnoredPath, getAllIgnoredPaths, removeIgnoredPath, removeResourceByPath,
-  batchRemoveResources, batchReplacePath
+  batchRemoveResources, batchReplacePath,
+  getBlockedDirs, addBlockedDir, removeBlockedDir
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
 import { dbPath, dataDir } from '../db/index'
@@ -166,6 +167,11 @@ export function registerIpcHandlers(): void {
     removeIgnoredPath(filePath)
     return true
   })
+
+  // ── 黑名单目录 ─────────────────────────────────────────
+  ipcMain.handle('blockedDirs:getAll', () => getBlockedDirs())
+  ipcMain.handle('blockedDirs:add', (_e, dirPath: string) => { addBlockedDir(dirPath); return true })
+  ipcMain.handle('blockedDirs:remove', (_e, dirPath: string) => { removeBlockedDir(dirPath); return true })
 
   // ── 标签 ──────────────────────────────────────────────
   ipcMain.handle('tags:getAll', () => getAllTags())
