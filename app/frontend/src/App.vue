@@ -1,8 +1,11 @@
 <template>
-  <!-- 首次启动授权弹窗 -->
-  <ConsentDialog v-if="showConsent" @consent="onConsent" />
+  <!-- 瀑布流独立窗口 -->
+  <MasonryWindow v-if="isMasonryWindow" />
 
-  <div class="app" v-else>
+  <!-- 首次启动授权弹窗 -->
+  <ConsentDialog v-else-if="showConsent" @consent="onConsent" />
+
+  <div class="app" v-else-if="!isMasonryWindow">
     <!-- 自定义标题栏（替代系统原生标题栏） -->
     <div class="titlebar">
       <div class="titlebar-drag" />
@@ -35,6 +38,9 @@ import { useResourceStore } from './stores/resources'
 import { useSettingsStore } from './stores/settings'
 import Sidebar from './components/Sidebar.vue'
 import ConsentDialog from './components/ConsentDialog.vue'
+import MasonryWindow from './components/MasonryWindow.vue'
+
+const isMasonryWindow = new URLSearchParams(window.location.search).get('window') === 'masonry'
 
 const store = useResourceStore()
 const settingsStore = useSettingsStore()

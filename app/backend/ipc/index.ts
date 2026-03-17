@@ -1,7 +1,7 @@
 import { ipcMain, shell, app, nativeImage, dialog, BrowserWindow, net } from 'electron'
 import { mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, statSync } from 'fs'
+import { readFile, readdir } from 'fs/promises'
 import { execFile, exec } from 'child_process'
-import { readdir } from 'fs/promises'
 import { join, dirname, extname, basename } from 'path'
 import { isUNC } from '../utils/fs-safe'
 import {
@@ -326,6 +326,21 @@ export function registerIpcHandlers(): void {
     } catch (e: any) {
       console.error('[Thumb] failed:', filePath, e?.message)
       thumbCache.set(filePath, null)
+      return null
+    }
+  })
+
+  // 原始分辨率图片（用于大图预览，不缩略）
+  ipcMain.handle('files:readFullImage', async (_e, filePath: string) => {
+    try {
+      const data = await readFile(filePath)
+      const ext = filePath.split('.').pop()?.toLowerCase() ?? 'png'
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+        : ext === 'gif' ? 'image/gif'
+        : ext === 'webp' ? 'image/webp'
+        : 'image/png'
+      return `data:${mime};base64,${data.toString('base64')}`
+    } catch {
       return null
     }
   })

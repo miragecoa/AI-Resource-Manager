@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, Menu, Tray, nativeImage, NativeImage, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net } from 'electron'
 import { join } from 'path'
 import { deflateSync } from 'zlib'
 import { existsSync, createReadStream, statSync } from 'fs'
@@ -23,6 +23,8 @@ import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
 
 let mainWindow: BrowserWindow | null = null
+let masonryWindow: BrowserWindow | null = null
+let masonryPaths: Array<{ path: string; title: string }> = []
 let tray: Tray | null = null
 let willQuit = false
 
@@ -119,6 +121,57 @@ function createTray(): void {
   ])
   tray.setContextMenu(menu)
   tray.on('click', () => mainWindow?.show())
+}
+
+function createMasonryWindow(items: Array<{ path: string; title: string }>): void {
+  masonryPaths = items
+  if (masonryWindow && !masonryWindow.isDestroyed()) {
+    masonryWindow.webContents.send('masonry:update', items)
+    masonryWindow.focus()
+    return
+  }
+
+  // 恢复上次窗口大小和位置
+  let savedBounds: { x?: number; y?: number; width: number; height: number } = { width: 1100, height: 750 }
+  try {
+    const raw = getSetting('masonryWindowBounds')
+    if (raw) savedBounds = { ...savedBounds, ...JSON.parse(raw) }
+  } catch { /* use defaults */ }
+
+  masonryWindow = new BrowserWindow({
+    ...savedBounds,
+    minWidth: 400, minHeight: 300,
+    show: false, frame: false,
+    title: '瀑布流预览',
+    backgroundColor: '#0C0C18',
+    ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+  masonryWindow.on('ready-to-show', () => masonryWindow?.show())
+  masonryWindow.on('closed', () => { masonryWindow = null })
+
+  // 拖拽/缩放后保存窗口边界（防抖 500ms）
+  let saveMasonryBoundsTimer: ReturnType<typeof setTimeout>
+  function saveMasonryBounds() {
+    clearTimeout(saveMasonryBoundsTimer)
+    saveMasonryBoundsTimer = setTimeout(() => {
+      if (masonryWindow && !masonryWindow.isMinimized()) {
+        setSetting('masonryWindowBounds', JSON.stringify(masonryWindow.getBounds()))
+      }
+    }, 500)
+  }
+  masonryWindow.on('resize', saveMasonryBounds)
+  masonryWindow.on('move', saveMasonryBounds)
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    masonryWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '?window=masonry')
+  } else {
+    masonryWindow.loadFile(join(__dirname, '../renderer/index.html'), { query: { window: 'masonry' } })
+  }
 }
 
 function createWindow(): void {
@@ -283,6 +336,10 @@ app.whenReady().then(() => {
   ensureProfiles()
   initDatabase()
   registerIpcHandlers()
+  ipcMain.handle('masonry:open', (_e, items: Array<{ path: string; title: string }>) => { createMasonryWindow(items) })
+  ipcMain.handle('masonry:getPaths', () => masonryPaths)
+  ipcMain.handle('masonry:minimize', () => { masonryWindow?.minimize() })
+  ipcMain.handle('masonry:close', () => { masonryWindow?.close() })
 
   // ── 开机自启动（便携版适配） ──────────────────────────
   // 首次运行默认开启；每次启动验证注册表路径与当前 exe 一致（便携版移动文件夹后自动修正）

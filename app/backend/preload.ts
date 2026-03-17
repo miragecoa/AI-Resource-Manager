@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
     resolveDropped: (paths: string[]): Promise<Array<{ type: string; title: string; file_path: string; meta?: string }>> =>
       ipcRenderer.invoke('files:resolveDropped', paths),
     readImage: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:readImage', filePath),
+    readFullImage: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:readFullImage', filePath),
     getAppIcon: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:getAppIcon', filePath),
     saveCover: (resourceId: string, dataUrl: string): Promise<string | null> => ipcRenderer.invoke('files:saveCover', resourceId, dataUrl),
     pickFile: (): Promise<string | null> => ipcRenderer.invoke('files:pickFile'),
@@ -162,6 +163,18 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('webpage:importChromeBookmarks'),
     importBrowserBookmarks: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
       ipcRenderer.invoke('webpage:importBrowserBookmarks'),
+  },
+
+  // 瀑布流窗口
+  masonry: {
+    open: (items: Array<{ path: string; title: string }>): Promise<void> => ipcRenderer.invoke('masonry:open', items),
+    getPaths: (): Promise<Array<{ path: string; title: string }>> => ipcRenderer.invoke('masonry:getPaths'),
+    minimize: (): Promise<void> => ipcRenderer.invoke('masonry:minimize'),
+    close: (): Promise<void> => ipcRenderer.invoke('masonry:close'),
+    onUpdate: (callback: (items: Array<{ path: string; title: string }>) => void) => {
+      ipcRenderer.on('masonry:update', (_e, items) => callback(items))
+      return () => ipcRenderer.removeAllListeners('masonry:update')
+    },
   },
 
   // 配置文件（多数据库）

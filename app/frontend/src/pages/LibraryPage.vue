@@ -78,6 +78,9 @@
             <button class="view-toggle-btn" :class="{ active: settingsStore.viewMode === 'list' }" @click="settingsStore.setViewMode('list')" title="列表视图">
               <span v-html="listViewSvg" />
             </button>
+            <button class="view-toggle-btn" :class="{ active: settingsStore.viewMode === 'heat' }" @click="settingsStore.setViewMode('heat')" title="热力图">
+              <span v-html="heatViewSvg" />
+            </button>
           </div>
           <button class="scan-sys-toolbar-btn" @click="openScanModal" title="读取 Windows 使用历史，导入最近打开的文件记录">
             <span class="btn-icon" v-html="scanSysSvg" />
@@ -185,6 +188,11 @@
             <span class="sort-bar-count">共 {{ listSortedFiltered.length }} 个</span>
             <div class="sort-bar-spacer" />
             <div class="sort-bar-right">
+              <!-- 瀑布流按钮（仅图片分类） -->
+              <button v-if="store.activeType === 'image'" class="masonry-popup-btn" @click="openMasonryWindow" title="瀑布流预览">
+                <span v-html="masonryViewSvg" />
+                瀑布流
+              </button>
               <!-- 高级筛选下拉 -->
               <div class="qf-wrap">
                 <button class="qf-trigger" :class="{ active: quickFilters.length > 0 }" @click.stop="showQfDropdown = !showQfDropdown">
@@ -207,6 +215,8 @@
               <select class="sort-select-inline" :value="settingsStore.resourceSort" @change="onSortChange">
                 <option value="lastUsed">最近使用</option>
                 <option value="recentlyAdded">最近添加</option>
+                <option value="openCount">使用次数</option>
+                <option value="totalTime">使用时间</option>
                 <option value="modifiedAt">修改时间</option>
               </select>
             </div>
@@ -254,7 +264,7 @@
               <div v-if="renderLimit < store.filtered.length" ref="sentinelRef" class="grid-sentinel" />
             </div>
             <!-- 列表视图 -->
-            <div v-else class="list-view" :style="{ '--list-zoom': settingsStore.cardZoom }">
+            <div v-else-if="settingsStore.viewMode === 'list'" class="list-view" :style="{ '--list-zoom': settingsStore.cardZoom }">
               <div class="list-header" :style="colStyle">
                 <span class="lh-thumb"></span>
                 <span class="lh-name sortable-col" :class="{ active: listSortCol === 'name' }" @click="onColSort('name')" title="点击排序">
@@ -331,6 +341,26 @@
                 <span class="lr-tags">
                   <span v-for="tag in (item.tags || []).slice(0, 3)" :key="tag.id" class="lr-tag">{{ tag.name }}</span>
                 </span>
+              </div>
+              <div v-if="renderLimit < store.filtered.length" ref="sentinelRef" class="grid-sentinel" />
+            </div>
+            <!-- 热力图视图 -->
+            <div v-else-if="settingsStore.viewMode === 'heat'" class="heat-grid">
+              <div
+                v-for="r in visibleItems" :key="r.id"
+                class="heat-tile" :class="`heat-lv${heatLevel(r)}`"
+                :title="heatTooltip(r)"
+                @click="openResource(r)"
+                @contextmenu.prevent="listMenu.show = true; listMenu.item = r; listMenu.x = $event.clientX; listMenu.y = $event.clientY"
+              >
+                <div class="heat-thumb" :class="{ 'is-icon': r.type === 'app' || r.type === 'game' }">
+                  <img v-if="heatThumbs.get(r.id)" :src="heatThumbs.get(r.id)!" class="heat-thumb-img" :class="{ 'is-icon': r.type === 'app' || r.type === 'game' }" />
+                  <span v-else class="heat-thumb-svg" v-html="navTypeIcon(r.type)" />
+                </div>
+                <div class="heat-tile-bottom">
+                  <span class="heat-tile-title">{{ r.title }}</span>
+                  <span class="heat-tile-count" v-if="r.open_count > 0">{{ r.open_count }}次</span>
+                </div>
               </div>
               <div v-if="renderLimit < store.filtered.length" ref="sentinelRef" class="grid-sentinel" />
             </div>
@@ -740,6 +770,7 @@ import { ref, computed, watch, onMounted, onUnmounted, reactive, nextTick } from
 import { useResourceStore } from '../stores/resources'
 import type { Resource, ResourceType } from '../stores/resources'
 import { useSettingsStore } from '../stores/settings'
+import { NAV_ITEM_DEFS } from '../config/navItems'
 import type { ResourceSortField, TagSortField } from '../stores/settings'
 import ResourceCard from '../components/ResourceCard.vue'
 import AddResourceModal from '../components/AddResourceModal.vue'
@@ -1613,6 +1644,65 @@ const LIST_TYPE_ICONS: Record<string, string> = {
 }
 function listTypeIcon(type: string) { return LIST_TYPE_ICONS[type] ?? LIST_TYPE_ICONS.app }
 
+// 热力图
+const NAV_ICON_MAP: Record<string, string> = Object.fromEntries(NAV_ITEM_DEFS.map(d => [d.type, d.svg]))
+function navTypeIcon(type: string) { return NAV_ICON_MAP[type] ?? NAV_ICON_MAP['other'] }
+
+function heatLevel(r: Resource): 0|1|2|3|4 {
+  const n = r.open_count
+  if (n === 0) return 0
+  if (n <= 5)  return 1
+  if (n <= 20) return 2
+  if (n <= 50) return 3
+  return 4
+}
+function heatTooltip(r: Resource): string {
+  const parts: string[] = [r.title, `打开 ${r.open_count} 次`]
+  if (r.total_run_time > 0) {
+    const h = Math.floor(r.total_run_time / 3600)
+    const m = Math.floor((r.total_run_time % 3600) / 60)
+    parts.push(h > 0 ? `累计 ${h}小时${m}分` : `累计 ${m}分`)
+  }
+  if (r.last_run_at) {
+    const days = Math.floor((Date.now() - r.last_run_at) / 86400000)
+    parts.push(days === 0 ? '上次 今天' : `上次 ${days}天前`)
+  }
+  return parts.join(' · ')
+}
+
+// 热力图缩略图缓存
+const _heatThumbCache = new Map<string, string | null>()
+const heatThumbs = reactive(new Map<string, string | null>())
+
+async function loadHeatThumbs(items: Resource[]) {
+  for (const r of items) {
+    if (heatThumbs.has(r.id)) continue
+    if (_heatThumbCache.has(r.id)) {
+      heatThumbs.set(r.id, _heatThumbCache.get(r.id) ?? null)
+      continue
+    }
+    let src: string | null = null
+    if (r.cover_path) {
+      src = await window.api.files.readImage(r.cover_path)
+    } else if (r.type === 'image') {
+      src = await window.api.files.readImage(r.file_path)
+    } else if (r.type === 'app' || r.type === 'game') {
+      src = await window.api.files.getAppIcon(r.file_path)
+    }
+    _heatThumbCache.set(r.id, src)
+    heatThumbs.set(r.id, src)
+  }
+}
+
+watch(
+  () => settingsStore.viewMode,
+  (mode) => { if (mode === 'heat') loadHeatThumbs(visibleItems.value) }
+)
+watch(
+  visibleItems,
+  (items) => { if (settingsStore.viewMode === 'heat') loadHeatThumbs(items) }
+)
+
 // 列表视图列宽
 const colStyle = computed(() => {
   const c = settingsStore.listColumns
@@ -1729,6 +1819,8 @@ const aiSvg           = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const scanSysSvg      = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`
 const gridViewSvg     = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`
 const listViewSvg     = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`
+const heatViewSvg     = `<svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><rect x="1" y="1" width="3.5" height="3.5" rx=".6"/><rect x="6.25" y="1" width="3.5" height="3.5" rx=".6"/><rect x="11.5" y="1" width="3.5" height="3.5" rx=".6"/><rect x="1" y="6.25" width="3.5" height="3.5" rx=".6"/><rect x="6.25" y="6.25" width="3.5" height="3.5" rx=".6"/><rect x="11.5" y="6.25" width="3.5" height="3.5" rx=".6"/><rect x="1" y="11.5" width="3.5" height="3.5" rx=".6"/><rect x="6.25" y="11.5" width="3.5" height="3.5" rx=".6"/><rect x="11.5" y="11.5" width="3.5" height="3.5" rx=".6"/></svg>`
+const masonryViewSvg  = `<svg viewBox="0 0 16 16" fill="currentColor" width="16" height="16"><rect x="1" y="1" width="5" height="9" rx=".6"/><rect x="8" y="1" width="5" height="5" rx=".6"/><rect x="1" y="12" width="5" height="3" rx=".6"/><rect x="8" y="8" width="5" height="7" rx=".6"/></svg>`
 const checkSvg        = `<svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>`
 const updateSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
 const aiLargeSvg      = `<svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M24 4l4.8 14.4H44l-12 9.6 4.8 14.4L24 32.8l-12.8 9.6 4.8-14.4-12-9.6h15.2z"/><circle cx="24" cy="20" r="3" fill="var(--accent)" opacity="0.3"/></svg>`
@@ -1737,6 +1829,13 @@ function openScanModal() {
   sysScanResult.value = null
   sysScanning.value = false
   showScanModal.value = true
+}
+
+function openMasonryWindow() {
+  const items = store.filtered
+    .filter(r => r.type === 'image')
+    .map(r => ({ path: r.cover_path || r.file_path, title: r.title }))
+  window.api.masonry.open(items)
 }
 
 async function doSystemScan() {
@@ -3575,4 +3674,96 @@ async function deleteIgnored(filePath: string) {
   background: var(--danger); color: #fff;
 }
 .kill-confirm:hover { background: #dc2626; }
+
+/* 热力图视图 */
+.heat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 4px;
+  padding: 12px;
+  align-content: start;
+}
+.heat-tile {
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: filter .15s, transform .1s;
+  overflow: hidden;
+}
+.heat-tile:hover { filter: brightness(1.2); transform: scale(1.03); }
+.heat-lv0 { background: rgba(255,255,255,0.04); }
+.heat-lv1 { background: rgba(99,102,241,0.22); }
+.heat-lv2 { background: rgba(99,102,241,0.52); }
+.heat-lv3 { background: rgba(245,158,11,0.48); }
+.heat-lv4 { background: rgba(239,68,68,0.68); }
+
+/* 缩略图区域 */
+.heat-thumb {
+  width: 100%;
+  height: 70px;
+  background: rgba(0,0,0,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.heat-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.heat-thumb-img.is-icon {
+  object-fit: contain;
+  padding: 10px;
+}
+.heat-thumb-svg { line-height: 0; }
+.heat-thumb-svg :deep(svg) { width: 22px; height: 22px; opacity: .55; }
+
+/* 文字区域 */
+.heat-tile-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+}
+.heat-tile-title {
+  font-size: 11px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: rgba(255,255,255,0.9);
+}
+.heat-tile-count {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+}
+
+/* 瀑布流按钮（排序栏） */
+.masonry-popup-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap;
+}
+.masonry-popup-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--accent);
+}
+.masonry-popup-btn :deep(svg) { width: 14px; height: 14px; }
 </style>

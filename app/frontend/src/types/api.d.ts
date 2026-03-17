@@ -38,6 +38,7 @@ declare global {
         openAsAdmin: (filePath: string) => Promise<import('../stores/resources').Resource | null>
         openInExplorer: (filePath: string) => Promise<void>
         readImage: (filePath: string) => Promise<string | null>
+        readFullImage: (filePath: string) => Promise<string | null>
         getAppIcon: (filePath: string) => Promise<string | null>
         saveCover: (resourceId: string, dataUrl: string) => Promise<string | null>
         pickFile: () => Promise<string | null>
@@ -98,6 +99,13 @@ declare global {
         fetchFavicon: (url: string) => Promise<string | null>
         importChromeBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>
         importBrowserBookmarks: () => Promise<Array<{ name: string; url: string; folder: string }>>
+      }
+      masonry: {
+        open: (items: Array<{ path: string; title: string }>) => Promise<void>
+        getPaths: () => Promise<Array<{ path: string; title: string }>>
+        minimize: () => Promise<void>
+        close: () => Promise<void>
+        onUpdate: (callback: (items: Array<{ path: string; title: string }>) => void) => () => void
       }
       profiles: {
         list: () => Promise<{ active: string; profiles: Array<{ id: string; name: string }> }>

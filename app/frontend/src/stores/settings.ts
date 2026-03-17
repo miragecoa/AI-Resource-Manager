@@ -23,7 +23,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const sidebarCollapsed = ref(false)
   const showFileExt = ref(true)
   const autoUpdate = ref(true)
-  const viewMode = ref<'grid' | 'list'>('grid')
+  const viewMode = ref<'grid' | 'list' | 'heat' | 'masonry'>('grid')
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
   const appTitle = ref('AI资源管家')
   const offlineMode = ref(false)
@@ -58,7 +58,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (collapsedVal) sidebarCollapsed.value = collapsedVal === 'true'
     if (fileExtVal !== null && fileExtVal !== undefined) showFileExt.value = fileExtVal !== 'false'
     autoUpdate.value = autoUpdateVal !== 'false'
-    if (viewModeVal === 'list') viewMode.value = 'list'
+    if (viewModeVal === 'list' || viewModeVal === 'heat' || viewModeVal === 'masonry') viewMode.value = viewModeVal
     if (listColVal) { try { listColumns.value = { ...listColumns.value, ...JSON.parse(listColVal) } } catch {} }
     if (appTitleVal) appTitle.value = appTitleVal
     if (offlineModeVal === 'true') offlineMode.value = true
@@ -130,7 +130,7 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('autoUpdate', String(enabled))
   }
 
-  async function setViewMode(mode: 'grid' | 'list') {
+  async function setViewMode(mode: 'grid' | 'list' | 'heat' | 'masonry') {
     viewMode.value = mode
     await window.api.settings.set('viewMode', mode)
   }
