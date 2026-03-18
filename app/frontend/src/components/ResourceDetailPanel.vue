@@ -39,6 +39,9 @@
             <button class="cover-btn" @click="pickCover">
               <span v-html="imageSvg" />设置封面
             </button>
+            <button v-if="resource.type === 'webpage'" class="cover-btn" :class="{ 'cover-btn-fail': faviconFailed }" @click="refetchFavicon" :disabled="faviconLoading">
+              <span v-html="faviconLoading ? spinSvg : refreshSvg" />{{ faviconLoading ? '获取中…' : faviconFailed ? '未找到图标' : '重新获取图标' }}
+            </button>
           </div>
 
           <!-- 右栏：可滚动表单 -->
@@ -127,16 +130,19 @@
             <div class="field-row align-start">
               <label class="field-label">路径</label>
               <div class="path-col">
-                <div class="path-box" :title="resource.file_path">{{ resource.file_path }}</div>
+                <input
+                  v-model="editPath"
+                  class="path-input"
+                  spellcheck="false"
+                  @blur="savePath"
+                  @keydown.enter.prevent="savePath"
+                />
                 <div class="path-actions">
                   <button class="action-btn" @click="openFile">
                     <span v-html="openSvg" />打开文件
                   </button>
                   <button class="action-btn" @click="showInFolder">
                     <span v-html="folderSvg" />在文件夹中显示
-                  </button>
-                  <button v-if="resource.type === 'webpage'" class="action-btn" @click="refetchFavicon" :disabled="faviconLoading">
-                    <span v-html="faviconLoading ? spinSvg : refreshSvg" />{{ faviconLoading ? '获取中…' : '重新获取图标' }}
                   </button>
                 </div>
               </div>
@@ -184,12 +190,14 @@ const store = useResourceStore()
 const editTitle   = ref(props.resource.title)
 const editNote    = ref(props.resource.note ?? '')
 const editRating  = ref(props.resource.rating)
+const editPath    = ref(props.resource.file_path)
 const newTagInput = ref('')
 
 watch(() => props.resource.id, () => {
   editTitle.value   = props.resource.title
   editNote.value    = props.resource.note ?? ''
   editRating.value  = props.resource.rating
+  editPath.value    = props.resource.file_path
   newTagInput.value = ''
   loadTagSuggestions()
 })
@@ -291,6 +299,11 @@ async function removeTag(tagId: number) {
 // ─── File actions ──────────────────────────────────────────────────
 function openFile() { window.api.files.openPath(props.resource.file_path) }
 function showInFolder() { window.api.files.openInExplorer(props.resource.file_path) }
+function savePath() {
+  const val = editPath.value.trim()
+  if (!val || val === props.resource.file_path) return
+  saveField('file_path', val)
+}
 
 // ─── Danger ────────────────────────────────────────────────────────
 async function doRemove() {
@@ -362,12 +375,14 @@ const spinSvg    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 
 // ─── Refetch favicon (webpage only) ────────────────────────────────
 const faviconLoading = ref(false)
+const faviconFailed  = ref(false)
 async function refetchFavicon() {
   if (faviconLoading.value) return
   faviconLoading.value = true
+  faviconFailed.value  = false
   try {
     const icon = await window.api.webpage.fetchFavicon(props.resource.file_path)
-    if (!icon) return
+    if (!icon) { faviconFailed.value = true; return }
     const savedPath = await window.api.files.saveCover(props.resource.id, icon)
     if (savedPath) {
       store.addOrUpdate({ ...props.resource, cover_path: savedPath })
@@ -375,6 +390,7 @@ async function refetchFavicon() {
     }
   } finally {
     faviconLoading.value = false
+    if (faviconFailed.value) setTimeout(() => { faviconFailed.value = false }, 2500)
   }
 }
 </script>
@@ -545,6 +561,7 @@ async function refetchFavicon() {
   flex-shrink: 0;
 }
 .cover-btn:hover { border-color: var(--accent); color: var(--accent-2); background: rgba(99,102,241,0.07); }
+.cover-btn-fail { border-color: rgba(239,68,68,0.4) !important; color: rgba(239,68,68,0.8) !important; }
 .cover-btn span { width: 13px; height: 13px; display: flex; }
 .cover-btn :deep(svg) { width: 13px; height: 13px; }
 
@@ -777,17 +794,21 @@ async function refetchFavicon() {
   gap: 5px;
 }
 
-.path-box {
+.path-input {
+  width: 100%;
+  box-sizing: border-box;
   font-size: 11px;
   font-family: 'Consolas', 'Courier New', monospace;
-  color: var(--text-3);
+  color: var(--text-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
-  word-break: break-all;
-  line-height: 1.5;
+  outline: none;
+  transition: border-color 0.15s, color 0.15s;
 }
+.path-input:hover { border-color: rgba(99,102,241,0.4); }
+.path-input:focus { border-color: var(--accent); color: var(--text); }
 
 .path-actions {
   display: flex;

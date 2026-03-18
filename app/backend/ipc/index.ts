@@ -589,14 +589,32 @@ export function registerIpcHandlers(): void {
 
   // ── 网页资源 ────────────────────────────────────────────
   ipcMain.handle('webpage:fetchFavicon', async (_e, url: string) => {
+    async function tryFetch(src: string): Promise<string | null> {
+      try {
+        const resp = await net.fetch(src, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }
+        })
+        if (!resp.ok) return null
+        const buf = Buffer.from(await resp.arrayBuffer())
+        if (buf.length < 64) return null  // blank placeholder
+        const contentType = resp.headers.get('content-type') || 'image/png'
+        // Reject text responses (e.g. HTML error pages)
+        if (contentType.includes('text/')) return null
+        return `data:${contentType};base64,${buf.toString('base64')}`
+      } catch { return null }
+    }
     try {
-      const domain = new URL(url).hostname
-      const resp = await net.fetch(`https://www.google.com/s2/favicons?domain=${domain}&sz=128`)
-      if (!resp.ok) return null
-      const buf = Buffer.from(await resp.arrayBuffer())
-      if (buf.length < 100) return null  // Too small = default blank icon
-      const contentType = resp.headers.get('content-type') || 'image/png'
-      return `data:${contentType};base64,${buf.toString('base64')}`
+      const { hostname, origin } = new URL(url)
+      // 1. DuckDuckGo favicon (works in China, no auth required)
+      const ddg = await tryFetch(`https://icons.duckduckgo.com/ip3/${hostname}.ico`)
+      if (ddg) return ddg
+      // 2. Direct /favicon.ico from the site
+      const direct = await tryFetch(`${origin}/favicon.ico`)
+      if (direct) return direct
+      // 3. Google S2 fallback
+      const google = await tryFetch(`https://www.google.com/s2/favicons?domain=${hostname}&sz=128`)
+      if (google) return google
+      return null
     } catch { return null }
   })
 
