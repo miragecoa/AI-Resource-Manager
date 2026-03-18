@@ -500,17 +500,31 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('window:isMaximized', (e) => {
     return BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
   })
+  // 图钉锁定：防意外最小化，但不强制置顶（其他窗口可正常浮上来）
+  const pinnedWindows = new WeakMap<BrowserWindow, () => void>()
   ipcMain.handle('window:toggleAlwaysOnTop', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) return false
-    const pin = !win.isAlwaysOnTop()
-    win.setAlwaysOnTop(pin)
-    win.setResizable(!pin)
-    win.setMinimizable(!pin)
-    return pin
+    if (pinnedWindows.has(win)) {
+      // 解锁
+      win.removeListener('minimize', pinnedWindows.get(win)!)
+      pinnedWindows.delete(win)
+      win.setResizable(true)
+      win.setMinimizable(true)
+      return false
+    } else {
+      // 锁定：监听 minimize 事件，立即 restore
+      const handler = () => win.restore()
+      win.on('minimize', handler)
+      pinnedWindows.set(win, handler)
+      win.setResizable(false)
+      win.setMinimizable(false)
+      return true
+    }
   })
   ipcMain.handle('window:isAlwaysOnTop', (e) => {
-    return BrowserWindow.fromWebContents(e.sender)?.isAlwaysOnTop() ?? false
+    const win = BrowserWindow.fromWebContents(e.sender)
+    return win ? pinnedWindows.has(win) : false
   })
 
   // ── 应用控制 ──────────────────────────────────────────
