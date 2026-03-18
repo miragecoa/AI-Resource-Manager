@@ -135,6 +135,9 @@
                   <button class="action-btn" @click="showInFolder">
                     <span v-html="folderSvg" />在文件夹中显示
                   </button>
+                  <button v-if="resource.type === 'webpage'" class="action-btn" @click="refetchFavicon" :disabled="faviconLoading">
+                    <span v-html="faviconLoading ? spinSvg : refreshSvg" />{{ faviconLoading ? '获取中…' : '重新获取图标' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -352,8 +355,28 @@ const xSvg      = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
 const openSvg   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
 const folderSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
 const trashSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`
-const ignoreSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`
-const imageSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
+const ignoreSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>`
+const imageSvg   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
+const refreshSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`
+const spinSvg    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>`
+
+// ─── Refetch favicon (webpage only) ────────────────────────────────
+const faviconLoading = ref(false)
+async function refetchFavicon() {
+  if (faviconLoading.value) return
+  faviconLoading.value = true
+  try {
+    const icon = await window.api.webpage.fetchFavicon(props.resource.file_path)
+    if (!icon) return
+    const savedPath = await window.api.files.saveCover(props.resource.id, icon)
+    if (savedPath) {
+      store.addOrUpdate({ ...props.resource, cover_path: savedPath })
+      thumbSrc.value = icon
+    }
+  } finally {
+    faviconLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -786,8 +809,10 @@ const imageSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" st
   transition: border-color 0.12s, color 0.12s;
 }
 .action-btn:hover { border-color: var(--accent); color: var(--accent-2); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 .action-btn span { width: 12px; height: 12px; display: flex; flex-shrink: 0; }
 .action-btn :deep(svg) { width: 12px; height: 12px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* 危险操作 */
 .danger-row {
