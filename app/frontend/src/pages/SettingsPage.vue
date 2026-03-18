@@ -109,19 +109,21 @@
       <section class="section">
         <h2 class="section-title">外观主题</h2>
 
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">预设主题</div>
-            <div class="setting-desc">深色或浅色，也可在下方自定义每个颜色</div>
-          </div>
-          <div class="theme-presets">
-            <button class="theme-preset-btn" :class="{ active: currentPreset === 'dark' }" @click="applyPreset('dark')">
-              <span class="preset-dot" style="background:#0C0C18;border-color:#28284A" /> 深色
-            </button>
-            <button class="theme-preset-btn" :class="{ active: currentPreset === 'light' }" @click="applyPreset('light')">
-              <span class="preset-dot" style="background:#F4F4FF;border-color:#C8C8E0" /> 浅色
-            </button>
-          </div>
+        <div class="theme-presets-grid">
+          <button
+            v-for="preset in THEME_PRESETS"
+            :key="preset.id"
+            class="theme-preset-card"
+            :class="{ active: currentPreset === preset.id }"
+            @click="applyPreset(preset.id)"
+          >
+            <span class="preset-swatch">
+              <span class="swatch-bg" :style="{ background: preset.vars['bg'] }" />
+              <span class="swatch-surface" :style="{ background: preset.vars['surface'] }" />
+              <span class="swatch-accent" :style="{ background: preset.vars['accent'] }" />
+            </span>
+            <span class="preset-name">{{ preset.name }}</span>
+          </button>
         </div>
 
         <div class="theme-colors-block">
@@ -361,7 +363,8 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useSettingsStore, DARK_THEME, LIGHT_THEME } from '../stores/settings'
+import { useSettingsStore, DARK_THEME, LIGHT_THEME, THEME_PRESETS } from '../stores/settings'
+import type { ThemeId } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 const dbPath = ref('')
@@ -565,13 +568,15 @@ const themeVarDefs = [
 
 const currentPreset = computed(() => {
   const v = settingsStore.themeVars
-  if (Object.keys(DARK_THEME).every(k => v[k] === DARK_THEME[k])) return 'dark'
-  if (Object.keys(LIGHT_THEME).every(k => v[k] === LIGHT_THEME[k])) return 'light'
+  for (const p of THEME_PRESETS) {
+    if (Object.keys(p.vars).every(k => v[k] === p.vars[k])) return p.id
+  }
   return 'custom'
 })
 
-function applyPreset(preset: 'dark' | 'light') {
-  settingsStore.setTheme(preset === 'dark' ? { ...DARK_THEME } : { ...LIGHT_THEME })
+function applyPreset(id: ThemeId) {
+  const preset = THEME_PRESETS.find(p => p.id === id)
+  if (preset) settingsStore.setTheme({ ...preset.vars })
 }
 
 function onColorChange(key: string, e: Event) {
@@ -818,37 +823,47 @@ function onColorChange(key: string, e: Event) {
 }
 
 /* Theme */
-.theme-presets {
-  display: flex;
-  gap: 6px;
-  flex-shrink: 0;
+.theme-presets-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
 }
 
-.theme-preset-btn {
+.theme-preset-card {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 5px 12px;
-  background: var(--surface-3);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-2);
-  font-size: 13px;
-  font-family: inherit;
+  padding: 10px 6px 8px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: border-color .15s, background .15s;
 }
-.theme-preset-btn:hover { border-color: var(--text-3); color: var(--text); }
-.theme-preset-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.theme-preset-card:hover { border-color: var(--text-3); }
+.theme-preset-card.active { border-color: var(--accent); background: var(--surface-3); }
 
-.preset-dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid;
-  flex-shrink: 0;
+.preset-swatch {
+  width: 36px;
+  height: 24px;
+  border-radius: 5px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  border: 1px solid rgba(128,128,128,.2);
 }
+.swatch-bg     { grid-column: 1 / 3; grid-row: 1; }
+.swatch-surface { grid-column: 1;    grid-row: 2; }
+.swatch-accent  { grid-column: 2;    grid-row: 2; }
+
+.preset-name {
+  font-size: 11px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.theme-preset-card.active .preset-name { color: var(--accent); font-weight: 600; }
 
 .theme-colors-block {
   background: var(--surface-2);

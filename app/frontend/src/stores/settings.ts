@@ -2,33 +2,122 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { NAV_ITEM_DEFS } from '../config/navItems'
 
-export const DARK_THEME: Record<string, string> = {
-  'bg':        '#0C0C18',
-  'surface':   '#111122',
-  'surface-2': '#191930',
-  'surface-3': '#20203A',
-  'border':    '#28284A',
-  'text':      '#E2E2F2',
-  'text-2':    '#9090B8',
-  'text-3':    '#525278',
-  'accent':    '#6366F1',
-  'accent-2':  '#818CF8',
-  'danger':    '#EF4444',
+export type ThemeId = 'dark' | 'light' | 'midnight' | 'aurora' | 'sand' | 'mint'
+
+export interface ThemePreset {
+  id: ThemeId
+  name: string
+  vars: Record<string, string>
 }
 
-export const LIGHT_THEME: Record<string, string> = {
-  'bg':        '#F4F4FF',
-  'surface':   '#FFFFFF',
-  'surface-2': '#EDEDF8',
-  'surface-3': '#E2E2F4',
-  'border':    '#C8C8E0',
-  'text':      '#1A1A2E',
-  'text-2':    '#5A5A80',
-  'text-3':    '#9090B8',
-  'accent':    '#6366F1',
-  'accent-2':  '#818CF8',
-  'danger':    '#EF4444',
-}
+export const THEME_PRESETS: ThemePreset[] = [
+  {
+    id: 'dark',
+    name: '深色',
+    vars: {
+      'bg':        '#0C0C18',
+      'surface':   '#111122',
+      'surface-2': '#191930',
+      'surface-3': '#20203A',
+      'border':    '#28284A',
+      'text':      '#E2E2F2',
+      'text-2':    '#9090B8',
+      'text-3':    '#525278',
+      'accent':    '#6366F1',
+      'accent-2':  '#818CF8',
+      'danger':    '#EF4444',
+    }
+  },
+  {
+    id: 'light',
+    name: '浅色',
+    vars: {
+      'bg':        '#F4F4FF',
+      'surface':   '#FFFFFF',
+      'surface-2': '#EDEDF8',
+      'surface-3': '#E2E2F4',
+      'border':    '#C8C8E0',
+      'text':      '#1A1A2E',
+      'text-2':    '#5A5A80',
+      'text-3':    '#9090B8',
+      'accent':    '#6366F1',
+      'accent-2':  '#818CF8',
+      'danger':    '#EF4444',
+    }
+  },
+  {
+    id: 'midnight',
+    name: '午夜',
+    vars: {
+      'bg':        '#0F172A',
+      'surface':   '#1E293B',
+      'surface-2': '#263347',
+      'surface-3': '#2D3D57',
+      'border':    '#334155',
+      'text':      '#F1F5F9',
+      'text-2':    '#94A3B8',
+      'text-3':    '#475569',
+      'accent':    '#3B82F6',
+      'accent-2':  '#60A5FA',
+      'danger':    '#EF4444',
+    }
+  },
+  {
+    id: 'aurora',
+    name: '极光',
+    vars: {
+      'bg':        '#F8FAFC',
+      'surface':   '#FFFFFF',
+      'surface-2': '#F1F5F9',
+      'surface-3': '#E8EEF5',
+      'border':    '#E2E8F0',
+      'text':      '#1E293B',
+      'text-2':    '#64748B',
+      'text-3':    '#94A3B8',
+      'accent':    '#2563EB',
+      'accent-2':  '#3B82F6',
+      'danger':    '#EF4444',
+    }
+  },
+  {
+    id: 'sand',
+    name: '暖沙',
+    vars: {
+      'bg':        '#1A1510',
+      'surface':   '#252018',
+      'surface-2': '#302A20',
+      'surface-3': '#3A3428',
+      'border':    '#4A4235',
+      'text':      '#F0E8D8',
+      'text-2':    '#B8A890',
+      'text-3':    '#706858',
+      'accent':    '#E8A020',
+      'accent-2':  '#F0B840',
+      'danger':    '#E05040',
+    }
+  },
+  {
+    id: 'mint',
+    name: '薄荷',
+    vars: {
+      'bg':        '#F0FDFB',
+      'surface':   '#FFFFFF',
+      'surface-2': '#E6FAF7',
+      'surface-3': '#D5F2EE',
+      'border':    '#A8DDD8',
+      'text':      '#134E4A',
+      'text-2':    '#2D7A72',
+      'text-3':    '#5CA8A0',
+      'accent':    '#0891B2',
+      'accent-2':  '#22D3EE',
+      'danger':    '#EF4444',
+    }
+  },
+]
+
+// Keep named exports for backward compatibility
+export const DARK_THEME = THEME_PRESETS[0].vars
+export const LIGHT_THEME = THEME_PRESETS[1].vars
 
 function applyThemeToRoot(vars: Record<string, string>) {
   for (const [key, value] of Object.entries(vars)) {
