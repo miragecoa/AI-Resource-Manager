@@ -356,15 +356,10 @@ app.whenReady().then(() => {
     const userDisabled = getSetting('autoStartDisabled') === 'true'
     const exePath = process.execPath
     if (!userDisabled) {
-      const current = app.getLoginItemSettings()
-      if (!getSetting('autoStartInitialized') || !current.openAtLogin) {
-        // 未初始化，或被意外关闭（如安全软件清理、文件夹移动等），自动重新注册
-        app.setLoginItemSettings({ openAtLogin: true, path: exePath, args: ['--hidden'] })
-        setSetting('autoStartInitialized', 'true')
-        console.log('[AutoStart] Registered/Repaired, exe:', exePath)
-      } else {
-        console.log('[AutoStart] Already active, exe:', exePath)
-      }
+      // 每次启动都重新注册，确保路径和参数始终最新（便携版移动、版本升级等场景自动修正）
+      app.setLoginItemSettings({ openAtLogin: true, path: exePath, args: ['--hidden'] })
+      setSetting('autoStartInitialized', 'true')
+      console.log('[AutoStart] Registered/ensured, exe:', exePath)
     } else {
       console.log('[AutoStart] Skipped (User disabled)')
       // 确保系统内的注册也被关闭（防止清理不彻底）
