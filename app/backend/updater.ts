@@ -185,8 +185,14 @@ export function applyAndRestart(): void {
     `Write-Host 'Waiting for app to exit...' -ForegroundColor Cyan`,
     `while(Get-Process -Id ${pid} -EA SilentlyContinue){Start-Sleep 1}`,
     'Start-Sleep 2',
+    // Snapshot existing exe names before extraction so we can detect a renamed exe
+    `$oldExeName=[System.IO.Path]::GetFileName('${exePath}')`,
+    `$beforeExes=Get-ChildItem -Path '${appDir}' -Filter '*.exe' -File | Select-Object -ExpandProperty Name`,
     `Write-Host 'Extracting update...'`,
     `try { Expand-Archive -Path '${downloadedZipPath}' -DestinationPath '${appDir}' -Force -EA Stop; Write-Host 'OK' -ForegroundColor Green } catch { Write-Host "FAILED: $_" -ForegroundColor Red; Read-Host 'Press Enter to exit'; exit 1 }`,
+    // If the zip introduced a new-named exe (exe rename), replace the old exe with it
+    `$newExe=Get-ChildItem -Path '${appDir}' -Filter '*.exe' -File | Where-Object { $beforeExes -notcontains $_.Name } | Select-Object -First 1`,
+    `if($newExe){ Remove-Item '${exePath}' -Force -EA SilentlyContinue; Rename-Item $newExe.FullName $oldExeName -Force }`,
     `Remove-Item '${downloadedZipPath}' -Force -EA SilentlyContinue`,
     `Start-Process '${exePath}'`,
   ].join('; ')
@@ -194,12 +200,15 @@ export function applyAndRestart(): void {
   // Encode as UTF-16LE Base64 → avoids encoding issues with Chinese paths
   const encoded = Buffer.from(cmd, 'utf16le').toString('base64')
 
-  // Write a .cmd launcher — Electron is a GUI app, so spawn() alone
-  // won't create a visible console window. Using `start` via .cmd fixes this.
+  // Write a .cmd launcher so users can see the extraction progress window.
+  // We host it under conhost.exe explicitly: on Win11, the default terminal is
+  // Windows Terminal (wt.exe) which keeps the session alive until all child processes
+  // exit — including the newly launched Electron app — causing startup logs to leak
+  // into the update window. Conhost.exe uses classic behavior and closes on script exit.
   const batPath = join(dirname(downloadedZipPath), 'update.cmd')
-  writeFileSync(batPath, `@powershell.exe -EncodedCommand ${encoded}\n`)
+  writeFileSync(batPath, `@powershell.exe -NonInteractive -EncodedCommand ${encoded}\n`)
 
-  spawn('cmd.exe', ['/c', 'start', '""', batPath], {
+  spawn('conhost.exe', ['cmd.exe', '/c', batPath], {
     detached: true,
     stdio: 'ignore',
   }).unref()

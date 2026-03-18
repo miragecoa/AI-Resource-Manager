@@ -819,16 +819,18 @@ function openInExplorer() {
 
 /* compact (zoom ≤ 0.87, ~130px): 徽章只保留圆点，pin/ignore 按钮缩小 */
 .running-badge.badge-compact {
-  padding: 4px;
+  padding: 0;
   gap: 0;
   border-radius: 50%;
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   min-width: unset;
+  justify-content: center;
+  box-sizing: border-box;
 }
 .running-badge.badge-compact .running-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 .pin-quick-btn.btn-compact,
