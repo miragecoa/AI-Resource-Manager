@@ -113,6 +113,8 @@ contextBridge.exposeInMainWorld('api', {
     maximize:    (): Promise<boolean> => ipcRenderer.invoke('window:maximize'),
     close:       (): Promise<void> => ipcRenderer.invoke('window:close'),
     isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window:isMaximized'),
+    toggleAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:toggleAlwaysOnTop'),
+    isAlwaysOnTop: (): Promise<boolean> => ipcRenderer.invoke('window:isAlwaysOnTop'),
     onMaximizeChange: (callback: (maximized: boolean) => void) => {
       ipcRenderer.on('window:maximizeChange', (_e, val) => callback(val))
       return () => ipcRenderer.removeAllListeners('window:maximizeChange')

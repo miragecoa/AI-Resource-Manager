@@ -500,6 +500,18 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('window:isMaximized', (e) => {
     return BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
   })
+  ipcMain.handle('window:toggleAlwaysOnTop', (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return false
+    const pin = !win.isAlwaysOnTop()
+    win.setAlwaysOnTop(pin)
+    win.setResizable(!pin)
+    win.setMinimizable(!pin)
+    return pin
+  })
+  ipcMain.handle('window:isAlwaysOnTop', (e) => {
+    return BrowserWindow.fromWebContents(e.sender)?.isAlwaysOnTop() ?? false
+  })
 
   // ── 应用控制 ──────────────────────────────────────────
   ipcMain.handle('app:quit', () => app.quit())
