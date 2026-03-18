@@ -1,0 +1,56 @@
+name: Sync Release to Gitee
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push code to Gitee
+        run: |
+          git remote add gitee https://leyradc:${{ secrets.GITEE_TOKEN }}@gitee.com/leyradc/ai-resource-manager.git
+          git push gitee main --force
+
+      - name: Create Gitee Release
+        id: create_release
+        run: |
+          BODY=$(echo '${{ toJson(github.event.release.body) }}' | sed 's/^"//;s/"$//')
+          RESPONSE=$(curl -s -X POST \
+            "https://gitee.com/api/v5/repos/leyradc/ai-resource-manager/releases" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"access_token\": \"${{ secrets.GITEE_TOKEN }}\",
+              \"tag_name\": \"${{ github.event.release.tag_name }}\",
+              \"name\": \"${{ github.event.release.name }}\",
+              \"body\": \"同步自 GitHub Release。下载地址见下方附件。\n\n${{ github.event.release.tag_name }}\",
+              \"prerelease\": false,
+              \"target_commitish\": \"main\"
+            }")
+          echo "RELEASE_ID=$(echo $RESPONSE | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"id\"])')" >> $GITHUB_ENV
+
+      - name: Download & Upload assets to Gitee
+        run: |
+          # 下载 GitHub Release 的所有附件
+          echo '${{ toJson(github.event.release.assets) }}' | python3 -c "
+          import sys, json, subprocess, os
+          assets = json.load(sys.stdin)
+          for a in assets:
+              name = a['name']
+              url = a['browser_download_url']
+              print(f'Downloading {name}...')
+              subprocess.run(['curl', '-L', '-o', name, url], check=True)
+              print(f'Uploading {name}...')
+              subprocess.run([
+                  'curl', '-s', '-X', 'POST',
+                  f'https://gitee.com/api/v5/repos/leyradc/ai-resource-manager/releases/{os.environ[\"RELEASE_ID\"]}/attach_files',
+                  '-F', f'access_token=${{ secrets.GITEE_TOKEN }}',
+                  '-F', f'file=@{name}'
+              ], check=True)
+          "
