@@ -37,9 +37,10 @@ jobs:
               get_req = urllib.request.Request(f'https://gitee.com/api/v5/repos/{owner}/{repo}/releases/tags/{tag}?access_token={token}')
               with urllib.request.urlopen(get_req) as r:
                   old = json.loads(r.read())
-              del_req = urllib.request.Request(f'https://gitee.com/api/v5/repos/{owner}/{repo}/releases/{old[\"id\"]}?access_token={token}', method='DELETE')
-              urllib.request.urlopen(del_req)
-          except urllib.error.HTTPError:
+              if old and isinstance(old, dict) and old.get('id'):
+                  del_req = urllib.request.Request(f'https://gitee.com/api/v5/repos/{owner}/{repo}/releases/{old[\"id\"]}?access_token={token}', method='DELETE')
+                  urllib.request.urlopen(del_req)
+          except Exception:
               pass
           # 创建新 release
           data = json.dumps({
@@ -57,7 +58,11 @@ jobs:
               method='POST'
           )
           with urllib.request.urlopen(req) as r:
-              resp = json.loads(r.read())
+              body = r.read()
+          resp = json.loads(body)
+          if not resp or not isinstance(resp, dict) or not resp.get('id'):
+              print(f'ERROR: unexpected response: {body[:500]}', file=sys.stderr)
+              sys.exit(1)
           print(resp['id'])
           ")
           echo "RELEASE_ID=$RELEASE_ID" >> $GITHUB_ENV
