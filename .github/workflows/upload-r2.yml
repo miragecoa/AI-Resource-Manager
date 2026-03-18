@@ -63,9 +63,10 @@ jobs:
             "
           done
 
-          # Upload latest.json (overwrites previous)
+          # Upload latest.json (overwrites previous, no-store prevents CDN/client caching)
           aws s3 cp latest.json "s3://ai-resource-manager/latest.json" \
             --endpoint-url "$ENDPOINT" \
             --content-type "application/json" \
+            --cache-control "no-store" \
             --no-progress
           echo "latest.json updated -> $PUBLIC_BASE/latest.json"

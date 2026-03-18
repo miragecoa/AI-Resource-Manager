@@ -53,10 +53,10 @@ export async function checkForUpdate(): Promise<UpdateInfo> {
   const currentVersion = app.getVersion()
 
   // Check from R2 (China-accessible, no GitHub API dependency)
-  // Add timestamp to bust CDN cache on R2/Cloudflare
+  // cache: 'no-store' bypasses Electron/Chromium disk cache; ?_t= busts CDN cache
   const resp = await net.fetch(
     `${R2_PUBLIC_URL}/latest.json?_t=${Date.now()}`,
-    { headers: { 'User-Agent': 'AI-Resource-Manager-Updater', 'Cache-Control': 'no-cache' } }
+    { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
   )
   if (!resp.ok) throw new Error(`R2 update check failed: ${resp.status}`)
 
@@ -148,7 +148,7 @@ function followDownload(url: string, totalSize: number): Promise<string> {
 export async function forceUpdate(): Promise<void> {
   const resp = await net.fetch(
     `${R2_PUBLIC_URL}/latest.json?_t=${Date.now()}`,
-    { headers: { 'User-Agent': 'AI-Resource-Manager-Updater', 'Cache-Control': 'no-cache' } }
+    { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
   )
   if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`)
   const latest = await resp.json() as LatestJson
