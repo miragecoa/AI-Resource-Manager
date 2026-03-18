@@ -43,3 +43,6 @@ Thumbs.db
 *.pem
 *.key
 app/.update-temp/
+
+# local secrets
+.env

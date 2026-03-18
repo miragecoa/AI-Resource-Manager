@@ -26,7 +26,7 @@ jobs:
           RELEASE_NAME: ${{ github.event.release.name }}
           RELEASE_BODY: ${{ github.event.release.body }}
         run: |
-          RELEASE_ID=$(python3 -c "
+          python3 -c "
           import json, os, sys, urllib.request, urllib.error
           owner = 'leyradc'
           repo = 'ai-resource-manager'
@@ -63,35 +63,6 @@ jobs:
           if not resp or not isinstance(resp, dict) or not resp.get('id'):
               print(f'ERROR: unexpected response: {body[:500]}', file=sys.stderr)
               sys.exit(1)
-          print(resp['id'])
-          ")
-          echo "RELEASE_ID=$RELEASE_ID" >> $GITHUB_ENV
-
-      - name: Download & Upload assets to Gitee
-        env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          ASSETS_JSON: ${{ toJson(github.event.release.assets) }}
-        run: |
-          python3 -c "
-          import json, os, subprocess
-          assets = json.loads(os.environ['ASSETS_JSON'])
-          release_id = os.environ['RELEASE_ID']
-          token = os.environ['GITEE_TOKEN']
-          for a in assets:
-              name = a['name']
-              url = a['browser_download_url']
-              print(f'Downloading {name}...')
-              subprocess.run(['curl', '-L', '-o', name, url], check=True)
-              print(f'Uploading {name} to Gitee release {release_id}...')
-              size_mb = os.path.getsize(name) / 1024 / 1024
-              print(f'File size: {size_mb:.1f} MB')
-              result = subprocess.run([
-                  'curl', '-v', '-X', 'POST',
-                  f'https://gitee.com/api/v5/repos/leyradc/ai-resource-manager/releases/{release_id}/attach_files',
-                  '-F', f'access_token={token}',
-                  '-F', f'file=@{name}'
-              ], capture_output=True, text=True)
-              print('STDOUT:', result.stdout)
-              print('STDERR:', result.stderr[-2000:])
-              print('Return code:', result.returncode)
+          print(f'Gitee release created: id={resp[\"id\"]}')
+          print('Binary upload skipped — run locally: node scripts/upload-gitee.js')
           "
