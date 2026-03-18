@@ -44,5 +44,4 @@ Thumbs.db
 *.key
 app/.update-temp/
 
-# local secrets
-.env
+.playwright-mcp/
