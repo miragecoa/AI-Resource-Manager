@@ -461,7 +461,8 @@ export function registerIpcHandlers(): void {
   })
 
   // ── 开机自启 ──────────────────────────────────────────
-  ipcMain.handle('loginItem:get', () => app.getLoginItemSettings({ args: ['--hidden'] }).openAtLogin)
+  // 以数据库为准（Windows getLoginItemSettings 对带 args 的注册项检测不稳定）
+  ipcMain.handle('loginItem:get', () => getSetting('autoStartDisabled') !== 'true')
   ipcMain.handle('loginItem:set', (_e, enable: boolean) => {
     if (app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: enable, path: process.execPath, args: ['--hidden'] })
