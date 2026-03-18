@@ -49,6 +49,7 @@ declare global {
       }
       onNewResource: (callback: (entry: object) => void) => () => void
       onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => () => void
+      onDrawerImport: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => () => void
       monitor: {
         scanNow:  () => Promise<import('../stores/resources').Resource[]>
         pause:    () => Promise<void>

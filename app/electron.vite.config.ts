@@ -14,9 +14,12 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: resolve(__dirname, 'backend/preload.ts'),
+        input: {
+          index: resolve(__dirname, 'backend/preload.ts'),
+          drawer: resolve(__dirname, 'backend/drawer-preload.ts'),
+        },
         output: {
-          entryFileNames: 'index.js'
+          entryFileNames: '[name].js'
         }
       }
     },

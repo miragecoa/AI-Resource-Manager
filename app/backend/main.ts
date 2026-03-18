@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net, globalShortcut } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net, globalShortcut, screen } from 'electron'
 import { join } from 'path'
 import { deflateSync } from 'zlib'
 import { existsSync, createReadStream, statSync } from 'fs'
@@ -17,13 +17,14 @@ protocol.registerSchemesAsPrivileged([
 import { initDatabase } from './db/index'
 import { getSetting, setSetting } from './db/queries'
 import { ensureProfiles } from './db/profiles'
-import { registerIpcHandlers } from './ipc/index'
+import { registerIpcHandlers, resolveDroppedPaths } from './ipc/index'
 import { startMonitor } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
 
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
+let drawerWindow: BrowserWindow | null = null
 let masonryPaths: Array<{ path: string; title: string }> = []
 let tray: Tray | null = null
 let willQuit = false
@@ -112,17 +113,68 @@ function createTrayIcon(): NativeImage {
   return loadFileIcon() ?? nativeImage.createFromBuffer(makeSolidPng(0x63, 0x66, 0xF1))
 }
 
-function createTray(): void {
-  tray = new Tray(createTrayIcon())
-  tray.setToolTip('AI资源管家')
-
-  const menu = Menu.buildFromTemplate([
+function buildTrayMenu(): Electron.Menu {
+  const drawerVisible = getSetting('drawerVisible') !== 'false'
+  return Menu.buildFromTemplate([
     { label: '显示窗口', click: () => mainWindow?.show() },
+    {
+      label: drawerVisible ? '隐藏悬浮窗' : '显示悬浮窗',
+      click: () => {
+        if (drawerVisible) {
+          drawerWindow?.hide()
+          setSetting('drawerVisible', 'false')
+        } else {
+          if (!drawerWindow || drawerWindow.isDestroyed()) {
+            createDrawerWindow()
+          } else {
+            drawerWindow.show()
+          }
+          setSetting('drawerVisible', 'true')
+        }
+        tray?.setContextMenu(buildTrayMenu())
+      }
+    },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }
   ])
-  tray.setContextMenu(menu)
+}
+
+function createTray(): void {
+  tray = new Tray(createTrayIcon())
+  tray.setToolTip('AI资源管家')
+  tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => mainWindow?.show())
+}
+
+function createDrawerWindow(): void {
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const winW = 52
+  const winH = 80
+  drawerWindow = new BrowserWindow({
+    width: winW,
+    height: winH,
+    x: width - winW,
+    y: Math.round((height - winH) / 2),
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    movable: false,
+    focusable: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/drawer.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    }
+  })
+  drawerWindow.on('closed', () => { drawerWindow = null })
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    drawerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer.html')
+  } else {
+    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'))
+  }
 }
 
 function createMasonryWindow(items: Array<{ path: string; title: string }>): void {
@@ -369,6 +421,50 @@ app.whenReady().then(() => {
 
   createTray()
   createWindow()
+
+  // 悬浮小抽屉 IPC
+  ipcMain.handle('drawer:openMain', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+  })
+  ipcMain.handle('drawer:filesDropped', async (_e, paths: string[]) => {
+    const items = resolveDroppedPaths(paths)
+    if (!items.length) return
+    mainWindow?.show()
+    mainWindow?.focus()
+    mainWindow?.webContents.send('drawer:import', items)
+  })
+  ipcMain.handle('drawer:showContextMenu', () => {
+    const drawerVisible = getSetting('drawerVisible') !== 'false'
+    Menu.buildFromTemplate([
+      {
+        label: '隐藏悬浮窗',
+        click: () => {
+          drawerWindow?.hide()
+          setSetting('drawerVisible', 'false')
+          tray?.setContextMenu(buildTrayMenu())
+        }
+      },
+      { type: 'separator' },
+      { label: '显示主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
+    ]).popup({ window: drawerWindow ?? undefined })
+    void drawerVisible  // suppress unused warning
+  })
+
+  // 悬浮窗启动策略：
+  // - 'true'  → 直接显示
+  // - 'false' → 不显示
+  // - 未设置  → 跟随主窗口：第一次 show 时才创建并记住 'true'
+  const drawerSetting = getSetting('drawerVisible')
+  if (drawerSetting === 'true') {
+    createDrawerWindow()
+  } else if (drawerSetting !== 'false') {
+    mainWindow?.once('show', () => {
+      createDrawerWindow()
+      setSetting('drawerVisible', 'true')
+    })
+  }
+
   registerWakeShortcut(getSetting('hotkeyWake') || 'Alt+Space')
 
   // 启动 Recent Files 监听

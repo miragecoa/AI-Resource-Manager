@@ -65,6 +65,42 @@ function findNearbyIcon(exePath: string): string | null {
   return null
 }
 
+export function resolveDroppedPaths(paths: string[]): Array<{ type: string; title: string; file_path: string; meta?: string }> {
+  const results: Array<{ type: string; title: string; file_path: string; meta?: string }> = []
+  for (const p of paths) {
+    try {
+      const stat = statSync(p)
+      if (stat.isDirectory()) {
+        results.push({ type: 'folder', title: basename(p), file_path: p })
+      } else if (p.toLowerCase().endsWith('.lnk')) {
+        try {
+          const shortcut = shell.readShortcutLink(p)
+          if (!shortcut.target) continue
+          let type: string
+          try {
+            type = statSync(shortcut.target).isDirectory() ? 'folder' : (SCAN_EXT_TYPES[extname(shortcut.target).toLowerCase()] || 'other')
+          } catch {
+            type = SCAN_EXT_TYPES[extname(shortcut.target).toLowerCase()] || 'other'
+          }
+          const lnkName = basename(p, '.lnk').replace(/\.\d+$/, '')
+          const meta: Record<string, string> = {}
+          if (shortcut.args) meta.lnk_args = shortcut.args
+          if (shortcut.cwd) meta.lnk_cwd = shortcut.cwd
+          results.push({
+            type, title: lnkName, file_path: shortcut.target,
+            meta: Object.keys(meta).length ? JSON.stringify(meta) : undefined
+          })
+        } catch { /* 无法读取快捷方式，跳过 */ }
+      } else {
+        const ext = extname(p).toLowerCase()
+        const type = SCAN_EXT_TYPES[ext] || 'other'
+        results.push({ type, title: basename(p, ext), file_path: p })
+      }
+    } catch { /* 无法访问的路径，跳过 */ }
+  }
+  return results
+}
+
 export function registerIpcHandlers(): void {
 
   // ── 资源 ──────────────────────────────────────────────
@@ -255,41 +291,7 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('files:openInExplorer', (_e, filePath: string) => shell.showItemInFolder(filePath))
 
   // 解析拖放的文件路径：识别类型、解析快捷方式、处理文件夹
-  ipcMain.handle('files:resolveDropped', (_e, paths: string[]) => {
-    const results: Array<{ type: string; title: string; file_path: string; meta?: string }> = []
-    for (const p of paths) {
-      try {
-        const stat = statSync(p)
-        if (stat.isDirectory()) {
-          results.push({ type: 'folder', title: basename(p), file_path: p })
-        } else if (p.toLowerCase().endsWith('.lnk')) {
-          try {
-            const shortcut = shell.readShortcutLink(p)
-            if (!shortcut.target) continue
-            let type: string
-            try {
-              type = statSync(shortcut.target).isDirectory() ? 'folder' : (SCAN_EXT_TYPES[extname(shortcut.target).toLowerCase()] || 'other')
-            } catch {
-              type = SCAN_EXT_TYPES[extname(shortcut.target).toLowerCase()] || 'other'
-            }
-            const lnkName = basename(p, '.lnk').replace(/\.\d+$/, '')
-            const meta: Record<string, string> = {}
-            if (shortcut.args) meta.lnk_args = shortcut.args
-            if (shortcut.cwd) meta.lnk_cwd = shortcut.cwd
-            results.push({
-              type, title: lnkName, file_path: shortcut.target,
-              meta: Object.keys(meta).length ? JSON.stringify(meta) : undefined
-            })
-          } catch { /* 无法读取快捷方式，跳过 */ }
-        } else {
-          const ext = extname(p).toLowerCase()
-          const type = SCAN_EXT_TYPES[ext] || 'other'
-          results.push({ type, title: basename(p, ext), file_path: p })
-        }
-      } catch { /* 无法访问的路径，跳过 */ }
-    }
-    return results
-  })
+  ipcMain.handle('files:resolveDropped', (_e, paths: string[]) => resolveDroppedPaths(paths))
 
   // 以管理员身份运行（Windows UAC 提权）
   // 使用 -PassThru 获取 PID，手动注册运行会话（UAC 提权进程的父进程是 svchost，WMI 监听会过滤掉）

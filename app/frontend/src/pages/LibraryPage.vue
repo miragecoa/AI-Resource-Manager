@@ -1095,6 +1095,9 @@ async function onDrop(e: DragEvent) {
 
   const items = await window.api.files.resolveDropped(paths)
   if (!items.length) return
+  if (store.activeType === 'game') {
+    items.forEach(item => { if (item.type === 'app') item.type = 'game' })
+  }
   dropResolved.value = items
   showDropModal.value = true
 }
@@ -1518,11 +1521,19 @@ async function saveListViewState() {
 }
 watch([typeFilterArr, extFilterArr, typeSortDir, listSortCol, listSortDesc, quickFilters], saveListViewState, { deep: true })
 
+let unsubDrawerImport: (() => void) | null = null
+
 onMounted(async () => {
   settingsStore.load()
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('dragover', onDocDragOver)
   document.addEventListener('click', onDocCloseTypeFilter)
+
+  // 悬浮小抽屉拖入
+  unsubDrawerImport = window.api.onDrawerImport((items) => {
+    dropResolved.value = [...items]
+    showDropModal.value = true
+  })
   // 恢复列表视图状态
   const raw = await window.api.settings.get(LIST_STATE_KEY)
   if (raw) {
@@ -1557,6 +1568,7 @@ onUnmounted(() => {
   document.removeEventListener('dragover', onDocDragOver)
   document.removeEventListener('click', onDocCloseTypeFilter)
   sentinelObserver?.disconnect()
+  unsubDrawerImport?.()
 })
 
 // Per-type view mode and card zoom (derived from active category)

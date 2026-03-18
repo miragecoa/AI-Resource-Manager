@@ -79,6 +79,12 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('resource:running')
   },
 
+  // 悬浮小抽屉拖入文件
+  onDrawerImport: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => {
+    ipcRenderer.on('drawer:import', (_event, items) => callback(items))
+    return () => ipcRenderer.removeAllListeners('drawer:import')
+  },
+
   // 监听控制
   monitor: {
     scanNow:  () => ipcRenderer.invoke('monitor:scanNow'),
