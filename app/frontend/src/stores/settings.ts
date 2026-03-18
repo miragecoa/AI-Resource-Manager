@@ -2,6 +2,40 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { NAV_ITEM_DEFS } from '../config/navItems'
 
+export const DARK_THEME: Record<string, string> = {
+  'bg':        '#0C0C18',
+  'surface':   '#111122',
+  'surface-2': '#191930',
+  'surface-3': '#20203A',
+  'border':    '#28284A',
+  'text':      '#E2E2F2',
+  'text-2':    '#9090B8',
+  'text-3':    '#525278',
+  'accent':    '#6366F1',
+  'accent-2':  '#818CF8',
+  'danger':    '#EF4444',
+}
+
+export const LIGHT_THEME: Record<string, string> = {
+  'bg':        '#F4F4FF',
+  'surface':   '#FFFFFF',
+  'surface-2': '#EDEDF8',
+  'surface-3': '#E2E2F4',
+  'border':    '#C8C8E0',
+  'text':      '#1A1A2E',
+  'text-2':    '#5A5A80',
+  'text-3':    '#9090B8',
+  'accent':    '#6366F1',
+  'accent-2':  '#818CF8',
+  'danger':    '#EF4444',
+}
+
+function applyThemeToRoot(vars: Record<string, string>) {
+  for (const [key, value] of Object.entries(vars)) {
+    document.documentElement.style.setProperty(`--${key}`, value)
+  }
+}
+
 export type ResourceSortField = 'lastUsed' | 'recentlyAdded' | 'name' | 'openCount' | 'totalTime' | 'modifiedAt'
 export type TagSortField = 'lastUsed' | 'count' | 'name'
 
@@ -27,11 +61,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
   const appTitle = ref('AI资源管家')
   const offlineMode = ref(false)
+  const themeVars = ref<Record<string, string>>({ ...DARK_THEME })
   const loaded = ref(false)
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeVal, listColVal, appTitleVal, offlineModeVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, cardZoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeVal, listColVal, appTitleVal, offlineModeVal, themeVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -46,6 +81,7 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('listColumns'),
       window.api.settings.get('appTitle'),
       window.api.settings.get('offlineMode'),
+      window.api.settings.get('theme'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -62,6 +98,11 @@ export const useSettingsStore = defineStore('settings', () => {
     if (listColVal) { try { listColumns.value = { ...listColumns.value, ...JSON.parse(listColVal) } } catch {} }
     if (appTitleVal) appTitle.value = appTitleVal
     if (offlineModeVal === 'true') offlineMode.value = true
+
+    if (themeVal) {
+      try { themeVars.value = { ...DARK_THEME, ...JSON.parse(themeVal) } } catch {}
+    }
+    applyThemeToRoot(themeVars.value)
 
     if (navVal) {
       try {
@@ -150,5 +191,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('offlineMode', String(enabled))
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, viewMode, listColumns, appTitle, offlineMode, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setViewMode, setListColumns, setAppTitle, setOfflineMode }
+  async function setTheme(vars: Record<string, string>) {
+    themeVars.value = { ...vars }
+    applyThemeToRoot(themeVars.value)
+    await window.api.settings.set('theme', JSON.stringify(themeVars.value))
+  }
+
+  return { monitorEnabled, autostartEnabled, zoom, cardZoom, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, viewMode, listColumns, appTitle, offlineMode, themeVars, load, setMonitor, setAutostart, setZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setViewMode, setListColumns, setAppTitle, setOfflineMode, setTheme }
 })

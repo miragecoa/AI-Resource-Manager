@@ -105,6 +105,38 @@
         </div>
       </section>
 
+      <!-- 外观主题 -->
+      <section class="section">
+        <h2 class="section-title">外观主题</h2>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">预设主题</div>
+            <div class="setting-desc">深色或浅色，也可在下方自定义每个颜色</div>
+          </div>
+          <div class="theme-presets">
+            <button class="theme-preset-btn" :class="{ active: currentPreset === 'dark' }" @click="applyPreset('dark')">
+              <span class="preset-dot" style="background:#0C0C18;border-color:#28284A" /> 深色
+            </button>
+            <button class="theme-preset-btn" :class="{ active: currentPreset === 'light' }" @click="applyPreset('light')">
+              <span class="preset-dot" style="background:#F4F4FF;border-color:#C8C8E0" /> 浅色
+            </button>
+          </div>
+        </div>
+
+        <div class="theme-colors-block">
+          <div class="theme-colors-grid">
+            <div v-for="item in themeVarDefs" :key="item.key" class="theme-color-item">
+              <span class="theme-color-label">{{ item.label }}</span>
+              <div class="theme-color-control">
+                <input type="color" class="color-input" :value="settingsStore.themeVars[item.key]" @input="onColorChange(item.key, $event)" />
+                <span class="color-hex">{{ settingsStore.themeVars[item.key] }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- 显示设置 -->
       <section class="section">
         <h2 class="section-title">显示</h2>
@@ -306,8 +338,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, onUnmounted, watch } from 'vue'
-import { useSettingsStore } from '../stores/settings'
+import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useSettingsStore, DARK_THEME, LIGHT_THEME } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
 const dbPath = ref('')
@@ -470,6 +502,36 @@ function onZoomInput(e: Event) {
 }
 function applyZoom() {
   settingsStore.setZoom(pendingZoom.value)
+}
+
+// ── 外观主题 ──
+const themeVarDefs = [
+  { key: 'bg',        label: '主背景' },
+  { key: 'surface',   label: '卡片背景' },
+  { key: 'surface-2', label: '次级背景' },
+  { key: 'surface-3', label: '深次级背景' },
+  { key: 'border',    label: '边框' },
+  { key: 'text',      label: '主文字' },
+  { key: 'text-2',    label: '次级文字' },
+  { key: 'text-3',    label: '辅助文字' },
+  { key: 'accent',    label: '强调色' },
+  { key: 'accent-2',  label: '强调色2' },
+  { key: 'danger',    label: '危险色' },
+]
+
+const currentPreset = computed(() => {
+  const v = settingsStore.themeVars
+  if (Object.keys(DARK_THEME).every(k => v[k] === DARK_THEME[k])) return 'dark'
+  if (Object.keys(LIGHT_THEME).every(k => v[k] === LIGHT_THEME[k])) return 'light'
+  return 'custom'
+})
+
+function applyPreset(preset: 'dark' | 'light') {
+  settingsStore.setTheme(preset === 'dark' ? { ...DARK_THEME } : { ...LIGHT_THEME })
+}
+
+function onColorChange(key: string, e: Event) {
+  settingsStore.setTheme({ ...settingsStore.themeVars, [key]: (e.target as HTMLInputElement).value })
 }
 </script>
 
@@ -709,6 +771,91 @@ function applyZoom() {
   border-color: var(--accent);
   color: #fff;
   font-weight: 600;
+}
+
+/* Theme */
+.theme-presets {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.theme-preset-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.theme-preset-btn:hover { border-color: var(--text-3); color: var(--text); }
+.theme-preset-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+.preset-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.theme-colors-block {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.theme-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+}
+
+.theme-color-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.theme-color-label {
+  font-size: 13px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.theme-color-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.color-input {
+  -webkit-appearance: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 2px;
+  background: transparent;
+}
+.color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.color-input::-webkit-color-swatch { border: none; border-radius: 4px; }
+
+.color-hex {
+  font-size: 11px;
+  font-family: 'Consolas', monospace;
+  color: var(--text-3);
+  width: 52px;
 }
 
 /* Profile controls */
