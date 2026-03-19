@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld('clipboardApi', {
   saveImage: (id: number) => ipcRenderer.invoke('clipboard:saveImage', id),
   pin:       (id: number, pinned: number) => ipcRenderer.invoke('clipboard:pin', id, pinned),
   cleanup:   (olderThanMs: number) => ipcRenderer.invoke('clipboard:cleanup', olderThanMs),
+  getAutoCleanDays: () => ipcRenderer.invoke('clipboard:getAutoCleanDays'),
+  setAutoCleanDays: (days: string) => ipcRenderer.invoke('clipboard:setAutoCleanDays', days),
   onUpdated: (cb: () => void) => {
     ipcRenderer.on('clipboard:updated', () => cb())
   },

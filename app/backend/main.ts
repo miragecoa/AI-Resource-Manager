@@ -726,6 +726,11 @@ app.whenReady().then(() => {
 
   ensureProfiles()
   initDatabase()
+  // 自动清理剪贴板历史（根据设置，启动时执行一次）
+  const autoCleanDays = parseInt(getSetting('clipboardAutoCleanDays') || '0')
+  if (autoCleanDays > 0) {
+    clipboardCleanup(autoCleanDays * 24 * 60 * 60 * 1000)
+  }
   // 剪贴板图片目录（与 profile DB 同级，dataDir 在 initDatabase() 后已赋值）
   clipboardImgDir = join(dataDir, 'clipboard')
   mkdirSync(clipboardImgDir, { recursive: true })
@@ -1003,6 +1008,9 @@ app.whenReady().then(() => {
   ipcMain.handle('clipboard:cleanup', (_e, olderThanMs: number) => {
     return clipboardCleanup(olderThanMs)
   })
+
+  ipcMain.handle('clipboard:getAutoCleanDays', () => getSetting('clipboardAutoCleanDays') || '0')
+  ipcMain.handle('clipboard:setAutoCleanDays', (_e, days: string) => setSetting('clipboardAutoCleanDays', days))
 
   // 启动 Recent Files 监听
   startMonitor(
