@@ -1,19 +1,19 @@
 <template>
-  <div class="card" :class="[{ 'is-selected': selected }, heatLevel !== undefined ? `heat-lv${heatLevel}` : '']" @dblclick="selectable ? $emit('toggle-select', resource) : $emit('open', resource)" @contextmenu.prevent="!selectable && openMenu($event)" @click="selectable ? $emit('toggle-select', resource) : undefined">
-    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' || resource.type === 'document' }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
+  <div ref="cardRef" class="card" :class="[{ 'is-selected': selected }, heatLevel !== undefined ? `heat-lv${heatLevel}` : '']" :style="{ '--zoom': cardZoom }" @dblclick="selectable ? $emit('toggle-select', resource) : $emit('open', resource)" @contextmenu.prevent="!selectable && openMenu($event)" @click="selectable ? $emit('toggle-select', resource) : undefined" @mouseenter="onMicroEnter" @mouseleave="onMicroLeave">
+    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' || resource.type === 'document', 'cover-solo': micro, 'cover-solo-labeled': micro && showMicroLabel }" @click.stop="selectable ? $emit('toggle-select', resource) : $emit('open', resource)">
       <img v-if="thumbSrc" :src="thumbSrc" :alt="resource.title" />
       <div v-else class="cover-placeholder" style="pointer-events:none">
         <span class="type-icon" v-html="typeIcon" />
       </div>
-      <!-- hover 覆盖层：▶ 运行 / ⏹ 结束（批量选择时隐藏，避免拦截点击） -->
-      <div v-if="!selectable" class="cover-action" :class="{ 'is-running': isRunning, 'action-compact': compact, 'action-narrow': narrow }"
+      <!-- hover 覆盖层：▶ 运行 / ⏹ 结束（批量选择时隐藏） -->
+      <div v-if="!selectable" class="cover-action" :class="{ 'is-running': isRunning }"
         @click.stop="isRunning ? showKillConfirm = true : $emit('open', resource)">
-        <div class="action-btn" :class="{ 'action-compact': compact, 'action-narrow': narrow }">
+        <div class="action-btn">
           <span v-html="isRunning ? stopIcon : playIcon" />
         </div>
       </div>
       <!-- 运行中徽章（批量选择时隐藏） -->
-      <div v-if="isRunning && !selectable" class="running-badge" :class="{ 'badge-compact': compact }">
+      <div v-if="isRunning && !selectable" class="running-badge" :class="{ 'badge-compact': compact, 'badge-micro': micro }">
         <span class="running-dot" /><template v-if="!compact">运行中</template>
       </div>
       <!-- 批量选择 checkbox -->
@@ -42,18 +42,21 @@
       </button>
     </div>
 
-    <div v-if="!micro" class="info" :class="{ 'info-narrow': narrow, 'info-compact': compact && !narrow }">
+    <!-- micro 模式：图片/文件夹分类下显示名称，其他分类纯图标 -->
+    <div v-if="micro && showMicroLabel" class="micro-label" :title="displayTitle">{{ displayTitle }}</div>
+
+    <div v-else-if="!micro" class="info" :class="{ 'info-narrow': narrow, 'info-compact': compact && !narrow }">
       <div class="title" :title="displayTitle" :class="{ 'title-single': narrow }">{{ displayTitle }}</div>
       <!-- 统计信息行 -->
       <div v-if="!narrow" class="stats-row">
         <span class="stat-item" :title="`共打开 ${resource.open_count} 次，累计 ${fmtDuration(resource.total_run_time)}`">
           <span v-html="clockIcon" />
-          <template v-if="isRunning">累计 {{ resource.total_run_time > 0 ? fmtDuration(resource.total_run_time) : '—' }}</template>
-          <template v-else>{{ resource.total_run_time > 0 ? fmtDuration(resource.total_run_time) : (resource.open_count > 0 ? '—' : unplayedLabel) }}</template>
+          <span v-if="!compact" class="stat-label-text">累计</span>
+          {{ resource.total_run_time > 0 ? fmtDuration(resource.total_run_time) : (resource.open_count > 0 ? '—' : unplayedLabel) }}
         </span>
         <span v-if="resource.open_count > 0" class="stat-count">{{ resource.open_count }}次</span>
-        <span v-if="isRunning" class="stat-session">本次 {{ fmtDuration(currentSessionSecs) }}</span>
-        <span v-else-if="resource.last_run_at" class="stat-last">上次 {{ fmtRelDate(resource.last_run_at) }}</span>
+        <span v-if="isRunning" class="stat-session"><span v-if="!compact" class="stat-label-text">本次</span>{{ fmtDuration(currentSessionSecs) }}</span>
+        <span v-else-if="resource.last_run_at" class="stat-last">{{ fmtRelDate(resource.last_run_at) }}</span>
       </div>
       <div v-if="!narrow" class="tags">
         <template v-if="resource.tags?.length">
@@ -101,7 +104,7 @@
       <div v-if="showMenu" class="ctx-backdrop" @mousedown="showMenu = false" />
       <div v-if="showMenu" ref="menuRef" class="context-menu" :style="menuStyle" @mouseleave="showMenu = false">
         <button @click="$emit('select', resource); showMenu = false">
-          <span v-html="detailIcon" />查看详情
+          <span v-html="detailIcon" />查看/修改
         </button>
         <button @click="$emit('open', resource); showMenu = false">
           <span v-html="openIcon" />打开
@@ -119,6 +122,40 @@
         <button @click="$emit('ignore', resource); showMenu = false" class="danger">
           <span v-html="ignoreIcon" />忽略此文件
         </button>
+      </div>
+    </Teleport>
+
+    <!-- micro 悬浮提示 -->
+    <Teleport to="body">
+      <div v-if="showMicroTooltip" class="micro-tooltip-popup" :style="{ left: tooltipX + 'px', top: tooltipY + 'px' }">
+        <!-- 标题 + 类型 -->
+        <div class="micro-tt-header">
+          <span class="micro-tt-title">{{ displayTitle }}</span>
+          <span class="micro-tt-type">{{ typeLabel }}</span>
+        </div>
+        <!-- 运行状态 -->
+        <div v-if="isRunning" class="micro-tt-running-row">
+          <span class="micro-tt-dot" /><span class="micro-tt-running">运行中 · 本次 {{ fmtDuration(currentSessionSecs) }}</span>
+        </div>
+        <!-- 统计 -->
+        <div class="micro-tt-stats">
+          <span v-if="resource.total_run_time > 0">
+            <span class="micro-tt-label">时长</span>{{ fmtDuration(resource.total_run_time) }}
+          </span>
+          <span v-if="resource.open_count > 0">
+            <span class="micro-tt-label">次数</span>{{ resource.open_count }}次
+          </span>
+          <span v-if="resource.last_run_at && !isRunning">
+            <span class="micro-tt-label">上次</span>{{ fmtRelDate(resource.last_run_at) }}
+          </span>
+        </div>
+        <!-- 标签 -->
+        <div v-if="resource.tags?.length" class="micro-tt-tags">
+          <span v-for="tag in resource.tags.slice(0, 4)" :key="tag.id" class="micro-tt-tag">{{ tag.name }}</span>
+          <span v-if="resource.tags.length > 4" class="micro-tt-tag-more">+{{ resource.tags.length - 4 }}</span>
+        </div>
+        <!-- 备注 -->
+        <div v-if="resource.note" class="micro-tt-note">{{ resource.note }}</div>
       </div>
     </Teleport>
 </template>
@@ -142,12 +179,13 @@ const props = withDefaults(defineProps<{
   selected?: boolean
   cardZoom?: number
   heatLevel?: number
-}>(), { selectable: false, selected: false, cardZoom: 0.75 })
+  showMicroLabel?: boolean
+}>(), { selectable: false, selected: false, cardZoom: 0.75, showMicroLabel: false })
 
 // Responsive breakpoints based on zoom factor (150px * cardZoom = minCardWidth)
 const compact = computed(() => props.cardZoom <= 0.87) // < ~130px: collapse badge, hide tags
 const narrow  = computed(() => props.cardZoom <= 0.60) // < ~90px:  hide stats row
-const micro   = computed(() => props.cardZoom <= 0.40) // < ~60px:  hide info entirely
+const micro   = computed(() => props.cardZoom <= 0.55) // < ~82px:  hide info entirely (only cover)
 const emit = defineEmits<{
   open:   [resource: Resource]
   select: [resource: Resource]
@@ -160,6 +198,20 @@ const store = useResourceStore()
 const settingsStore = useSettingsStore()
 const showKillConfirm = ref(false)
 const showIgnoreWarn = ref(false)
+const cardRef = ref<HTMLElement | null>(null)
+
+// ── micro 悬浮提示 ──────────────────────────────────────────────────
+const showMicroTooltip = ref(false)
+const tooltipX = ref(0)
+const tooltipY = ref(0)
+function onMicroEnter() {
+  const rect = cardRef.value?.getBoundingClientRect()
+  if (!rect) return
+  tooltipX.value = rect.left + rect.width / 2
+  tooltipY.value = rect.top - 8
+  showMicroTooltip.value = true
+}
+function onMicroLeave() { showMicroTooltip.value = false }
 
 const displayTitle = computed(() => {
   const r = props.resource
@@ -209,14 +261,14 @@ async function doKill() {
   await window.api.monitor.kill(props.resource.id)
 }
 
-// 时长格式化：总秒数 → "1小时23分" / "45分" / "30秒"
+// 时长格式化：只显示最大单位 "10时" / "45分" / "30秒"
 function fmtDuration(secs: number): string {
   if (!secs || secs < 0) return '0分'
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   const s = secs % 60
-  if (h > 0) return `${h}小时${m}分`
-  if (m > 0) return `${m}分${s}秒`
+  if (h > 0) return `${h}时`
+  if (m > 0) return `${m}分`
   return `${s}秒`
 }
 
@@ -347,6 +399,13 @@ const TYPE_ICONS: Record<string, string> = {
 
 const typeIcon = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.app)
 
+const TYPE_LABELS: Record<string, string> = {
+  image: '图片', game: '游戏', app: '应用程序', video: '视频',
+  comic: '漫画', music: '音乐', novel: '小说', document: '文档',
+  folder: '文件夹', webpage: '网页', other: '其他'
+}
+const typeLabel = computed(() => TYPE_LABELS[props.resource.type] ?? props.resource.type)
+
 const UNPLAYED_LABELS: Record<string, string> = {
   game: '未游玩', app: '未运行', video: '未观看',
   image: '未查看', comic: '未阅读', music: '未收听', novel: '未阅读', document: '未查看', folder: '未打开', other: '未使用'
@@ -412,6 +471,28 @@ function openInExplorer() {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+}
+
+/* micro 模式：正方形封面 */
+.cover.cover-solo {
+  aspect-ratio: 1 / 1;
+  border-radius: 7px; /* 纯图标：四角全圆 */
+}
+
+/* 有标签时：保留底部直角，与 micro-label 衔接 */
+.cover.cover-solo-labeled {
+  border-radius: 7px 7px 0 0;
+}
+
+.micro-label {
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+  padding: 3px 6px 4px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cover img {
@@ -561,7 +642,7 @@ function openInExplorer() {
   /* ▶ 播放：左下角 */
   align-items: flex-end;
   justify-content: flex-start;
-  padding: 7px;
+  padding: calc(clamp(2px, var(--zoom, 0.75) * 8px, 8px));
   background: transparent;
   opacity: 0;
   pointer-events: none;
@@ -582,8 +663,8 @@ function openInExplorer() {
 }
 
 .action-btn {
-  width: 42px;
-  height: 42px;
+  width: calc(clamp(13px, var(--zoom, 0.75) * 48px, 44px));
+  height: calc(clamp(13px, var(--zoom, 0.75) * 48px, 44px));
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(8px);
@@ -622,18 +703,18 @@ function openInExplorer() {
 }
 
 .action-btn :deep(svg) {
-  width: 17px;
-  height: 17px;
+  width: calc(clamp(6px, var(--zoom, 0.75) * 18px, 17px));
+  height: calc(clamp(6px, var(--zoom, 0.75) * 18px, 17px));
   color: white;
 }
 
 /* ── 快捷忽略按钮（右上角） ── */
 .ignore-quick-btn {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 24px;
-  height: 24px;
+  top: calc(clamp(2px, var(--zoom, 0.75) * 7px, 7px));
+  right: calc(clamp(2px, var(--zoom, 0.75) * 7px, 7px));
+  width: calc(clamp(10px, var(--zoom, 0.75) * 27px, 25px));
+  height: calc(clamp(10px, var(--zoom, 0.75) * 27px, 25px));
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -666,17 +747,17 @@ function openInExplorer() {
 }
 
 .ignore-quick-btn :deep(svg) {
-  width: 12px;
-  height: 12px;
+  width: calc(clamp(5px, var(--zoom, 0.75) * 14px, 13px));
+  height: calc(clamp(5px, var(--zoom, 0.75) * 14px, 13px));
 }
 
 /* ── 快捷置顶按钮（左上角） ── */
 .pin-quick-btn {
   position: absolute;
-  top: 6px;
-  left: 6px;
-  width: 24px;
-  height: 24px;
+  top: calc(clamp(2px, var(--zoom, 0.75) * 7px, 7px));
+  left: calc(clamp(2px, var(--zoom, 0.75) * 7px, 7px));
+  width: calc(clamp(10px, var(--zoom, 0.75) * 27px, 25px));
+  height: calc(clamp(10px, var(--zoom, 0.75) * 27px, 25px));
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -714,8 +795,8 @@ function openInExplorer() {
 }
 
 .pin-quick-btn :deep(svg) {
-  width: 11px;
-  height: 11px;
+  width: calc(clamp(5px, var(--zoom, 0.75) * 13px, 12px));
+  height: calc(clamp(5px, var(--zoom, 0.75) * 13px, 12px));
 }
 
 /* ── 运行中徽章 ── */
@@ -763,7 +844,8 @@ function openInExplorer() {
   align-items: center;
   gap: 6px;
   margin-top: 4px;
-  flex-wrap: wrap;
+  overflow: hidden;
+  flex-wrap: nowrap;
 }
 
 .stat-item {
@@ -772,6 +854,8 @@ function openInExplorer() {
   gap: 3px;
   font-size: 11px;
   color: var(--text-2);
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .stat-item :deep(svg) {
@@ -780,21 +864,35 @@ function openInExplorer() {
   flex-shrink: 0;
 }
 
+.stat-label-text {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-right: 1px;
+  white-space: nowrap;
+}
+
 .stat-count {
   font-size: 11px;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .stat-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-size: 11px;
   color: #4ade80;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .stat-last {
   font-size: 11px;
   color: var(--text-3);
+  white-space: nowrap;
 }
 
 /* ── 热力模式：通过 CSS 变量统一作用于 card + cover ── */
@@ -828,28 +926,25 @@ function openInExplorer() {
   justify-content: center;
   box-sizing: border-box;
 }
+
+/* micro (zoom ≤ 0.55): 徽章进一步缩小 */
+.running-badge.badge-micro {
+  width: 9px;
+  height: 9px;
+  bottom: 3px;
+  left: 3px;
+}
 .running-badge.badge-compact .running-dot {
   width: 6px;
   height: 6px;
 }
-
-.pin-quick-btn.btn-compact,
-.ignore-quick-btn.btn-compact {
-  width: 18px;
-  height: 18px;
-}
-.pin-quick-btn.btn-compact :deep(svg),
-.ignore-quick-btn.btn-compact :deep(svg) {
-  width: 9px;
-  height: 9px;
+.running-badge.badge-micro .running-dot {
+  width: 4px;
+  height: 4px;
 }
 
-/* compact 播放/停止按钮缩小 */
+/* compact/narrow 播放按钮仅调整 padding（大小已由 --zoom 控制） */
 .cover-action.action-compact { padding: 4px; }
-.action-btn.action-compact { width: 28px; height: 28px; }
-.action-btn.action-compact :deep(svg) { width: 12px; height: 12px; }
-.action-btn.action-narrow { width: 22px; height: 22px; }
-.action-btn.action-narrow :deep(svg) { width: 10px; height: 10px; }
 
 /* compact info: 收紧 padding */
 .info.info-compact {
@@ -965,5 +1060,125 @@ function openInExplorer() {
 .select-checkbox.checked {
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* ── micro 悬浮提示 ── */
+.micro-tooltip-popup {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  min-width: 140px;
+  max-width: 260px;
+  z-index: 8500;
+  pointer-events: none;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.micro-tt-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.micro-tt-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.4;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.micro-tt-type {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--accent-2);
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.micro-tt-running-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.micro-tt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+
+.micro-tt-running {
+  font-size: 11px;
+  color: #4ade80;
+}
+
+.micro-tt-stats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.micro-tt-stats span {
+  font-size: 11px;
+  color: var(--text-2);
+}
+
+.micro-tt-label {
+  font-size: 10px;
+  color: var(--text-3);
+  margin-right: 3px;
+}
+
+.micro-tt-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.micro-tt-tag {
+  font-size: 10px;
+  background: var(--surface-3);
+  color: var(--accent-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(99, 102, 241, 0.15);
+}
+
+.micro-tt-tag-more {
+  font-size: 10px;
+  color: var(--text-3);
+  padding: 1px 3px;
+}
+
+.micro-tt-note {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 1px;
 }
 </style>

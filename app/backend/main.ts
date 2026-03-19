@@ -18,7 +18,7 @@ import { initDatabase } from './db/index'
 import { getSetting, setSetting, addManualResource } from './db/queries'
 import { ensureProfiles, getProfileDir, loadManifest } from './db/profiles'
 import { registerIpcHandlers, resolveDroppedPaths } from './ipc/index'
-import { startMonitor } from './monitor/recent-files'
+import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
 
@@ -35,7 +35,10 @@ let willQuit = false
 const launchedHidden = process.argv.includes('--hidden')
 
 // 点击 X 时隐藏到托盘，而非退出
-app.on('before-quit', () => { willQuit = true })
+app.on('before-quit', () => {
+  willQuit = true
+  flushRunningSessions()
+})
 
 /** 用 Node 内置 zlib 生成合法 PNG buffer（无外部依赖） */
 function makeSolidPng(r: number, g: number, b: number, size = 16): Buffer {

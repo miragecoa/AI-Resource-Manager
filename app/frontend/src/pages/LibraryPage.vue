@@ -37,8 +37,8 @@
               type="range"
               class="zoom-slider"
               :value="cardZoom"
-              min="0.5"
-              max="2"
+              min="0.25"
+              max="1.5"
               step="0.05"
               @input="onCardZoomChange"
             />
@@ -46,8 +46,8 @@
               type="number"
               class="zoom-number"
               :value="Math.round(cardZoom * 100)"
-              min="50"
-              max="200"
+              min="25"
+              max="150"
               step="5"
               @change="onCardZoomInput"
             />
@@ -256,6 +256,7 @@
                 :selectable="batchMode"
                 :selected="selectedIds.has(item.id)"
                 :card-zoom="cardZoom"
+                :show-micro-label="store.activeType === 'folder' || store.activeType === 'document'"
                 :heat-level="viewMode === 'heat' ? heatLevel(item) : undefined"
                 @toggle-select="toggleSelect(item)"
                 @select="onCardSelect"
@@ -321,10 +322,20 @@
                 class="list-row"
                 :style="colStyle"
                 :class="{ selected: selectedId === item.id, 'batch-selected': batchMode && selectedIds.has(item.id) }"
-                @click="batchMode ? toggleSelect(item) : onCardSelect(item)"
+                @click="batchMode ? toggleSelect(item) : undefined"
                 @dblclick="openResource(item)"
                 @contextmenu.prevent="openListMenu($event, item)"
+                @mouseenter="onListRowEnter($event, item)"
+                @mouseleave="onListRowLeave"
               >
+                <button
+                  class="lr-play-btn"
+                  :class="{ 'is-running': store.runningMap.has(item.id) }"
+                  @click.stop="store.runningMap.has(item.id) ? (listMenuKillTarget = item) : openResource(item)"
+                  :title="store.runningMap.has(item.id) ? '强制结束' : '打开'"
+                >
+                  <span v-html="store.runningMap.has(item.id) ? ctxIcons.kill : ctxIcons.play" />
+                </button>
                 <span v-if="store.runningMap.has(item.id)" class="lr-running-dot" />
                 <span class="lr-thumb">
                   <img v-if="listThumbCache.get(item.id)" :src="listThumbCache.get(item.id)" class="lr-thumb-img" />
@@ -351,7 +362,7 @@
               <div v-if="listMenu.show" class="ctx-backdrop" @mousedown="listMenu.show = false" />
               <div v-if="listMenu.show" ref="listMenuRef" class="context-menu" :style="{ left: listMenu.x + 'px', top: listMenu.y + 'px' }">
                 <button @click="onCardSelect(listMenu.item!); listMenu.show = false">
-                  <span v-html="ctxIcons.detail" />查看详情
+                  <span v-html="ctxIcons.detail" />查看/修改
                 </button>
                 <button @click="openResource(listMenu.item!); listMenu.show = false">
                   <span v-html="ctxIcons.open" />打开
@@ -380,6 +391,29 @@
                     <button class="kill-confirm" @click="doListKill">强制结束</button>
                   </div>
                 </div>
+              </div>
+            </Teleport>
+            <!-- 列表行悬浮提示 -->
+            <Teleport to="body">
+              <div v-if="listTooltip.show && listTooltip.item" class="lt-tooltip-popup" :style="{ left: listTooltip.x + 'px', top: listTooltip.y + 'px' }">
+                <div class="lt-tt-header">
+                  <span class="lt-tt-title">{{ listTooltip.item.title }}</span>
+                  <span class="lt-tt-type">{{ listTypeLabel(listTooltip.item.type) }}</span>
+                </div>
+                <div v-if="store.runningMap.has(listTooltip.item.id)" class="lt-tt-running-row">
+                  <span class="lt-tt-dot" />
+                  <span class="lt-tt-running">运行中 · 本次 {{ ltFmtDuration(Math.floor((store.clockTick - (store.runningMap.get(listTooltip.item.id) ?? store.clockTick)) / 1000)) }}</span>
+                </div>
+                <div class="lt-tt-stats">
+                  <span v-if="listTooltip.item.total_run_time > 0"><span class="lt-tt-label">时长</span>{{ ltFmtDuration(listTooltip.item.total_run_time) }}</span>
+                  <span v-if="listTooltip.item.open_count > 0"><span class="lt-tt-label">次数</span>{{ listTooltip.item.open_count }}次</span>
+                  <span v-if="listTooltip.item.last_run_at && !store.runningMap.has(listTooltip.item.id)"><span class="lt-tt-label">上次</span>{{ ltFmtRelDate(listTooltip.item.last_run_at) }}</span>
+                </div>
+                <div v-if="listTooltip.item.tags?.length" class="lt-tt-tags">
+                  <span v-for="tag in listTooltip.item.tags.slice(0, 4)" :key="tag.id" class="lt-tt-tag">{{ tag.name }}</span>
+                  <span v-if="listTooltip.item.tags.length > 4" class="lt-tt-tag-more">+{{ listTooltip.item.tags.length - 4 }}</span>
+                </div>
+                <div v-if="listTooltip.item.note" class="lt-tt-note">{{ listTooltip.item.note }}</div>
               </div>
             </Teleport>
             <!-- 滚动到最底部才显示的导入按钮 -->
@@ -1154,7 +1188,30 @@ function onCardSelect(resource: Resource) {
 const listMenu = reactive({ show: false, x: 0, y: 0, item: null as Resource | null })
 const listMenuRef = ref<HTMLElement | null>(null)
 const listMenuKillTarget = ref<Resource | null>(null)
+
+// ── 列表行悬浮提示 ─────────────────────────────────────────────────
+const listTooltip = reactive({ show: false, x: 0, y: 0, item: null as Resource | null })
+function onListRowEnter(e: MouseEvent, item: Resource) {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  listTooltip.item = item
+  listTooltip.x = rect.left + rect.width / 2
+  listTooltip.y = rect.top - 8
+  listTooltip.show = true
+}
+function onListRowLeave() { listTooltip.show = false }
+function ltFmtDuration(secs: number): string {
+  if (!secs || secs < 0) return '0分'
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60
+  if (h > 0) return `${h}时`; if (m > 0) return `${m}分`; return `${s}秒`
+}
+function ltFmtRelDate(ts: number): string {
+  const days = Math.floor((Date.now() - ts) / 86400000)
+  if (days === 0) return '今天'; if (days === 1) return '昨天'
+  if (days < 7) return `${days}天前`
+  return new Date(ts).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+}
 const ctxIcons = {
+  play:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
   open:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`,
   detail: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
   folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
@@ -1584,7 +1641,7 @@ function onCardZoomChange(e: Event) {
 
 function onCardZoomInput(e: Event) {
   const raw = parseInt((e.target as HTMLInputElement).value, 10)
-  const clamped = Math.min(200, Math.max(50, isNaN(raw) ? 75 : raw))
+  const clamped = Math.min(150, Math.max(25, isNaN(raw) ? 75 : raw))
   settingsStore.setCardZoom(store.activeType, clamped / 100)
 }
 
@@ -2468,6 +2525,25 @@ async function deleteIgnored(filePath: string) {
 .list-row:hover { background: var(--surface-2); }
 .list-row.selected { background: rgba(99, 102, 241, 0.1); }
 .list-row.batch-selected { background: rgba(99, 102, 241, 0.15); }
+
+.lr-play-btn {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-right: 2px;
+  padding: 0;
+}
+.lr-play-btn:hover { background: rgba(99,102,241,0.15); color: var(--accent); }
+.lr-play-btn.is-running { color: #ef4444; }
+.lr-play-btn.is-running:hover { background: rgba(239,68,68,0.12); }
+.lr-play-btn :deep(span) { display: flex; align-items: center; justify-content: center; line-height: 0; }
+.lr-play-btn :deep(svg) { width: 13px; height: 13px; display: block; }
 
 .lr-running-dot {
   width: 6px; height: 6px; border-radius: 50%;
@@ -3654,4 +3730,35 @@ async function deleteIgnored(filePath: string) {
   border-color: var(--accent);
 }
 .masonry-popup-btn :deep(svg) { width: 14px; height: 14px; }
+
+/* ── 列表行悬浮提示 ── */
+.lt-tooltip-popup {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  min-width: 160px;
+  max-width: 280px;
+  z-index: 8500;
+  pointer-events: none;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.lt-tt-header { display: flex; align-items: flex-start; gap: 6px; justify-content: space-between; }
+.lt-tt-title { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.4; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lt-tt-type { font-size: 10px; font-weight: 500; color: var(--accent-2); background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.2); border-radius: 3px; padding: 1px 5px; flex-shrink: 0; margin-top: 1px; white-space: nowrap; }
+.lt-tt-running-row { display: flex; align-items: center; gap: 5px; }
+.lt-tt-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+.lt-tt-running { font-size: 11px; color: #4ade80; }
+.lt-tt-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.lt-tt-stats span { font-size: 11px; color: var(--text-2); }
+.lt-tt-label { font-size: 10px; color: var(--text-3); margin-right: 3px; }
+.lt-tt-tags { display: flex; flex-wrap: wrap; gap: 3px; }
+.lt-tt-tag { font-size: 10px; background: var(--surface-3); color: var(--accent-2); padding: 1px 5px; border-radius: 3px; border: 1px solid rgba(99,102,241,0.15); }
+.lt-tt-tag-more { font-size: 10px; color: var(--text-3); padding: 1px 3px; }
+.lt-tt-note { font-size: 11px; color: var(--text-3); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; border-top: 1px solid var(--border); padding-top: 4px; margin-top: 1px; }
 </style>

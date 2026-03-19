@@ -42,6 +42,8 @@ const EXT_MAP: Record<string, Resource['type']> = {
   '.ppt': 'document', '.pptx': 'document', '.csv': 'document',
   '.odt': 'document', '.ods': 'document', '.odp': 'document',
   '.pdf': 'document', '.txt': 'document', '.rtf': 'document',
+  '.md': 'document', '.mdx': 'document',
+  '.html': 'document', '.htm': 'document',
   // 可执行（游戏/应用，后续异步区分）
   '.exe': 'app'
 }
@@ -109,6 +111,54 @@ async function hasAppIcon(exePath: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * 从进程命令行参数中提取用户打开的文件路径列表。
+ * 处理带引号路径、裸路径、file:// URL（Chrome 打开本地 HTML）。
+ * 只返回扩展名在 EXT_MAP 中、且文件实际存在的路径。
+ */
+function parseFileArgsFromCmdLine(cmdLine: string, exePath: string): string[] {
+  const results: string[] = []
+  const seen = new Set<string>()
+  const exeLower = exePath.toLowerCase()
+
+  // 匹配带引号的字符串，或盘符开头的裸路径（Windows 路径不含这些特殊字符）
+  const regex = /"([^"]+)"|([A-Za-z]:\\[^\s"*?<>]+)/g
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(cmdLine)) !== null) {
+    let candidate = (match[1] ?? match[2]).trim()
+    if (!candidate) continue
+
+    // 处理 file:// URL（如 Chrome 打开本地 html）
+    if (candidate.startsWith('file:///')) {
+      try { candidate = decodeURIComponent(candidate.slice(8)).replace(/\//g, '\\') } catch { continue }
+    } else if (candidate.startsWith('file://')) {
+      continue  // 远程或 UNC，跳过
+    }
+
+    // 跳过 exe 自身
+    if (candidate.toLowerCase() === exeLower) continue
+
+    const ext = extname(candidate).toLowerCase()
+    const type = EXT_MAP[ext]
+    if (!type || type === 'app') continue  // 无已知类型或是 exe，跳过
+
+    if (!existsSync(candidate)) continue
+
+    const lower = candidate.toLowerCase()
+    if (seen.has(lower)) continue
+    seen.add(lower)
+
+    if (BLOCKED_PROCESS_PATHS.some(p => lower.startsWith(p))) continue
+    if (isIgnored(candidate)) continue
+    if (isBlockedDir(candidate)) continue
+
+    results.push(candidate)
+  }
+
+  return results
 }
 
 function isBlockedProcess(exePath: string): boolean {
@@ -228,7 +278,8 @@ function buildWmiWatcherScript(): string {
     '      $parent = Get-Process -Id $ppid -ErrorAction SilentlyContinue',
     '      if (-not $parent -or $sysSpawners -notcontains $parent.ProcessName.ToLower()) {',
     '        $pid2 = $e.TargetInstance.ProcessId',
-    '        Write-Output "$pid2|$p"',
+    '        $cmdline = $e.TargetInstance.CommandLine',
+    '        Write-Output "$pid2|$p|$cmdline"',
     '      }',
     '    }',
     '  } catch { }',
@@ -265,9 +316,12 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
     createInterface({ input: processWatcherProc.stdout! }).on('line', async (line) => {
       if (monitorPaused) return
       const raw = line.trim()
-      const sepIdx = raw.indexOf('|')
-      const pid = sepIdx > 0 ? parseInt(raw.slice(0, sepIdx)) : 0
-      const exePath = sepIdx > 0 ? raw.slice(sepIdx + 1).trim() : raw
+      // 格式: pid|exePath|commandLine（commandLine 可能含 |，取前两个分隔符）
+      const first  = raw.indexOf('|')
+      const second = first >= 0 ? raw.indexOf('|', first + 1) : -1
+      const pid    = first > 0 ? parseInt(raw.slice(0, first)) : 0
+      const exePath = first >= 0 ? (second > first ? raw.slice(first + 1, second) : raw.slice(first + 1)).trim() : raw
+      const cmdLine = second > 0 ? raw.slice(second + 1) : ''
       const lower = exePath.toLowerCase()
       if (!exePath || lower === ownExe || !lower.endsWith('.exe')) return
       if (isBlockedProcess(exePath)) {
@@ -314,6 +368,25 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
         }
       } catch (e) {
         console.error('[Monitor] upsertResource failed for process:', exePath, e)
+      }
+
+      // 解析命令行参数，捕获被打开的文件（图片、视频、文档等）
+      if (cmdLine) {
+        const filePaths = parseFileArgsFromCmdLine(cmdLine, exePath)
+        for (const filePath of filePaths) {
+          const ext = extname(filePath).toLowerCase()
+          const type = EXT_MAP[ext]!
+          const fileTitle = basename(filePath, ext)
+          try {
+            const fileResource = upsertResource({ type, title: fileTitle, file_path: filePath, rating: 0 })
+            if (fileResource) {
+              console.log('[Monitor] File opened via args:', type, fileTitle)
+              onNewEntry(fileResource)
+            }
+          } catch (e) {
+            console.error('[Monitor] upsertResource failed for file arg:', filePath, e)
+          }
+        }
       }
     })
 
@@ -489,6 +562,23 @@ export function stopMonitor(): void {
   recentWatcher?.close(); recentWatcher = null
   desktopWatcher?.close(); desktopWatcher = null
   if (processWatcherProc) { processWatcherProc.kill(); processWatcherProc = null }
+}
+
+/** 退出前将所有活跃会话的已用时间写入数据库，防止重启后丢失累计记录 */
+export function flushRunningSessions(): void {
+  if (pidCheckInterval) { clearInterval(pidCheckInterval); pidCheckInterval = null }
+  for (const [pid, session] of runningSessions) {
+    const elapsed = Math.floor((Date.now() - session.startTime) / 1000)
+    if (elapsed > 0) {
+      try {
+        recordProcessStop(session.resourceId, elapsed)
+        console.log(`[Monitor] Flushed session on quit: ${session.filePath} (pid ${pid}, ${elapsed}s)`)
+      } catch (e) {
+        console.error('[Monitor] flushRunningSessions error:', e)
+      }
+    }
+  }
+  runningSessions.clear()
 }
 
 /**
