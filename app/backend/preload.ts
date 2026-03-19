@@ -85,6 +85,19 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('drawer:import')
   },
 
+  // 独立导入窗口
+  onDropWindowItems: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => {
+    ipcRenderer.on('dropWindow:items', (_event, items) => callback(items))
+    return () => ipcRenderer.removeAllListeners('dropWindow:items')
+  },
+  dropImport: {
+    getItems: (): Promise<Array<{ type: string; title: string; file_path: string; meta?: string }>> =>
+      ipcRenderer.invoke('dropImport:getItems'),
+    confirm: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) =>
+      ipcRenderer.invoke('dropImport:confirm', items),
+    close: () => ipcRenderer.invoke('dropImport:close'),
+  },
+
   // 监听控制
   monitor: {
     scanNow:  () => ipcRenderer.invoke('monitor:scanNow'),

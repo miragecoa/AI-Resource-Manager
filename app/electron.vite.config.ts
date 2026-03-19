@@ -17,6 +17,7 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'backend/preload.ts'),
           drawer: resolve(__dirname, 'backend/drawer-preload.ts'),
+          drawerSettings: resolve(__dirname, 'backend/drawer-settings-preload.ts'),
         },
         output: {
           entryFileNames: '[name].js'

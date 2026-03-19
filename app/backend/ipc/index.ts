@@ -1,4 +1,4 @@
-import { ipcMain, shell, app, nativeImage, dialog, BrowserWindow, net, globalShortcut } from 'electron'
+import { ipcMain, shell, app, nativeImage, dialog, BrowserWindow, net, globalShortcut, webContents } from 'electron'
 import { mkdirSync, writeFileSync, readdirSync, readFileSync, existsSync, statSync } from 'fs'
 import { readFile, readdir } from 'fs/promises'
 import { execFile, exec } from 'child_process'
@@ -263,6 +263,11 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', (_e, key: string, value: string) => {
     setSetting(key, value)
+    if (key === 'theme') {
+      webContents.getAllWebContents().forEach(wc => {
+        if (!wc.isDestroyed()) wc.send('theme:change', value)
+      })
+    }
     return true
   })
 

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root {
+      --accent: #6366F1;
+      --accent-2: #818CF8;
+      --bg: #0C0C18;
+      --surface: #111122;
+      --border: #28284A;
+      --text: #E2E2F2;
+      --text-2: #9090B8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .panel {
+      width: 100%;
+      height: 100%;
+      background: color-mix(in srgb, var(--surface) 96%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+    }
+
+    .title {
+      font-size: 10px;
+      color: color-mix(in srgb, var(--accent-2) 70%, transparent);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .row-label {
+      width: 36px;
+      font-size: 12px;
+      color: var(--text-2);
+      flex-shrink: 0;
+    }
+
+    input[type=range] {
+      flex: 1;
+      height: 3px;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      background: color-mix(in srgb, var(--accent) 28%, transparent);
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      background: var(--accent);
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent);
+    }
+
+    input[type=range]::-webkit-slider-thumb:hover { background: var(--accent-2); }
+
+    .val {
+      width: 32px;
+      text-align: right;
+      font-size: 11px;
+      color: color-mix(in srgb, var(--text-2) 60%, transparent);
+      flex-shrink: 0;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+      margin: 4px 0 8px;
+    }
+
+    .btn {
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      font-size: 12px;
+      font-family: inherit;
+      color: var(--text-2);
+      padding: 5px 6px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .btn:hover {
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
+      color: var(--text);
+    }
+
+    .btn.accent { color: var(--accent-2); }
+    .btn.accent:hover { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+    .btn.danger { color: rgba(252,165,165,0.82); }
+    .btn.danger:hover { background: rgba(239,68,68,0.12); color: rgba(252,165,165,1); }
+
+    .hint {
+      font-size: 9.5px;
+      color: color-mix(in srgb, var(--text-2) 40%, transparent);
+      text-align: center;
+      margin-top: auto;
+      padding-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <div class="title">悬浮窗设置</div>
+
+    <div class="row">
+      <span class="row-label">透明度</span>
+      <input type="range" id="opacitySlider" min="20" max="100" step="1" value="100" />
+      <span class="val" id="opacityVal">100%</span>
+    </div>
+
+    <div class="row">
+      <span class="row-label">大小</span>
+      <input type="range" id="sizeSlider" min="0" max="100" step="1" value="40" />
+      <span class="val" id="sizeVal">68px</span>
+    </div>
+
+    <hr class="divider" />
+
+    <button class="btn accent" id="pickIconBtn">自定义图标</button>
+    <button class="btn" id="clearIconBtn" style="display:none">恢复默认图标</button>
+
+    <hr class="divider" />
+
+    <button class="btn" id="showMainBtn">显示主窗口</button>
+    <button class="btn danger" id="hideDrawerBtn">隐藏悬浮窗</button>
+
+    <div class="hint">将文件拖入悬浮图标可快速导入</div>
+  </div>
+
+  <script>
+    function sizeToWidth(v) {
+      return Math.round(32 * Math.pow(8, v / 100))  // 32px → 256px
+    }
+
+    const opacitySlider = document.getElementById('opacitySlider')
+    const opacityVal    = document.getElementById('opacityVal')
+    const sizeSlider    = document.getElementById('sizeSlider')
+    const sizeVal       = document.getElementById('sizeVal')
+    const clearIconBtn  = document.getElementById('clearIconBtn')
+
+    // Apply all theme vars synchronously from URL params (zero-flash)
+    const _p = new URLSearchParams(window.location.search)
+    const _themeVars = {
+      '--accent': _p.get('accent'),
+      '--accent-2': _p.get('accent2'),
+      '--bg': _p.get('bg'),
+      '--surface': _p.get('surface'),
+      '--border': _p.get('border'),
+      '--text': _p.get('text'),
+      '--text-2': _p.get('text2'),
+    }
+    for (const [k, v] of Object.entries(_themeVars)) {
+      if (v) document.documentElement.style.setProperty(k, v)
+    }
+
+    window.settingsApi.getSettings().then(({ opacity, size, hasCustomIcon }) => {
+      const pct = Math.round(opacity * 100)
+      opacitySlider.value    = pct
+      opacityVal.textContent = pct + '%'
+
+      sizeSlider.value    = size
+      sizeVal.textContent = sizeToWidth(size) + 'px'
+
+      clearIconBtn.style.display = hasCustomIcon ? 'block' : 'none'
+    })
+
+    // Live theme updates (if popup stays open while theme changes)
+    window.settingsApi.onThemeChange(({ accent, accent2 }) => {
+      document.documentElement.style.setProperty('--accent', accent)
+      document.documentElement.style.setProperty('--accent-2', accent2)
+    })
+
+    opacitySlider.addEventListener('input', () => {
+      const v = parseInt(opacitySlider.value) / 100
+      opacityVal.textContent = opacitySlider.value + '%'
+      window.settingsApi.setOpacity(v)
+    })
+
+    sizeSlider.addEventListener('input', () => {
+      const v = parseInt(sizeSlider.value)
+      sizeVal.textContent = sizeToWidth(v) + 'px'
+      window.settingsApi.setSize(v)
+    })
+
+    document.getElementById('pickIconBtn').addEventListener('click', () => {
+      window.settingsApi.pickCustomIcon()
+    })
+
+    clearIconBtn.addEventListener('click', () => {
+      window.settingsApi.clearCustomIcon()
+      clearIconBtn.style.display = 'none'
+    })
+
+    document.getElementById('showMainBtn').addEventListener('click', () => {
+      window.settingsApi.openMain()
+    })
+
+    document.getElementById('hideDrawerBtn').addEventListener('click', () => {
+      window.settingsApi.hideDrawer()
+    })
+
+    window.addEventListener('blur', () => {
+      window.settingsApi.close()
+    })
+  </script>
+</body>
+</html>

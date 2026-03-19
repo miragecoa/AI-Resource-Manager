@@ -2,10 +2,13 @@
   <!-- 瀑布流独立窗口 -->
   <MasonryWindow v-if="isMasonryWindow" />
 
+  <!-- 拖入导入独立窗口 -->
+  <DropImportWindow v-else-if="isDropWindow" />
+
   <!-- 首次启动授权弹窗 -->
   <ConsentDialog v-else-if="showConsent" @consent="onConsent" />
 
-  <div class="app" v-else-if="!isMasonryWindow">
+  <div class="app" v-else-if="!isMasonryWindow && !isDropWindow">
     <!-- 自定义标题栏（替代系统原生标题栏） -->
     <div class="titlebar" :class="{ 'is-pinned': isPinned }">
       <div class="titlebar-drag" />
@@ -46,8 +49,11 @@ import { useSettingsStore } from './stores/settings'
 import Sidebar from './components/Sidebar.vue'
 import ConsentDialog from './components/ConsentDialog.vue'
 import MasonryWindow from './components/MasonryWindow.vue'
+import DropImportWindow from './components/DropImportWindow.vue'
 
-const isMasonryWindow = new URLSearchParams(window.location.search).get('window') === 'masonry'
+const windowParam = new URLSearchParams(window.location.search).get('window')
+const isMasonryWindow = windowParam === 'masonry'
+const isDropWindow = windowParam === 'drop-import'
 
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
@@ -77,6 +83,9 @@ function startApp() {
 onMounted(async () => {
   // 最先加载设置（含缩放），确保 UI 出现前就已应用
   await settingsStore.load()
+
+  // 独立子窗口只需要主题，不需要完整的应用初始化
+  if (isMasonryWindow || isDropWindow) return
 
   // 窗口最大化 / 置顶状态同步
   isMaximized.value = await window.api.win.isMaximized()

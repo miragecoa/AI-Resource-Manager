@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net, globalShortcut, screen } from 'electron'
-import { join } from 'path'
+import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net, globalShortcut, screen, dialog } from 'electron'
+import { join, extname } from 'path'
 import { deflateSync } from 'zlib'
-import { existsSync, createReadStream, statSync } from 'fs'
+import { existsSync, createReadStream, statSync, copyFileSync, unlinkSync, readFileSync } from 'fs'
 import { pathToFileURL } from './utils/fs-safe'
 import { execFile } from 'child_process'
 
@@ -15,8 +15,8 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }
 ])
 import { initDatabase } from './db/index'
-import { getSetting, setSetting } from './db/queries'
-import { ensureProfiles } from './db/profiles'
+import { getSetting, setSetting, addManualResource } from './db/queries'
+import { ensureProfiles, getProfileDir, loadManifest } from './db/profiles'
 import { registerIpcHandlers, resolveDroppedPaths } from './ipc/index'
 import { startMonitor } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
@@ -25,6 +25,9 @@ import { initAutoUpdater } from './updater'
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
 let drawerWindow: BrowserWindow | null = null
+let drawerSettingsWindow: BrowserWindow | null = null
+let dropImportWindow: BrowserWindow | null = null
+let dropImportItems: Array<{ type: string; title: string; file_path: string; meta?: string }> = []
 let masonryPaths: Array<{ path: string; title: string }> = []
 let tray: Tray | null = null
 let willQuit = false
@@ -146,10 +149,32 @@ function createTray(): void {
   tray.on('click', () => mainWindow?.show())
 }
 
+const DRAWER_SIZES: Record<string, { w: number; h: number }> = {
+  xs:     { w: 40, h: 50 },
+  small:  { w: 56, h: 68 },
+  medium: { w: 68, h: 80 },
+  large:  { w: 96, h: 114 },
+  xl:     { w: 256, h: 304 },
+}
+// Legacy named-preset → numeric (0-100) migration map
+const DRAWER_SIZE_LEGACY: Record<string, number> = { xs: 5, small: 20, medium: 40, large: 60, xl: 85 }
+function drawerSizeFromValue(v: number): { w: number; h: number } {
+  // Exponential scale: 0→32px wide … 100→256px wide, aspect ratio ~1.2
+  const minW = 32, maxW = 256
+  const w = Math.round(minW * Math.pow(maxW / minW, v / 100))
+  return { w, h: Math.round(w * 1.2) }
+}
+function getDrawerSizeValue(): number {
+  const raw = getSetting('drawerSize') ?? '40'
+  const n = parseFloat(raw)
+  if (!isNaN(n)) return Math.max(0, Math.min(100, n))
+  return DRAWER_SIZE_LEGACY[raw] ?? 40
+}
+
 function createDrawerWindow(): void {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  const winW = 52
-  const winH = 80
+  const { w: winW, h: winH } = drawerSizeFromValue(getDrawerSizeValue())
+  const opacityVal = parseFloat(getSetting('drawerOpacity') ?? '1')
   const savedX = getSetting('drawerX')
   const savedY = getSetting('drawerY')
   const startX = savedX !== null ? parseInt(savedX) : width - winW
@@ -173,11 +198,80 @@ function createDrawerWindow(): void {
     }
   })
   drawerWindow.on('closed', () => { drawerWindow = null })
+  drawerWindow.setOpacity(isNaN(opacityVal) ? 1 : opacityVal)
+  // Ensure drawer stays above all other windows in the TOPMOST z-order
+  drawerWindow.setAlwaysOnTop(true, 'screen-saver')
+  drawerWindow.webContents.on('did-finish-load', () => {
+    drawerWindow?.moveTop()
+    const dataUrl = iconToDataUrl(getSetting('drawerCustomIcon') ?? '')
+    if (dataUrl) drawerWindow?.webContents.send('drawer:setCustomIcon', dataUrl)
+  })
+  drawerWindow.on('show', () => drawerWindow?.moveTop())
 
+  // Inject current accent colors via URL (avoids async flicker on first paint)
+  let dAccent = '#6366F1', dAccent2 = '#818CF8'
+  try {
+    const t = JSON.parse(getSetting('theme') ?? '{}')
+    dAccent = t['accent'] ?? dAccent; dAccent2 = t['accent-2'] ?? dAccent2
+  } catch {}
+  const drawerQuery = '?' + new URLSearchParams({ accent: dAccent, accent2: dAccent2 }).toString()
   if (process.env['ELECTRON_RENDERER_URL']) {
-    drawerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer.html')
+    drawerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer.html' + drawerQuery)
   } else {
-    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'))
+    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'), { query: { accent: dAccent, accent2: dAccent2 } })
+  }
+}
+
+const ICON_MIME: Record<string, string> = {
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif', '.webp': 'image/webp', '.ico': 'image/x-icon', '.svg': 'image/svg+xml',
+}
+function iconToDataUrl(filePath: string): string | null {
+  if (!filePath || !existsSync(filePath)) return null
+  try {
+    const mime = ICON_MIME[extname(filePath).toLowerCase()] ?? 'image/png'
+    const data = readFileSync(filePath).toString('base64')
+    return `data:${mime};base64,${data}`
+  } catch { return null }
+}
+
+function openDrawerSettings(): void {
+  if (drawerSettingsWindow && !drawerSettingsWindow.isDestroyed()) {
+    drawerSettingsWindow.focus()
+    return
+  }
+  const db = drawerWindow?.getBounds()
+  if (!db) return
+  const sw = 248, sh = 280
+  const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
+  const sx = Math.max(0, Math.min(db.x - sw - 8, screenW - sw))
+  const sy = Math.max(0, db.y + Math.round((db.height - sh) / 2))
+  // Inject all theme vars into URL for synchronous application (avoids async flicker)
+  let accent = '#6366F1', accent2 = '#818CF8'
+  let bg = '#0C0C18', surface = '#111122', border = '#28284A', text = '#E2E2F2', text2 = '#9090B8'
+  try {
+    const t = JSON.parse(getSetting('theme') ?? '{}')
+    accent = t['accent'] ?? accent; accent2 = t['accent-2'] ?? accent2
+    bg = t['bg'] ?? bg; surface = t['surface'] ?? surface; border = t['border'] ?? border
+    text = t['text'] ?? text; text2 = t['text-2'] ?? text2
+  } catch {}
+  const _q = new URLSearchParams({ accent, accent2, bg, surface, border, text, text2 }).toString()
+  const query = '?' + _q
+  drawerSettingsWindow = new BrowserWindow({
+    width: sw, height: sh, x: sx, y: sy,
+    transparent: true, frame: false, alwaysOnTop: true,
+    skipTaskbar: true, resizable: false, movable: false, focusable: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/drawerSettings.js'),
+      contextIsolation: true, nodeIntegration: false,
+    }
+  })
+  drawerSettingsWindow.on('closed', () => { drawerSettingsWindow = null })
+  drawerSettingsWindow.setAlwaysOnTop(true, 'screen-saver')
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    drawerSettingsWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer-settings.html' + query)
+  } else {
+    drawerSettingsWindow.loadFile(join(__dirname, '../renderer/drawer-settings.html'), { query: { accent, accent2, bg, surface, border, text, text2 } })
   }
 }
 
@@ -229,6 +323,41 @@ function createMasonryWindow(items: Array<{ path: string; title: string }>): voi
     masonryWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '?window=masonry')
   } else {
     masonryWindow.loadFile(join(__dirname, '../renderer/index.html'), { query: { window: 'masonry' } })
+  }
+}
+
+function openDropImportWindow(items: Array<{ type: string; title: string; file_path: string; meta?: string }>): void {
+  dropImportItems = items
+  if (dropImportWindow && !dropImportWindow.isDestroyed()) {
+    dropImportWindow.webContents.send('dropWindow:items', items)
+    dropImportWindow.show()
+    dropImportWindow.focus()
+    return
+  }
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  dropImportWindow = new BrowserWindow({
+    width: 560, height: 460,
+    x: Math.round((sw - 560) / 2), y: Math.round((sh - 460) / 2),
+    show: false, frame: false,
+    title: '导入文件',
+    backgroundColor: '#0C0C18',
+    ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+  dropImportWindow.on('ready-to-show', () => {
+    dropImportWindow?.show()
+    dropImportWindow?.focus()
+  })
+  dropImportWindow.on('closed', () => { dropImportWindow = null })
+
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    dropImportWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '?window=drop-import')
+  } else {
+    dropImportWindow.loadFile(join(__dirname, '../renderer/index.html'), { query: { window: 'drop-import' } })
   }
 }
 
@@ -431,12 +560,18 @@ app.whenReady().then(() => {
     mainWindow?.show()
     mainWindow?.focus()
   })
+  ipcMain.handle('drawer:toggleMain', () => {
+    if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()) {
+      mainWindow.minimize()
+    } else {
+      mainWindow?.show()
+      mainWindow?.focus()
+    }
+  })
   ipcMain.handle('drawer:filesDropped', async (_e, paths: string[]) => {
     const items = resolveDroppedPaths(paths)
     if (!items.length) return
-    mainWindow?.show()
-    mainWindow?.focus()
-    mainWindow?.webContents.send('drawer:import', items)
+    openDropImportWindow(items)
   })
   ipcMain.handle('drawer:move', (_e, x: number, y: number) => {
     drawerWindow?.setPosition(Math.round(x), Math.round(y))
@@ -445,21 +580,99 @@ app.whenReady().then(() => {
     setSetting('drawerX', String(Math.round(x)))
     setSetting('drawerY', String(Math.round(y)))
   })
-  ipcMain.handle('drawer:showContextMenu', () => {
-    const drawerVisible = getSetting('drawerVisible') !== 'false'
-    Menu.buildFromTemplate([
-      {
-        label: '隐藏悬浮窗',
-        click: () => {
-          drawerWindow?.hide()
-          setSetting('drawerVisible', 'false')
-          tray?.setContextMenu(buildTrayMenu())
-        }
-      },
-      { type: 'separator' },
-      { label: '显示主窗口', click: () => { mainWindow?.show(); mainWindow?.focus() } },
-    ]).popup({ window: drawerWindow ?? undefined })
-    void drawerVisible  // suppress unused warning
+  // Right-click → open HTML settings popup with sliders
+  ipcMain.handle('drawer:showContextMenu', () => openDrawerSettings())
+
+  // Settings popup IPC
+  ipcMain.handle('drawerSettings:get', () => {
+    const customIconPath = getSetting('drawerCustomIcon') ?? ''
+    let accent = '#6366F1', accent2 = '#818CF8'
+    try {
+      const t = JSON.parse(getSetting('theme') ?? '{}')
+      accent = t['accent'] ?? accent; accent2 = t['accent-2'] ?? accent2
+    } catch {}
+    return {
+      opacity: parseFloat(getSetting('drawerOpacity') ?? '1'),
+      size:    getDrawerSizeValue(),
+      hasCustomIcon: !!(customIconPath && existsSync(customIconPath)),
+      accent, accent2,
+    }
+  })
+  ipcMain.handle('drawer:getCustomIcon', () => {
+    return iconToDataUrl(getSetting('drawerCustomIcon') ?? '')
+  })
+  ipcMain.handle('drawer:getAccent', () => {
+    try {
+      const theme = JSON.parse(getSetting('theme') ?? '{}')
+      return { accent: theme['accent'] ?? '#6366F1', accent2: theme['accent-2'] ?? '#818CF8' }
+    } catch { return { accent: '#6366F1', accent2: '#818CF8' } }
+  })
+  ipcMain.handle('drawerSettings:pickCustomIcon', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender) ?? drawerSettingsWindow ?? undefined
+    const result = await dialog.showOpenDialog(win!, {
+      title: '选择悬浮窗图标',
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || !result.filePaths.length) return
+    const src  = result.filePaths[0]
+    const ext  = extname(src).toLowerCase()
+    const activeProfile = loadManifest().active
+    const dest = join(getProfileDir(activeProfile), `custom-drawer-icon${ext}`)
+    copyFileSync(src, dest)
+    setSetting('drawerCustomIcon', dest)
+    drawerWindow?.webContents.send('drawer:setCustomIcon', iconToDataUrl(dest))
+    drawerSettingsWindow?.close()
+  })
+  ipcMain.handle('drawerSettings:clearCustomIcon', () => {
+    const p = getSetting('drawerCustomIcon') ?? ''
+    if (p) {
+      try { unlinkSync(p) } catch { /* already gone */ }
+      setSetting('drawerCustomIcon', '')
+    }
+    drawerWindow?.webContents.send('drawer:setCustomIcon', null)
+  })
+  ipcMain.handle('drawerSettings:setOpacity', (_e, v: number) => {
+    setSetting('drawerOpacity', String(v))
+    drawerWindow?.setOpacity(v)
+  })
+  ipcMain.handle('drawerSettings:setSize', (_e, v: number) => {
+    const { w, h } = drawerSizeFromValue(v)
+    setSetting('drawerSize', String(v))
+    const b = drawerWindow?.getBounds()
+    if (b) drawerWindow?.setBounds({ x: b.x, y: b.y, width: w, height: h })
+  })
+  ipcMain.handle('drawerSettings:openMain', () => {
+    mainWindow?.show()
+    mainWindow?.focus()
+    drawerSettingsWindow?.close()
+  })
+  ipcMain.handle('drawerSettings:hideDrawer', () => {
+    drawerWindow?.hide()
+    setSetting('drawerVisible', 'false')
+    tray?.setContextMenu(buildTrayMenu())
+    drawerSettingsWindow?.close()
+  })
+  ipcMain.handle('drawerSettings:close', () => {
+    drawerSettingsWindow?.close()
+  })
+
+  // 独立导入窗口
+  ipcMain.handle('dropImport:getItems', () => dropImportItems)
+  ipcMain.handle('dropImport:confirm', (_e, items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => {
+    const added: any[] = []
+    for (const item of items) {
+      const result = addManualResource(item)
+      if (!result.existed) {
+        added.push(result.resource)
+        mainWindow?.webContents.send('resource:new', result.resource)
+      }
+    }
+    dropImportWindow?.close()
+    return { added }
+  })
+  ipcMain.handle('dropImport:close', () => {
+    dropImportWindow?.close()
   })
 
   // 悬浮窗启动策略：

@@ -50,6 +50,12 @@ declare global {
       onNewResource: (callback: (entry: object) => void) => () => void
       onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => () => void
       onDrawerImport: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => () => void
+      onDropWindowItems: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => () => void
+      dropImport: {
+        getItems: () => Promise<Array<{ type: string; title: string; file_path: string; meta?: string }>>
+        confirm: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => Promise<void>
+        close: () => Promise<void>
+      }
       monitor: {
         scanNow:  () => Promise<import('../stores/resources').Resource[]>
         pause:    () => Promise<void>
