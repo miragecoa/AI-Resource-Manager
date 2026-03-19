@@ -216,6 +216,8 @@ function onMicroLeave() { showMicroTooltip.value = false }
 const displayTitle = computed(() => {
   const r = props.resource
   if (!settingsStore.showFileExt) return r.title
+  // 网页类型（file_path 是 URL）不追加扩展名
+  if (r.type === 'webpage' || r.file_path.startsWith('http://') || r.file_path.startsWith('https://')) return r.title
   // 从 file_path 提取扩展名追加到 title
   const dot = r.file_path.lastIndexOf('.')
   const sep = Math.max(r.file_path.lastIndexOf('/'), r.file_path.lastIndexOf('\\'))
@@ -1076,8 +1078,8 @@ function openInExplorer() {
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 11px;
-  min-width: 140px;
-  max-width: 260px;
+  min-width: 160px;
+  max-width: 360px;
   z-index: 8500;
   pointer-events: none;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
@@ -1100,7 +1102,7 @@ function openInExplorer() {
   line-height: 1.4;
   word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

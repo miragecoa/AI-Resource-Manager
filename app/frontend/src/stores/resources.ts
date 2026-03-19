@@ -59,15 +59,32 @@ export const useResourceStore = defineStore('resources', () => {
       list = list.filter((r) => r.type === activeType.value)
     }
 
+    // 搜索过滤 + 相关度评分
+    const relevanceMap = new Map<string, number>()
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.toLowerCase()
-      list = list.filter((r) => {
-        if (r.title.toLowerCase().includes(q)) return true
-        if (pinyinMatch(r.title, q) !== null) return true
-        // 匹配标签名称
-        if (r.tags?.some(t => t.name.toLowerCase().includes(q) || pinyinMatch(t.name, q) !== null)) return true
-        return false
-      })
+      const matched: Resource[] = []
+      for (const r of list) {
+        const t = r.title.toLowerCase()
+        let score = -1
+        if (t === q) {
+          score = 5000
+        } else if (t.startsWith(q)) {
+          score = 4000
+        } else {
+          const idx = t.indexOf(q)
+          if (idx >= 0) {
+            // 出现位置越靠前分越高（最多 999 分）
+            score = 3000 - Math.min(idx, 999)
+          } else if (pinyinMatch(r.title, q) !== null) {
+            score = 1000
+          } else if (r.tags?.some(t2 => t2.name.toLowerCase().includes(q) || pinyinMatch(t2.name, q) !== null)) {
+            score = 0
+          }
+        }
+        if (score >= 0) { matched.push(r); relevanceMap.set(r.id, score) }
+      }
+      list = matched
     }
 
     if (activeTags.value.length > 0 || excludedTags.value.length > 0) {
@@ -90,9 +107,10 @@ export const useResourceStore = defineStore('resources', () => {
       })
     }
 
-    // 排序：pinned/running 始终置顶，同组内按用户选择排序
+    // 排序：pinned/running 始终置顶，搜索时同组内按相关度排序，否则按用户设置排序
     const settingsStore = useSettingsStore()
     const sortField = settingsStore.resourceSort
+    const hasSearch = relevanceMap.size > 0
 
     const SORT_FN: Record<string, (a: Resource, b: Resource) => number> = {
       lastUsed:      (a, b) => (b.last_run_at ?? 0) - (a.last_run_at ?? 0),
@@ -105,6 +123,13 @@ export const useResourceStore = defineStore('resources', () => {
     const userSort = SORT_FN[sortField] ?? SORT_FN.lastUsed
 
     return list.slice().sort((a, b) => {
+      if (hasSearch) {
+        // 搜索时：仅 pinned 置顶，不提升运行中，按相关度排序
+        const aPinned = a.pinned ? 1 : 0
+        const bPinned = b.pinned ? 1 : 0
+        if (aPinned !== bPinned) return bPinned - aPinned
+        return (relevanceMap.get(b.id) ?? 0) - (relevanceMap.get(a.id) ?? 0)
+      }
       const aScore = (a.pinned ? 2 : 0) + (runningMap.value.has(a.id) ? 1 : 0)
       const bScore = (b.pinned ? 2 : 0) + (runningMap.value.has(b.id) ? 1 : 0)
       if (aScore !== bScore) return bScore - aScore
