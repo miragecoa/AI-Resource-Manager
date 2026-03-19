@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('settingsApi', {
   pickCustomIcon:  () => ipcRenderer.invoke('drawerSettings:pickCustomIcon'),
   clearCustomIcon: () => ipcRenderer.invoke('drawerSettings:clearCustomIcon'),
   openMain:        () => ipcRenderer.invoke('drawerSettings:openMain'),
+  setEdge:         (dir: string) => ipcRenderer.invoke('drawerSettings:setEdge', dir),
+  setStripSize:    (len: number, wid: number) => ipcRenderer.invoke('drawerSettings:setStripSize', len, wid),
+  recallDrawer:    () => ipcRenderer.invoke('drawerSettings:recallDrawer'),
   hideDrawer:      () => ipcRenderer.invoke('drawerSettings:hideDrawer'),
   close:           () => ipcRenderer.invoke('drawerSettings:close'),
   onThemeChange:   (cb: (vars: { accent: string; accent2: string }) => void) => {

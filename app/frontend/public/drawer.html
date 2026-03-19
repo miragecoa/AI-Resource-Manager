@@ -14,6 +14,7 @@
       overflow: hidden;
       user-select: none;
       -webkit-user-select: none;
+      position: relative;
     }
 
     .container {
@@ -25,11 +26,14 @@
       align-items: center;
       justify-content: center;
       cursor: grab;
+      transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .container.dragging { cursor: grabbing; }
+    .container.dragging {
+      cursor: grabbing;
+      transition: none;
+    }
 
-    /* The SVG icon glow */
     .icon-wrap {
       pointer-events: none;
       width: 88%;
@@ -46,7 +50,6 @@
     .icon-wrap svg path,
     .icon-wrap svg rect { stroke: var(--accent-2); }
 
-    /* Custom image: absolute, fills same area as icon-wrap */
     #customIconImg {
       display: none;
       position: absolute;
@@ -73,7 +76,23 @@
         drop-shadow(0 0 4px color-mix(in srgb, var(--accent-2) 90%, transparent));
     }
 
-    /* Drag-over chip label */
+    /*
+     * Peek strip — fixed sibling of .container, NEVER affected by container's transform.
+     * Same size/position whether drawer is expanded (ghost) or collapsed (active).
+     * Opacity is the only thing that changes.
+     */
+    #peekStrip {
+      position: fixed;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent);
+      transition: opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
     .label {
       position: absolute;
       bottom: 5px;
@@ -98,91 +117,225 @@
 <body>
   <div class="container" id="tab">
     <div class="icon-wrap">
-      <!--
-        收纳盒图标：
-        - 顶部拎手 (arch handle)
-        - 盒盖 (lid)
-        - 盒身 (body) + 横纵格线 (dividers)
-        fill="none" → 中空透明
-      -->
       <svg viewBox="0 0 56 66" preserveAspectRatio="xMidYMid meet" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- Handle arch -->
-        <path
-          d="M20 16 C20 8 36 8 36 16"
-          stroke-width="2.4" stroke-linecap="round"
-        />
-        <!-- Lid (slightly wider than body) -->
-        <rect x="3" y="16" width="50" height="9.5" rx="2.5"
-          stroke-width="2.4"
-        />
-        <!-- Box body -->
-        <rect x="5.5" y="25.5" width="45" height="34" rx="2"
-          stroke-width="2.4"
-        />
+        <path d="M20 16 C20 8 36 8 36 16" stroke-width="2.4" stroke-linecap="round" />
+        <rect x="3" y="16" width="50" height="9.5" rx="2.5" stroke-width="2.4" />
+        <rect x="5.5" y="25.5" width="45" height="34" rx="2" stroke-width="2.4" />
       </svg>
     </div>
     <img id="customIconImg" />
     <span class="label">松开导入</span>
   </div>
+  <div id="peekStrip"></div>
 
   <script>
-    const tab = document.getElementById('tab')
+    const tab      = document.getElementById('tab')
+    const peekStrip = document.getElementById('peekStrip')
+
+    // Strip dimensions — updated from settings or URL params
+    let PEEK_PX    = 14   // thickness in px (the part that stays visible when collapsed)
+    let STRIP_LEN  = 50   // length as % of the drawer dimension
+
+    // Chevron SVGs that point toward the expand direction
+    const CHEVRONS = {
+      right:  `<svg width="6" height="11" viewBox="0 0 6 11" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M5 1L1 5.5L5 10" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+      left:   `<svg width="6" height="11" viewBox="0 0 6 11" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5.5L1 10" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+      top:    `<svg width="11" height="6" viewBox="0 0 11 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5.5 5L10 1" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+      bottom: `<svg width="11" height="6" viewBox="0 0 11 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 5L5.5 1L10 5" stroke="rgba(255,255,255,0.85)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    }
 
     // ── Theme ──────────────────────────────────────────────────────────────
     function applyAccent({ accent, accent2 }) {
       document.documentElement.style.setProperty('--accent', accent)
       document.documentElement.style.setProperty('--accent-2', accent2)
     }
-    // Apply immediately from URL params (no async flicker on first paint)
     const _dp = new URLSearchParams(window.location.search)
     if (_dp.get('accent')) applyAccent({ accent: _dp.get('accent'), accent2: _dp.get('accent2') || '#818CF8' })
-    // Live updates when theme changes
     window.drawerApi?.onThemeChange(v => applyAccent(v))
 
-    // ── IPC-based drag (mouse drag moves the window; doesn't block file drop) ──
-    let dragStart = null   // { mx, my, wx, wy }
+    // Init strip size from URL params (passed at window creation — zero flash)
+    if (_dp.get('stripLen')) STRIP_LEN = parseInt(_dp.get('stripLen'))
+    if (_dp.get('stripWid')) PEEK_PX   = parseInt(_dp.get('stripWid'))
+
+    // ── Edge-hide mode ────────────────────────────────────────────────────
+    let currentEdge = 'none'
+    let peekLeaveTimer = null
+    let isDragging = false
+
+    // Position + size the peek strip for the given direction.
+    // The strip occupies exactly the same area whether expanded (ghost) or collapsed (active).
+    function positionStrip(dir) {
+      Object.assign(peekStrip.style, {
+        top: '', left: '', right: '', bottom: '',
+        width: '', height: '',
+        borderRadius: '',
+        transform: '',
+      })
+      peekStrip.innerHTML = CHEVRONS[dir] ?? ''
+
+      const lenPct = STRIP_LEN + '%'
+      const offset = ((100 - STRIP_LEN) / 2) + '%'  // center the strip
+
+      if (dir === 'right') {
+        Object.assign(peekStrip.style, {
+          right: '0', top: offset,
+          width: PEEK_PX + 'px', height: lenPct,
+          borderRadius: '6px 0 0 6px',
+        })
+      } else if (dir === 'left') {
+        Object.assign(peekStrip.style, {
+          left: '0', top: offset,
+          width: PEEK_PX + 'px', height: lenPct,
+          borderRadius: '0 6px 6px 0',
+        })
+      } else if (dir === 'top') {
+        Object.assign(peekStrip.style, {
+          top: '0', left: offset,
+          width: lenPct, height: PEEK_PX + 'px',
+          borderRadius: '0 0 6px 6px',
+        })
+      } else if (dir === 'bottom') {
+        Object.assign(peekStrip.style, {
+          bottom: '0', left: offset,
+          width: lenPct, height: PEEK_PX + 'px',
+          borderRadius: '6px 6px 0 0',
+        })
+      }
+    }
+
+    // applyEdge: configure state for new direction, show ghost strip, don't collapse yet
+    function applyEdge(dir) {
+      currentEdge = dir
+      if (peekLeaveTimer) { clearTimeout(peekLeaveTimer); peekLeaveTimer = null }
+      tab.style.transform = ''
+
+      if (dir === 'none') {
+        peekStrip.style.opacity = '0'
+        peekStrip.innerHTML = ''
+        return
+      }
+
+      positionStrip(dir)
+      // Ghost: strip is visible at low opacity when drawer is expanded,
+      // so the user always sees where it will collapse to.
+      peekStrip.style.opacity = '0.22'
+    }
+
+    // Collapse: slide the container into the chosen edge; strip goes full opacity
+    function collapseToEdge() {
+      if (currentEdge === 'none') return
+      if (currentEdge === 'right')  tab.style.transform = `translateX(calc(100% - ${PEEK_PX}px))`
+      else if (currentEdge === 'left')   tab.style.transform = `translateX(calc(-100% + ${PEEK_PX}px))`
+      else if (currentEdge === 'top')    tab.style.transform = `translateY(calc(-100% + ${PEEK_PX}px))`
+      else if (currentEdge === 'bottom') tab.style.transform = `translateY(calc(100% - ${PEEK_PX}px))`
+      peekStrip.style.opacity = '0.92'
+    }
+
+    // Expand: show the drawer, strip drops back to ghost opacity
+    function expandFromEdge() {
+      if (currentEdge === 'none') return
+      tab.style.transform = ''
+      peekStrip.style.opacity = '0.22'
+    }
+
+    // Settings changed edge direction
+    window.drawerApi?.onSetEdge(dir => {
+      applyEdge(dir)
+      if (dir !== 'none') collapseToEdge()
+    })
+
+    // Settings changed strip size — re-apply strip positioning immediately
+    window.drawerApi?.onSetStripSize(({ len, wid }) => {
+      STRIP_LEN = len
+      PEEK_PX   = wid
+      if (currentEdge !== 'none') {
+        positionStrip(currentEdge)
+        // Re-collapse with updated PEEK_PX if currently hidden, else stay expanded
+        if (tab.style.transform !== '') collapseToEdge()
+      }
+    })
+
+    // Init from URL param (set at window creation — zero flash)
+    const initialEdge = _dp.get('edge') ?? 'none'
+    if (initialEdge !== 'none') {
+      applyEdge(initialEdge)
+      collapseToEdge()
+    }
+
+    tab.addEventListener('mouseenter', () => {
+      if (currentEdge === 'none') return
+      if (peekLeaveTimer) { clearTimeout(peekLeaveTimer); peekLeaveTimer = null }
+      expandFromEdge()
+    })
+
+    tab.addEventListener('mouseleave', () => {
+      if (currentEdge === 'none' || isDragging) return
+      peekLeaveTimer = setTimeout(() => {
+        collapseToEdge()
+        peekLeaveTimer = null
+      }, 400)
+    })
+
+    // ── IPC-based drag ────────────────────────────────────────────────────
+    let mouseDownPos = null
     let wasDragging = false
+    isDragging = false
 
     tab.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return
-      dragStart = { mx: e.screenX, my: e.screenY, wx: window.screenX, wy: window.screenY }
-      wasDragging = false  // reset here so dblclick can check it
+      mouseDownPos = { x: e.screenX, y: e.screenY }
+      wasDragging = false
+      isDragging = false
       e.preventDefault()
     })
 
     window.addEventListener('mousemove', (e) => {
-      if (!dragStart) return
-      const dx = e.screenX - dragStart.mx
-      const dy = e.screenY - dragStart.my
-      if (!wasDragging && Math.hypot(dx, dy) < 4) return
-      wasDragging = true
-      tab.classList.add('dragging')
-      window.drawerApi?.move(dragStart.wx + dx, dragStart.wy + dy)
-    })
-
-    window.addEventListener('mouseup', (e) => {
-      if (wasDragging && dragStart) {
-        const dx = e.screenX - dragStart.mx
-        const dy = e.screenY - dragStart.my
-        window.drawerApi?.savePosition(dragStart.wx + dx, dragStart.wy + dy)
-        tab.classList.remove('dragging')
+      if (!mouseDownPos) return
+      if (!isDragging) {
+        const dx = e.screenX - mouseDownPos.x
+        const dy = e.screenY - mouseDownPos.y
+        if (Math.hypot(dx, dy) < 4) return
+        isDragging = true
+        wasDragging = true
+        tab.classList.add('dragging')
+        // Show drawer fully while dragging; keep ghost strip visible
+        if (currentEdge !== 'none') {
+          tab.style.transform = ''
+          peekStrip.style.opacity = '0.22'
+        }
+        window.drawerApi?.dragStart()
       }
-      dragStart = null
+      window.drawerApi?.dragMove()
     })
 
-    // ── Double-click → toggle main window (show if hidden, minimize if visible) ──
+    window.addEventListener('mouseup', () => {
+      if (isDragging) {
+        window.drawerApi?.dragEnd()  // main saves position; edge setting preserved
+        tab.classList.remove('dragging')
+        // Re-collapse after drag if mouse isn't hovering
+        if (currentEdge !== 'none') {
+          setTimeout(() => {
+            if (!tab.matches(':hover')) collapseToEdge()
+          }, 500)
+        }
+      }
+      mouseDownPos = null
+      isDragging = false
+    })
+
+    // ── Double-click → toggle main window ────────────────────────────────
     tab.addEventListener('dblclick', () => {
       if (wasDragging) return
       window.drawerApi?.toggleMain()
     })
 
-    // ── Right-click context menu ─────────────────────────────────────────
+    // ── Right-click context menu ──────────────────────────────────────────
     tab.addEventListener('contextmenu', (e) => {
       e.preventDefault()
       window.drawerApi?.showContextMenu()
     })
 
-    // ── File drag-drop ───────────────────────────────────────────────────
+    // ── File drag-drop ────────────────────────────────────────────────────
     tab.addEventListener('dragover', (e) => {
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
@@ -219,9 +372,7 @@
       }
     }
 
-    // Load saved custom icon on startup
     window.drawerApi?.getCustomIcon().then(url => applyCustomIcon(url))
-    // Listen for live changes (from settings panel)
     window.drawerApi?.onSetCustomIcon(url => applyCustomIcon(url))
   </script>
 </body>

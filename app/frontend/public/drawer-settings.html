@@ -118,6 +118,36 @@
     .btn.danger { color: rgba(252,165,165,0.82); }
     .btn.danger:hover { background: rgba(239,68,68,0.12); color: rgba(252,165,165,1); }
 
+    .edge-btns {
+      display: flex;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .edge-btn {
+      flex: 1;
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+      border-radius: 5px;
+      color: var(--text-2);
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      padding: 3px 0;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .edge-btn:hover {
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      color: var(--text);
+    }
+
+    .edge-btn.active {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      color: var(--accent-2);
+    }
+
     .hint {
       font-size: 9.5px;
       color: color-mix(in srgb, var(--text-2) 40%, transparent);
@@ -143,6 +173,29 @@
       <span class="val" id="sizeVal">68px</span>
     </div>
 
+    <div class="row">
+      <span class="row-label">贴边</span>
+      <div class="edge-btns">
+        <button class="edge-btn active" data-dir="none">关</button>
+        <button class="edge-btn" data-dir="left">左</button>
+        <button class="edge-btn" data-dir="right">右</button>
+        <button class="edge-btn" data-dir="top">上</button>
+        <button class="edge-btn" data-dir="bottom">下</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <span class="row-label">条长</span>
+      <input type="range" id="stripLenSlider" min="10" max="100" step="5" value="50" />
+      <span class="val" id="stripLenVal">50%</span>
+    </div>
+
+    <div class="row">
+      <span class="row-label">条宽</span>
+      <input type="range" id="stripWidSlider" min="6" max="32" step="2" value="14" />
+      <span class="val" id="stripWidVal">14px</span>
+    </div>
+
     <hr class="divider" />
 
     <button class="btn accent" id="pickIconBtn">自定义图标</button>
@@ -162,10 +215,14 @@
     }
 
     const opacitySlider = document.getElementById('opacitySlider')
-    const opacityVal    = document.getElementById('opacityVal')
-    const sizeSlider    = document.getElementById('sizeSlider')
-    const sizeVal       = document.getElementById('sizeVal')
-    const clearIconBtn  = document.getElementById('clearIconBtn')
+    const opacityVal      = document.getElementById('opacityVal')
+    const sizeSlider      = document.getElementById('sizeSlider')
+    const sizeVal         = document.getElementById('sizeVal')
+    const clearIconBtn    = document.getElementById('clearIconBtn')
+    const stripLenSlider  = document.getElementById('stripLenSlider')
+    const stripLenVal     = document.getElementById('stripLenVal')
+    const stripWidSlider  = document.getElementById('stripWidSlider')
+    const stripWidVal     = document.getElementById('stripWidVal')
 
     // Apply all theme vars synchronously from URL params (zero-flash)
     const _p = new URLSearchParams(window.location.search)
@@ -182,7 +239,33 @@
       if (v) document.documentElement.style.setProperty(k, v)
     }
 
-    window.settingsApi.getSettings().then(({ opacity, size, hasCustomIcon }) => {
+    const edgeBtns = document.querySelectorAll('.edge-btn')
+    edgeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        edgeBtns.forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        window.settingsApi.setEdge(btn.dataset.dir)
+      })
+    })
+
+    function fireStripSize() {
+      window.settingsApi.setStripSize(
+        parseInt(stripLenSlider.value),
+        parseInt(stripWidSlider.value)
+      )
+    }
+
+    stripLenSlider.addEventListener('input', () => {
+      stripLenVal.textContent = stripLenSlider.value + '%'
+      fireStripSize()
+    })
+
+    stripWidSlider.addEventListener('input', () => {
+      stripWidVal.textContent = stripWidSlider.value + 'px'
+      fireStripSize()
+    })
+
+    window.settingsApi.getSettings().then(({ opacity, size, hasCustomIcon, edge, stripLen, stripWid }) => {
       const pct = Math.round(opacity * 100)
       opacitySlider.value    = pct
       opacityVal.textContent = pct + '%'
@@ -191,6 +274,17 @@
       sizeVal.textContent = sizeToWidth(size) + 'px'
 
       clearIconBtn.style.display = hasCustomIcon ? 'block' : 'none'
+
+      const activeEdgeBtn = document.querySelector(`.edge-btn[data-dir="${edge ?? 'none'}"]`)
+      if (activeEdgeBtn) {
+        edgeBtns.forEach(b => b.classList.remove('active'))
+        activeEdgeBtn.classList.add('active')
+      }
+
+      stripLenSlider.value    = stripLen ?? 50
+      stripLenVal.textContent = (stripLen ?? 50) + '%'
+      stripWidSlider.value    = stripWid ?? 14
+      stripWidVal.textContent = (stripWid ?? 14) + 'px'
     })
 
     // Live theme updates (if popup stays open while theme changes)

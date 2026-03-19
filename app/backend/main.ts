@@ -25,6 +25,8 @@ import { initAutoUpdater } from './updater'
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
 let drawerWindow: BrowserWindow | null = null
+
+
 let drawerSettingsWindow: BrowserWindow | null = null
 let dropImportWindow: BrowserWindow | null = null
 let dropImportItems: Array<{ type: string; title: string; file_path: string; meta?: string }> = []
@@ -119,6 +121,26 @@ function createTrayIcon(): NativeImage {
   return loadFileIcon() ?? nativeImage.createFromBuffer(makeSolidPng(0x63, 0x66, 0xF1))
 }
 
+function recallDrawer(): void {
+  if (!drawerWindow || drawerWindow.isDestroyed()) {
+    createDrawerWindow()
+    setSetting('drawerVisible', 'true')
+    tray?.setContextMenu(buildTrayMenu())
+    return
+  }
+  // Clear edge mode and move to center of primary display
+  setSetting('drawerEdge', 'none')
+  drawerWindow.webContents.send('drawer:setEdge', 'none')
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize
+  const [winW, winH] = drawerWindow.getSize()
+  const cx = Math.round((width - winW) / 2)
+  const cy = Math.round((height - winH) / 2)
+  drawerWindow.setPosition(cx, cy)
+  setSetting('drawerX', String(cx))
+  setSetting('drawerY', String(cy))
+  drawerWindow.show()
+}
+
 function buildTrayMenu(): Electron.Menu {
   const drawerVisible = getSetting('drawerVisible') !== 'false'
   return Menu.buildFromTemplate([
@@ -140,6 +162,7 @@ function buildTrayMenu(): Electron.Menu {
         tray?.setContextMenu(buildTrayMenu())
       }
     },
+    { label: '召回悬浮窗到屏幕中央', click: () => recallDrawer() },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() }
   ])
@@ -180,8 +203,11 @@ function createDrawerWindow(): void {
   const opacityVal = parseFloat(getSetting('drawerOpacity') ?? '1')
   const savedX = getSetting('drawerX')
   const savedY = getSetting('drawerY')
-  const startX = savedX !== null ? parseInt(savedX) : width - winW
-  const startY = savedY !== null ? parseInt(savedY) : Math.round((height - winH) / 2)
+  const rawX = savedX !== null ? parseInt(savedX) : width - winW
+  const rawY = savedY !== null ? parseInt(savedY) : Math.round((height - winH) / 2)
+  // Clamp to keep at least 20px of the window visible on screen
+  const startX = Math.max(-winW + 20, Math.min(rawX, width - 20))
+  const startY = Math.max(0, Math.min(rawY, height - 20))
   drawerWindow = new BrowserWindow({
     width: winW,
     height: winH,
@@ -211,17 +237,20 @@ function createDrawerWindow(): void {
   })
   drawerWindow.on('show', () => drawerWindow?.moveTop())
 
-  // Inject current accent colors via URL (avoids async flicker on first paint)
+  // Inject current accent colors + edge setting via URL (avoids async flicker on first paint)
   let dAccent = '#6366F1', dAccent2 = '#818CF8'
   try {
     const t = JSON.parse(getSetting('theme') ?? '{}')
     dAccent = t['accent'] ?? dAccent; dAccent2 = t['accent-2'] ?? dAccent2
   } catch {}
-  const drawerQuery = '?' + new URLSearchParams({ accent: dAccent, accent2: dAccent2 }).toString()
+  const dEdge = getSetting('drawerEdge') ?? 'none'
+  const dStripLen = getSetting('drawerStripLen') ?? '50'
+  const dStripWid = getSetting('drawerStripWid') ?? '14'
+  const drawerQuery = '?' + new URLSearchParams({ accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid }).toString()
   if (process.env['ELECTRON_RENDERER_URL']) {
     drawerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer.html' + drawerQuery)
   } else {
-    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'), { query: { accent: dAccent, accent2: dAccent2 } })
+    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'), { query: { accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid } })
   }
 }
 
@@ -245,7 +274,7 @@ function openDrawerSettings(): void {
   }
   const db = drawerWindow?.getBounds()
   if (!db) return
-  const sw = 248, sh = 280
+  const sw = 248, sh = 350
   const { width: screenW } = screen.getPrimaryDisplay().workAreaSize
   const sx = Math.max(0, Math.min(db.x - sw - 8, screenW - sw))
   const sy = Math.max(0, db.y + Math.round((db.height - sh) / 2))
@@ -567,8 +596,11 @@ app.whenReady().then(() => {
     if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()) {
       mainWindow.minimize()
     } else {
+      // Briefly setAlwaysOnTop to force foreground on Windows (prevents being hidden behind other windows)
+      mainWindow?.setAlwaysOnTop(true)
       mainWindow?.show()
       mainWindow?.focus()
+      mainWindow?.setAlwaysOnTop(false)
     }
   })
   ipcMain.handle('drawer:filesDropped', async (_e, paths: string[]) => {
@@ -576,12 +608,50 @@ app.whenReady().then(() => {
     if (!items.length) return
     openDropImportWindow(items)
   })
-  ipcMain.handle('drawer:move', (_e, x: number, y: number) => {
-    drawerWindow?.setPosition(Math.round(x), Math.round(y))
+  // Drag: use main-process cursor position, converted to logical pixels via display scaleFactor.
+  // getCursorScreenPoint() returns physical pixels; getPosition() returns logical pixels.
+  // Converting through scaleFactor keeps them in the same coordinate space across multi-monitor DPI.
+  function cursorToLogical(): { x: number; y: number } {
+    const c = screen.getCursorScreenPoint()
+    const scale = screen.getDisplayNearestPoint(c).scaleFactor || 1
+    return { x: c.x / scale, y: c.y / scale }
+  }
+  let _dragOffset: { lcx: number; lcy: number; wx: number; wy: number } | null = null
+  ipcMain.handle('drawer:dragStart', () => {
+    if (!drawerWindow) return
+    const lc = cursorToLogical()
+    const [wx, wy] = drawerWindow.getPosition()
+    _dragOffset = { lcx: lc.x, lcy: lc.y, wx, wy }
   })
-  ipcMain.handle('drawer:savePosition', (_e, x: number, y: number) => {
-    setSetting('drawerX', String(Math.round(x)))
-    setSetting('drawerY', String(Math.round(y)))
+  ipcMain.handle('drawer:dragMove', () => {
+    if (!drawerWindow || !_dragOffset) return
+    const lc = cursorToLogical()
+    drawerWindow.setPosition(
+      Math.round(_dragOffset.wx + lc.x - _dragOffset.lcx),
+      Math.round(_dragOffset.wy + lc.y - _dragOffset.lcy)
+    )
+  })
+  ipcMain.handle('drawer:dragEnd', () => {
+    if (!drawerWindow || !_dragOffset) { _dragOffset = null; return }
+    const lc = cursorToLogical()
+    let x = Math.round(_dragOffset.wx + lc.x - _dragOffset.lcx)
+    let y = Math.round(_dragOffset.wy + lc.y - _dragOffset.lcy)
+    _dragOffset = null
+
+    // Clamp position so the peek strip (14px) stays within screen bounds
+    const PEEK_PX = 14
+    const display = screen.getDisplayNearestPoint({ x, y })
+    const b = display.bounds
+    const [winW, winH] = drawerWindow.getSize()
+    const edge = getSetting('drawerEdge') ?? 'none'
+    if (edge === 'right')       x = Math.min(x, b.x + b.width  - PEEK_PX)
+    else if (edge === 'left')   x = Math.max(x, b.x - winW + PEEK_PX)
+    else if (edge === 'top')    y = Math.max(y, b.y - winH + PEEK_PX)
+    else if (edge === 'bottom') y = Math.min(y, b.y + b.height - PEEK_PX)
+
+    drawerWindow.setPosition(x, y)
+    setSetting('drawerX', String(x))
+    setSetting('drawerY', String(y))
   })
   // Right-click → open HTML settings popup with sliders
   ipcMain.handle('drawer:showContextMenu', () => openDrawerSettings())
@@ -598,8 +668,22 @@ app.whenReady().then(() => {
       opacity: parseFloat(getSetting('drawerOpacity') ?? '1'),
       size:    getDrawerSizeValue(),
       hasCustomIcon: !!(customIconPath && existsSync(customIconPath)),
+      edge:      getSetting('drawerEdge') ?? 'none',
+      stripLen:  parseInt(getSetting('drawerStripLen') ?? '50'),
+      stripWid:  parseInt(getSetting('drawerStripWid') ?? '14'),
       accent, accent2,
     }
+  })
+  ipcMain.handle('drawerSettings:setStripSize', (_e, len: number, wid: number) => {
+    setSetting('drawerStripLen', String(len))
+    setSetting('drawerStripWid', String(wid))
+    drawerWindow?.webContents.send('drawer:setStripSize', { len, wid })
+  })
+  ipcMain.handle('drawerSettings:setEdge', (_e, dir: string) => {
+    setSetting('drawerEdge', dir)
+    // No position snapping — window stays wherever the user placed it;
+    // the renderer applies a CSS transform to hide in the chosen direction.
+    drawerWindow?.webContents.send('drawer:setEdge', dir)
   })
   ipcMain.handle('drawer:getCustomIcon', () => {
     return iconToDataUrl(getSetting('drawerCustomIcon') ?? '')
@@ -642,8 +726,11 @@ app.whenReady().then(() => {
   ipcMain.handle('drawerSettings:setSize', (_e, v: number) => {
     const { w, h } = drawerSizeFromValue(v)
     setSetting('drawerSize', String(v))
-    const b = drawerWindow?.getBounds()
-    if (b) drawerWindow?.setBounds({ x: b.x, y: b.y, width: w, height: h })
+    if (!drawerWindow) return
+    // resizable:false on Windows prevents programmatic shrinking; temporarily lift it
+    drawerWindow.setResizable(true)
+    drawerWindow.setSize(w, h)
+    drawerWindow.setResizable(false)
   })
   ipcMain.handle('drawerSettings:openMain', () => {
     mainWindow?.show()
@@ -655,6 +742,10 @@ app.whenReady().then(() => {
     setSetting('drawerVisible', 'false')
     tray?.setContextMenu(buildTrayMenu())
     drawerSettingsWindow?.close()
+  })
+  ipcMain.handle('drawerSettings:recallDrawer', () => {
+    drawerSettingsWindow?.close()
+    recallDrawer()
   })
   ipcMain.handle('drawerSettings:close', () => {
     drawerSettingsWindow?.close()
