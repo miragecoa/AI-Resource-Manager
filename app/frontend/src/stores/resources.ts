@@ -76,9 +76,21 @@ export const useResourceStore = defineStore('resources', () => {
           if (idx >= 0) {
             // 出现位置越靠前分越高（最多 999 分）
             score = 3000 - Math.min(idx, 999)
-          } else if (pinyinMatch(r.title, q) !== null) {
-            score = 1000
-          } else if (r.tags?.some(t2 => t2.name.toLowerCase().includes(q) || pinyinMatch(t2.name, q) !== null)) {
+          } else {
+            const pm = pinyinMatch(r.title, q)
+            if (pm !== null) {
+              // 判断是真拼音匹配（命中汉字）还是散列英文字母模糊匹配
+              const isChinese = pm.some(i => /[\u4e00-\u9fff]/.test(r.title[i]))
+              if (isChinese) {
+                // 真拼音匹配：区间 2000-1001，低于连续文本包含（3000-2001）
+                score = 2000 - Math.min(pm[0] ?? 0, 999)
+              } else {
+                // 散列英文字母模糊匹配：低于拼音，高于纯标签
+                score = 500
+              }
+            }
+          }
+          if (score < 0 && r.tags?.some(t2 => t2.name.toLowerCase().includes(q) || pinyinMatch(t2.name, q) !== null)) {
             score = 0
           }
         }
