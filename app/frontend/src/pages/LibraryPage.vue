@@ -975,7 +975,7 @@ const listSortedFiltered = computed(() => {
   }
 
   // 类型 + 后缀 过滤（列表视图专用）
-  if (viewMode === 'list') {
+  if (viewMode.value === 'list') {
     const typeSet = new Set(typeFilterArr.value)
     const extSet  = new Set(extFilterArr.value)
     if (typeSet.size > 0 || extSet.size > 0) {
@@ -987,7 +987,7 @@ const listSortedFiltered = computed(() => {
   }
 
   // 是否有任何列表视图专属排序
-  const hasListSort = viewMode === 'list' && (typeSortDir.value || listSortCol.value)
+  const hasListSort = viewMode.value === 'list' && (typeSortDir.value || listSortCol.value)
   if (!hasListSort) return base
 
   const typeDir = typeSortDir.value === 'asc' ? 1 : typeSortDir.value === 'desc' ? -1 : 0
