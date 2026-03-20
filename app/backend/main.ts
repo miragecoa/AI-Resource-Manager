@@ -800,24 +800,21 @@ app.whenReady().then(() => {
     if (!items.length) return
     openDropImportWindow(items)
   })
-  // Drag: use main-process cursor position, converted to logical pixels via display scaleFactor.
-  // getCursorScreenPoint() returns physical pixels; getPosition() returns logical pixels.
-  // Converting through scaleFactor keeps them in the same coordinate space across multi-monitor DPI.
-  function cursorToLogical(): { x: number; y: number } {
-    const c = screen.getCursorScreenPoint()
-    const scale = screen.getDisplayNearestPoint(c).scaleFactor || 1
-    return { x: c.x / scale, y: c.y / scale }
+  // Drag: getCursorScreenPoint() already returns logical pixels in Electron 29,
+  // same coordinate space as getPosition(). No scaleFactor conversion needed.
+  function cursorLogical(): { x: number; y: number } {
+    return screen.getCursorScreenPoint()
   }
   let _dragOffset: { lcx: number; lcy: number; wx: number; wy: number } | null = null
   ipcMain.handle('drawer:dragStart', () => {
     if (!drawerWindow) return
-    const lc = cursorToLogical()
+    const lc = cursorLogical()
     const [wx, wy] = drawerWindow.getPosition()
     _dragOffset = { lcx: lc.x, lcy: lc.y, wx, wy }
   })
   ipcMain.handle('drawer:dragMove', () => {
     if (!drawerWindow || !_dragOffset) return
-    const lc = cursorToLogical()
+    const lc = cursorLogical()
     drawerWindow.setPosition(
       Math.round(_dragOffset.wx + lc.x - _dragOffset.lcx),
       Math.round(_dragOffset.wy + lc.y - _dragOffset.lcy)
@@ -825,7 +822,7 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('drawer:dragEnd', () => {
     if (!drawerWindow || !_dragOffset) { _dragOffset = null; return }
-    const lc = cursorToLogical()
+    const lc = cursorLogical()
     let x = Math.round(_dragOffset.wx + lc.x - _dragOffset.lcx)
     let y = Math.round(_dragOffset.wy + lc.y - _dragOffset.lcy)
     _dragOffset = null
