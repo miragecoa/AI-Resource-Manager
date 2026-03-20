@@ -3,8 +3,8 @@
     <!-- 自定义标题栏 -->
     <div class="mw-titlebar">
       <div class="mw-drag">
-        <span class="mw-title">瀑布流预览</span>
-        <span class="mw-count" v-if="items.length">· {{ items.length }} 张</span>
+        <span class="mw-title">{{ t('masonry.title') }}</span>
+        <span class="mw-count" v-if="items.length">· {{ items.length }} {{ t('masonry.countSuffix') }}</span>
       </div>
       <div class="mw-controls">
         <span class="mw-zoom-label">{{ colWidth }}px</span>
@@ -12,12 +12,12 @@
           type="range" class="mw-slider"
           min="100" max="600" step="10"
           v-model.number="colWidth"
-          title="图片宽度"
+          :title="t('masonry.imgWidth')"
         />
-        <button class="mw-btn" @click="winMinimize" title="最小化">
+        <button class="mw-btn" @click="winMinimize" :title="t('masonry.minimize')">
           <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
         </button>
-        <button class="mw-btn mw-close" @click="winClose" title="关闭">
+        <button class="mw-btn mw-close" @click="winClose" :title="t('masonry.close')">
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.2"/></svg>
         </button>
       </div>
@@ -25,8 +25,8 @@
 
     <!-- 内容区 -->
     <div class="mw-body">
-      <div v-if="loading" class="mw-loading">正在加载图片…</div>
-      <div v-else-if="items.length === 0" class="mw-empty">没有图片</div>
+      <div v-if="loading" class="mw-loading">{{ t('masonry.loading') }}</div>
+      <div v-else-if="items.length === 0" class="mw-empty">{{ t('masonry.empty') }}</div>
       <div v-else class="mw-grid" :style="{ columnWidth: colWidth + 'px' }">
         <div
           v-for="img in items" :key="img.path"
@@ -57,15 +57,15 @@
       <div class="mw-ctx-menu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }">
         <button class="mw-ctx-item" @click="ctxOpen">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          打开
+          {{ t('masonry.open') }}
         </button>
         <button class="mw-ctx-item" @click="ctxReveal">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          在文件夹中显示
+          {{ t('masonry.showInFolder') }}
         </button>
         <button class="mw-ctx-item" @click="ctxViewFull">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          大图预览
+          {{ t('masonry.viewFull') }}
         </button>
       </div>
     </div>
@@ -87,14 +87,14 @@
       />
       <!-- 控制栏 -->
       <div class="mw-fs-controls" @click.stop>
-        <button class="mw-fs-btn" @click="adjustZoom(-0.25)" title="缩小">
+        <button class="mw-fs-btn" @click="adjustZoom(-0.25)" :title="t('masonry.zoomOut')">
           <svg width="14" height="14" viewBox="0 0 14 14"><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.8"/></svg>
         </button>
-        <span class="mw-fs-zoom-label" @click="resetZoom" title="点击重置">{{ Math.round(fullImgZoom * 100) }}%</span>
-        <button class="mw-fs-btn" @click="adjustZoom(0.25)" title="放大">
+        <span class="mw-fs-zoom-label" @click="resetZoom" :title="t('masonry.resetZoom')">{{ Math.round(fullImgZoom * 100) }}%</span>
+        <button class="mw-fs-btn" @click="adjustZoom(0.25)" :title="t('masonry.zoomIn')">
           <svg width="14" height="14" viewBox="0 0 14 14"><line x1="7" y1="2" x2="7" y2="12" stroke="currentColor" stroke-width="1.8"/><line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="1.8"/></svg>
         </button>
-        <button class="mw-fs-btn mw-fs-close" @click="closeFullscreen" title="关闭">
+        <button class="mw-fs-btn mw-fs-close" @click="closeFullscreen" :title="t('masonry.close')">
           <svg width="12" height="12" viewBox="0 0 12 12"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5"/></svg>
         </button>
       </div>
@@ -104,6 +104,9 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 interface ImageItem { path: string; title: string }
 

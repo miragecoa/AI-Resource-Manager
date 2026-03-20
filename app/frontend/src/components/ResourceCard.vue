@@ -14,7 +14,7 @@
       </div>
       <!-- 运行中徽章（批量选择时隐藏） -->
       <div v-if="isRunning && !selectable" class="running-badge" :class="{ 'badge-compact': compact, 'badge-micro': micro }">
-        <span class="running-dot" /><template v-if="!compact">运行中</template>
+        <span class="running-dot" /><template v-if="!compact">{{ t('resource.running') }}</template>
       </div>
       <!-- 批量选择 checkbox -->
       <div v-if="selectable" class="select-checkbox" :class="{ checked: selected }" @click.stop="$emit('toggle-select', resource)">
@@ -26,7 +26,7 @@
         class="pin-quick-btn"
         :class="{ 'is-pinned': resource.pinned, 'btn-compact': compact }"
         @click.stop="togglePin"
-        :title="resource.pinned ? '取消置顶' : '置顶'"
+        :title="resource.pinned ? t('resource.unpin') : t('resource.pin')"
       >
         <span v-html="pinIcon" />
       </button>
@@ -36,7 +36,7 @@
         class="ignore-quick-btn"
         :class="{ 'btn-compact': compact }"
         @click.stop="handleIgnoreClick"
-        title="忽略此文件"
+        :title="t('resource.ignore')"
       >
         <span v-html="ignoreIcon" />
       </button>
@@ -49,20 +49,20 @@
       <div class="title" :title="displayTitle" :class="{ 'title-single': narrow }">{{ displayTitle }}</div>
       <!-- 统计信息行 -->
       <div v-if="!narrow" class="stats-row">
-        <span class="stat-item" :title="`共打开 ${resource.open_count} 次，累计 ${fmtDuration(resource.total_run_time)}`">
+        <span class="stat-item" :title="`${t('resource.stats.accumulated')}: ${fmtDuration(resource.total_run_time)}, ${t('resource.stats.count', { n: resource.open_count })}`">
           <span v-html="clockIcon" />
-          <span v-if="!compact" class="stat-label-text">累计</span>
+          <span v-if="!compact" class="stat-label-text">{{ t('resource.stats.accumulated') }}</span>
           {{ resource.total_run_time > 0 ? fmtDuration(resource.total_run_time) : (resource.open_count > 0 ? '—' : unplayedLabel) }}
         </span>
-        <span v-if="resource.open_count > 0" class="stat-count">{{ resource.open_count }}次</span>
-        <span v-if="isRunning" class="stat-session"><span v-if="!compact" class="stat-label-text">本次</span>{{ fmtDuration(currentSessionSecs) }}</span>
+        <span v-if="resource.open_count > 0" class="stat-count">{{ t('resource.stats.count', { n: resource.open_count }) }}</span>
+        <span v-if="isRunning" class="stat-session"><span v-if="!compact" class="stat-label-text">{{ t('resource.stats.session') }}</span>{{ fmtDuration(currentSessionSecs) }}</span>
         <span v-else-if="resource.last_run_at" class="stat-last">{{ fmtRelDate(resource.last_run_at) }}</span>
       </div>
       <div v-if="!narrow" class="tags">
         <template v-if="resource.tags?.length">
           <span v-for="tag in resource.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
         </template>
-        <span v-else class="tag tag-unclassified">未分类</span>
+        <span v-else class="tag tag-unclassified">{{ t('resource.unclassified') }}</span>
       </div>
     </div>
 
@@ -70,11 +70,11 @@
     <Teleport to="body">
       <div v-if="showKillConfirm" class="kill-overlay" @mousedown.self="showKillConfirm = false">
         <div class="kill-dialog">
-          <div class="kill-title">强制结束进程</div>
-          <div class="kill-msg">确定要强制结束「{{ resource.title }}」吗？</div>
+          <div class="kill-title">{{ t('resource.killTitle') }}</div>
+          <div class="kill-msg">{{ t('resource.killMsg', { title: resource.title }) }}</div>
           <div class="kill-actions">
-            <button class="kill-cancel" @click="showKillConfirm = false">取消</button>
-            <button class="kill-confirm" @click="doKill">强制结束</button>
+            <button class="kill-cancel" @click="showKillConfirm = false">{{ t('resource.killCancel') }}</button>
+            <button class="kill-confirm" @click="doKill">{{ t('resource.killConfirm') }}</button>
           </div>
         </div>
       </div>
@@ -84,14 +84,13 @@
     <Teleport to="body">
       <div v-if="showIgnoreWarn" class="kill-overlay" @mousedown.self="showIgnoreWarn = false">
         <div class="kill-dialog">
-          <div class="kill-title">忽略此文件</div>
+          <div class="kill-title">{{ t('resource.ignoreTitle') }}</div>
           <div class="kill-msg">
-            忽略后，「{{ resource.title }}」将<strong>不再被自动入库</strong>。<br/>
-            如需重新添加，可通过「手动添加」功能操作，不受影响。
+            {{ t('resource.ignoreMsg', { title: resource.title }) }}
           </div>
           <div class="kill-actions">
-            <button class="kill-cancel" @click="showIgnoreWarn = false">取消</button>
-            <button class="kill-confirm" @click="confirmIgnore">确认忽略</button>
+            <button class="kill-cancel" @click="showIgnoreWarn = false">{{ t('resource.ignoreCancel') }}</button>
+            <button class="kill-confirm" @click="confirmIgnore">{{ t('resource.ignoreConfirm') }}</button>
           </div>
         </div>
       </div>
@@ -104,23 +103,23 @@
       <div v-if="showMenu" class="ctx-backdrop" @mousedown="showMenu = false" />
       <div v-if="showMenu" ref="menuRef" class="context-menu" :style="menuStyle" @mouseleave="showMenu = false">
         <button @click="$emit('select', resource); showMenu = false">
-          <span v-html="detailIcon" />查看/修改
+          <span v-html="detailIcon" />{{ t('resource.detail') }}
         </button>
         <button @click="$emit('open', resource); showMenu = false">
-          <span v-html="openIcon" />打开
+          <span v-html="openIcon" />{{ t('resource.open') }}
         </button>
         <button v-if="isExe" @click="openAsAdmin">
-          <span v-html="shieldIcon" />以管理员身份运行
+          <span v-html="shieldIcon" />{{ t('resource.admin') }}
         </button>
         <button v-if="resource.type !== 'webpage'" @click="openInExplorer">
-          <span v-html="folderIcon" />在文件夹中显示
+          <span v-html="folderIcon" />{{ t('resource.showInFolder') }}
         </button>
         <button v-if="isRunning" @click="showKillConfirm = true; showMenu = false" class="danger">
-          <span v-html="killIcon" />强制结束进程
+          <span v-html="killIcon" />{{ t('resource.kill') }}
         </button>
         <hr />
         <button @click="$emit('ignore', resource); showMenu = false" class="danger">
-          <span v-html="ignoreIcon" />忽略此文件
+          <span v-html="ignoreIcon" />{{ t('resource.ignore') }}
         </button>
       </div>
     </Teleport>
@@ -135,18 +134,18 @@
         </div>
         <!-- 运行状态 -->
         <div v-if="isRunning" class="micro-tt-running-row">
-          <span class="micro-tt-dot" /><span class="micro-tt-running">运行中 · 本次 {{ fmtDuration(currentSessionSecs) }}</span>
+          <span class="micro-tt-dot" /><span class="micro-tt-running">{{ `${t('resource.running')} · ${t('resource.stats.session')}` }} {{ fmtDuration(currentSessionSecs) }}</span>
         </div>
         <!-- 统计 -->
         <div class="micro-tt-stats">
           <span v-if="resource.total_run_time > 0">
-            <span class="micro-tt-label">时长</span>{{ fmtDuration(resource.total_run_time) }}
+            <span class="micro-tt-label">{{ t('resource.stats.duration') }}</span>{{ fmtDuration(resource.total_run_time) }}
           </span>
           <span v-if="resource.open_count > 0">
-            <span class="micro-tt-label">次数</span>{{ resource.open_count }}次
+            {{ t('resource.stats.count', { n: resource.open_count }) }}
           </span>
           <span v-if="resource.last_run_at && !isRunning">
-            <span class="micro-tt-label">上次</span>{{ fmtRelDate(resource.last_run_at) }}
+            <span class="micro-tt-label">{{ t('resource.stats.last') }}</span>{{ fmtRelDate(resource.last_run_at) }}
           </span>
         </div>
         <!-- 标签 -->
@@ -169,9 +168,12 @@ const _savedCovers = new Set<string>()   // 本次会话已保存封面的资源
 
 <script setup lang="ts">
 import { ref, computed, watchEffect, nextTick, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Resource } from '../stores/resources'
 import { useResourceStore } from '../stores/resources'
 import { useSettingsStore } from '../stores/settings'
+
+const { t } = useI18n()
 
 const props = withDefaults(defineProps<{
   resource: Resource
@@ -263,26 +265,26 @@ async function doKill() {
   await window.api.monitor.kill(props.resource.id)
 }
 
-// 时长格式化：只显示最大单位 "10时" / "45分" / "30秒"
+// 时长格式化：只显示最大单位
 function fmtDuration(secs: number): string {
-  if (!secs || secs < 0) return '0分'
+  if (!secs || secs < 0) return t('resource.time.minutes', { n: 0 })
   const h = Math.floor(secs / 3600)
   const m = Math.floor((secs % 3600) / 60)
   const s = secs % 60
-  if (h > 0) return `${h}时`
-  if (m > 0) return `${m}分`
-  return `${s}秒`
+  if (h > 0) return t('resource.time.hours', { n: h })
+  if (m > 0) return t('resource.time.minutes', { n: m })
+  return t('resource.time.seconds', { n: s })
 }
 
-// 相对日期：距今 → "今天" / "昨天" / "3天前" / "2025年1月15日"
+// 相对日期
 function fmtRelDate(ts: number): string {
   const now = Date.now()
   const diff = now - ts
   const days = Math.floor(diff / 86400000)
-  if (days === 0) return '今天'
-  if (days === 1) return '昨天'
-  if (days < 7) return `${days}天前`
-  return new Date(ts).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+  if (days === 0) return t('resource.stats.today')
+  if (days === 1) return t('resource.stats.yesterday')
+  if (days < 7) return t('resource.stats.daysAgo', { n: days })
+  return new Date(ts).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
 }
 
 async function getCachedImage(path: string): Promise<string | null> {
@@ -405,18 +407,8 @@ const TYPE_ICONS: Record<string, string> = {
 
 const typeIcon = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.app)
 
-const TYPE_LABELS: Record<string, string> = {
-  image: '图片', game: '游戏', app: '应用程序', video: '视频',
-  comic: '漫画', music: '音乐', novel: '小说', document: '文档',
-  folder: '文件夹', webpage: '网页', other: '其他'
-}
-const typeLabel = computed(() => TYPE_LABELS[props.resource.type] ?? props.resource.type)
-
-const UNPLAYED_LABELS: Record<string, string> = {
-  game: '未游玩', app: '未运行', video: '未观看',
-  image: '未查看', comic: '未阅读', music: '未收听', novel: '未阅读', document: '未查看', folder: '未打开', other: '未使用'
-}
-const unplayedLabel = computed(() => UNPLAYED_LABELS[props.resource.type] ?? '未使用')
+const typeLabel = computed(() => t('resource.types.' + props.resource.type, props.resource.type))
+const unplayedLabel = computed(() => t('resource.unplayed.' + props.resource.type, t('resource.unplayed.other')))
 
 const openIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`
 const detailIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`

@@ -5,7 +5,7 @@
 
         <!-- 标题栏 -->
         <div class="modal-header">
-          <span class="modal-title">添加资源</span>
+          <span class="modal-title">{{ t('addModal.title') }}</span>
           <button class="close-btn" @click="close" v-html="closeIcon" />
         </div>
 
@@ -27,11 +27,11 @@
               <div class="web-favicon-preview">
                 <img v-if="webFavicon" :src="webFavicon" class="web-favicon-img" />
                 <div v-else-if="webFaviconLoading" class="web-favicon-placeholder">
-                  <span style="opacity:.5">获取中...</span>
+                  <span style="opacity:.5">{{ t('addModal.webpage.fetching') }}</span>
                 </div>
                 <div v-else class="web-favicon-placeholder">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  <span style="margin-top:8px;font-size:12px;opacity:.4">输入 URL 自动获取图标</span>
+                  <span style="margin-top:8px;font-size:12px;opacity:.4">{{ t('addModal.webpage.autoIconHint') }}</span>
                 </div>
               </div>
             </div>
@@ -41,12 +41,12 @@
                 <input v-model="webForm.url" class="field-input" placeholder="https://example.com" />
               </div>
               <div class="field-row">
-                <label class="field-label">名称</label>
-                <input v-model="webForm.title" class="field-input" placeholder="可选，留空自动用域名" />
+                <label class="field-label">{{ t('addModal.webpage.titleLabel') }}</label>
+                <input v-model="webForm.title" class="field-input" :placeholder="t('addModal.webpage.titlePlaceholder')" />
               </div>
 
               <div class="field-row align-start">
-                <label class="field-label">标签</label>
+                <label class="field-label">{{ t('detail.tags') }}</label>
                 <div class="tags-area">
                   <div v-if="filteredTags.length" class="tag-chips">
                     <button
@@ -59,12 +59,12 @@
                       {{ tag.name }}<span v-if="tag.count" class="tag-count">{{ tag.count }}</span>
                     </button>
                   </div>
-                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">无匹配标签</div>
+                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">{{ t('addModal.tags.noMatch') }}</div>
                   <div class="new-tag-row">
                     <input
                       :value="newTagInput"
                       class="new-tag-input"
-                      placeholder="搜索或新建标签，回车确认..."
+                      :placeholder="t('addModal.tags.placeholder')"
                       @input="newTagInput = ($event.target as HTMLInputElement).value"
                       @keydown.enter.prevent="createAndAddTag"
                     />
@@ -77,12 +77,12 @@
           <div class="modal-footer">
             <span v-if="errorMsg" class="error-msg">{{ errorMsg }}</span>
             <div class="footer-actions">
-              <button class="btn-cancel" @click="close">取消</button>
+              <button class="btn-cancel" @click="close">{{ t('common.cancel') }}</button>
               <button
                 class="btn-add"
                 :disabled="!canSubmitCurrent || submitting"
                 @click="submitCurrent"
-              >{{ submitting ? '添加中…' : '添加到库' }}</button>
+              >{{ submitting ? t('addModal.webpage.fetching') : t('addModal.webpage.add') }}</button>
             </div>
           </div>
         </template>
@@ -118,18 +118,18 @@
                   </template>
                   <template v-else>
                     <span class="dz-upload-icon" v-html="uploadIcon" />
-                    <span class="dz-text">拖放文件到此处</span>
-                    <span class="dz-hint">或点击浏览文件</span>
+                    <span class="dz-text">{{ t('addModal.file.dragHint') }}</span>
+                    <span class="dz-hint">{{ t('addModal.file.orBrowse') }}</span>
                   </template>
                 </div>
                 <div class="path-row">
                   <input
                     v-model="form.file_path"
                     class="path-input"
-                    placeholder="手动输入文件路径..."
+                    :placeholder="t('addModal.file.placeholder')"
                     @change="onPathChange"
                   />
-                  <button class="browse-btn" @click.stop="pickFile" v-html="folderIcon" title="浏览文件" />
+                  <button class="browse-btn" @click.stop="pickFile" v-html="folderIcon" :title="t('addModal.file.browse')" />
                 </div>
               </template>
 
@@ -148,18 +148,18 @@
                   </template>
                   <template v-else>
                     <span class="dz-upload-icon" v-html="folderPlusIcon" />
-                    <span class="dz-text">拖放文件夹到此处</span>
-                    <span class="dz-hint">或点击浏览文件夹</span>
+                    <span class="dz-text">{{ t('addModal.folder.dragHint') }}</span>
+                    <span class="dz-hint">{{ t('addModal.folder.orBrowse') }}</span>
                   </template>
                 </div>
                 <div class="path-row">
                   <input
                     v-model="folderPath"
                     class="path-input"
-                    placeholder="文件夹路径..."
+                    :placeholder="t('addModal.folder.pathPlaceholder')"
                     @change="onFolderPathChange"
                   />
-                  <button class="browse-btn" @click.stop="pickFolderForImport" v-html="folderIcon" title="浏览文件夹" />
+                  <button class="browse-btn" @click.stop="pickFolderForImport" v-html="folderIcon" :title="t('addModal.scan.browse')" />
                 </div>
               </template>
             </div>
@@ -167,29 +167,29 @@
             <!-- 右栏：表单字段（共用） -->
             <div class="right-col">
               <div class="field-row">
-                <label class="field-label">名称</label>
-                <input v-model="currentForm.title" class="field-input" placeholder="资源名称..." />
+                <label class="field-label">{{ t('detail.name') }}</label>
+                <input v-model="currentForm.title" class="field-input" :placeholder="t('addModal.file.titlePlaceholder')" />
               </div>
 
               <div class="field-row">
-                <label class="field-label">类型</label>
+                <label class="field-label">{{ t('detail.type') }}</label>
                 <select v-model="currentForm.type" class="field-select">
-                  <option v-for="t in TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
+                  <option v-for="ty in TYPES" :key="ty.value" :value="ty.value">{{ ty.label }}</option>
                 </select>
               </div>
 
               <div class="field-row align-start">
-                <label class="field-label">描述</label>
+                <label class="field-label">{{ t('addModal.file.descLabel') }}</label>
                 <textarea
                   v-model="currentForm.note"
                   class="field-textarea"
-                  placeholder="可选的备注描述..."
+                  :placeholder="t('addModal.file.notePlaceholder')"
                   rows="2"
                 />
               </div>
 
               <div class="field-row align-start">
-                <label class="field-label">标签</label>
+                <label class="field-label">{{ t('detail.tags') }}</label>
                 <div class="tags-area">
                   <div v-if="filteredTags.length" class="tag-chips">
                     <button
@@ -202,12 +202,12 @@
                       {{ tag.name }}<span v-if="tag.count" class="tag-count">{{ tag.count }}</span>
                     </button>
                   </div>
-                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">无匹配标签</div>
+                  <div v-else-if="allTags.length && newTagInput.trim()" class="tag-chips-empty">{{ t('addModal.tags.noMatch') }}</div>
                   <div class="new-tag-row">
                     <input
                       :value="newTagInput"
                       class="new-tag-input"
-                      placeholder="搜索或新建标签，回车确认..."
+                      :placeholder="t('addModal.tags.placeholder')"
                       @input="newTagInput = ($event.target as HTMLInputElement).value"
                       @keydown.enter.prevent="createAndAddTag"
                     />
@@ -221,12 +221,12 @@
           <div class="modal-footer">
             <span v-if="errorMsg" class="error-msg">{{ errorMsg }}</span>
             <div class="footer-actions">
-              <button class="btn-cancel" @click="close">取消</button>
+              <button class="btn-cancel" @click="close">{{ t('common.cancel') }}</button>
               <button
                 class="btn-add"
                 :disabled="!canSubmitCurrent || submitting"
                 @click="submitCurrent"
-              >{{ submitting ? '添加中…' : '添加到库' }}</button>
+              >{{ submitting ? t('addModal.file.adding') : t('addModal.file.add') }}</button>
             </div>
           </div>
         </template>
@@ -239,11 +239,11 @@
                 <input
                   :value="scanDirPath"
                   class="scan-path-input"
-                  placeholder="选择要扫描的目录..."
+                  :placeholder="t('addModal.scan.dirPlaceholder')"
                   readonly
                 />
                 <button class="scan-pick-btn" @click="pickScanDir" :disabled="scanDirLoading">
-                  {{ scanDirLoading ? '扫描中…' : '选择目录' }}
+                  {{ scanDirLoading ? t('addModal.scan.scanning') : t('addModal.scan.dirLabel') }}
                 </button>
               </div>
               <div v-if="scanResults.length" class="scan-stats">
@@ -253,26 +253,26 @@
                     @click="clickTypeTab('all')"
                   >
                     <span class="tab-check" :class="typeSelectionState('all')" />
-                    全部 {{ scanResults.length }}
+                    {{ t('addModal.scan.all') }} {{ scanResults.length }}
                   </button>
                   <button
-                    v-for="t in scanTypeTabs" :key="t"
-                    class="scan-type-tab" :class="{ active: scanTypeFilter === t }"
-                    @click="clickTypeTab(t)"
+                    v-for="typeTab in scanTypeTabs" :key="typeTab"
+                    class="scan-type-tab" :class="{ active: scanTypeFilter === typeTab }"
+                    @click="clickTypeTab(typeTab)"
                   >
-                    <span class="tab-check" :class="typeSelectionState(t)" />
-                    {{ typeLabel(t) }} {{ scanTypeCounts[t] }}
+                    <span class="tab-check" :class="typeSelectionState(typeTab)" />
+                    {{ typeLabel(typeTab) }} {{ scanTypeCounts[typeTab] }}
                   </button>
                 </div>
                 <button class="scan-toggle-all" @click="toggleScanSelectAll">
-                  {{ scanAllSelected ? '取消全选' : '全选' }}
+                  {{ scanAllSelected ? t('addModal.scan.deselectAll') : t('addModal.scan.selectAll') }}
                 </button>
               </div>
             </div>
 
             <div v-if="scanDirLoading" class="scan-center">
               <div class="spinner" />
-              <span class="scan-center-text">正在扫描目录…</span>
+              <span class="scan-center-text">{{ t('addModal.scan.scanning') }}</span>
             </div>
             <div v-else-if="filteredScanResults.length" class="scan-file-list">
               <label
@@ -286,26 +286,26 @@
               </label>
             </div>
             <div v-else-if="scanDirPath && !scanDirLoading" class="scan-center">
-              <span class="scan-center-text">{{ scanResults.length ? '该类型下无文件' : '未找到可识别的文件' }}</span>
+              <span class="scan-center-text">{{ scanResults.length ? t('addModal.scan.emptyType') : t('addModal.scan.noFiles') }}</span>
             </div>
             <div v-else class="scan-center" :class="{ 'drag-over': isDragOver }"
               @dragover.prevent="isDragOver = true"
               @dragleave.prevent="isDragOver = false"
             >
               <span class="dz-upload-icon" v-html="scanDirIcon" />
-              <span class="scan-center-text">拖放目录到此处，或点击选择目录扫描</span>
+              <span class="scan-center-text">{{ t('addModal.scan.dirDragHint') }}</span>
             </div>
           </div>
 
           <div class="modal-footer">
-            <span v-if="scanSelectedCount > 0" class="footer-hint">{{ scanSelectedCount }} 个文件将被导入</span>
+            <span v-if="scanSelectedCount > 0" class="footer-hint">{{ t('addModal.scan.found', { n: scanSelectedCount }) }}</span>
             <div class="footer-actions">
-              <button class="btn-cancel" @click="close">取消</button>
+              <button class="btn-cancel" @click="close">{{ t('addModal.scan.cancel') }}</button>
               <button
                 class="btn-add"
                 :disabled="scanSelectedCount === 0 || submitting"
                 @click="importScanned"
-              >{{ submitting ? '导入中…' : `导入 (${scanSelectedCount})` }}</button>
+              >{{ submitting ? t('addModal.scan.importing') : `${t('addModal.scan.import')} (${scanSelectedCount})` }}</button>
             </div>
           </div>
         </template>
@@ -315,21 +315,21 @@
           <div class="modal-body-full scan-sys-body">
             <template v-if="!sysScanning && sysScanResult === null">
               <span class="scan-sys-icon" v-html="scanSysIcon" />
-              <p class="scan-sys-desc">读取 Windows 使用历史，导入最近打开的文件记录</p>
-              <button class="scan-sys-btn" @click="doSystemScan">开始读取</button>
+              <p class="scan-sys-desc">{{ t('addModal.scan.sysScanDesc') }}</p>
+              <button class="scan-sys-btn" @click="doSystemScan">{{ t('addModal.scan.start') }}</button>
             </template>
             <template v-else-if="sysScanning">
               <div class="spinner lg" />
-              <p class="scan-sys-desc">正在读取使用历史…</p>
+              <p class="scan-sys-desc">{{ t('addModal.scan.scanning') }}</p>
             </template>
             <template v-else>
               <span class="scan-sys-done" v-html="checkIcon" />
               <p class="scan-sys-desc">
-                {{ sysScanResult! > 0 ? `发现 ${sysScanResult} 个新资源` : '未发现新资源' }}
+                {{ sysScanResult! > 0 ? t('addModal.scan.foundNew', { n: sysScanResult }) : t('addModal.scan.noNew') }}
               </p>
               <div class="scan-sys-actions">
-                <button class="scan-sys-btn secondary" @click="doSystemScan">重新读取</button>
-                <button class="btn-add" @click="close">完成</button>
+                <button class="scan-sys-btn secondary" @click="doSystemScan">{{ t('addModal.scan.rescan') }}</button>
+                <button class="btn-add" @click="close">{{ t('addModal.scan.done') }}</button>
               </div>
             </template>
           </div>
@@ -345,6 +345,9 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { match as pinyinMatch } from 'pinyin-pro'
 import type { ResourceType } from '../stores/resources'
 import { useResourceStore } from '../stores/resources'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   modelValue: boolean
@@ -360,13 +363,13 @@ const store = useResourceStore()
 // ── 模式 ─────────────────────────────────────────────────
 const mode = ref<'file' | 'folder' | 'scan-dir' | 'scan-sys' | 'webpage'>('file')
 
-const modeTabs = [
-  { key: 'file' as const, label: '单个文件', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>` },
-  { key: 'folder' as const, label: '文件夹', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>` },
-  { key: 'scan-dir' as const, label: '扫描目录', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="12" y1="11" x2="12" y2="17"/></svg>` },
-  { key: 'scan-sys' as const, label: '使用历史', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>` },
-  { key: 'webpage' as const, label: '网页', icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>` },
-]
+const modeTabs = computed(() => [
+  { key: 'file' as const,     label: t('addModal.tabs.singleFile'), icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>` },
+  { key: 'folder' as const,   label: t('addModal.tabs.folder'),     icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>` },
+  { key: 'scan-dir' as const, label: t('addModal.tabs.scanDir'),    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="12" y1="11" x2="12" y2="17"/></svg>` },
+  { key: 'scan-sys' as const, label: t('addModal.tabs.scanSys'),    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>` },
+  { key: 'webpage' as const,  label: t('addModal.tabs.webpage'),    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>` },
+])
 
 // ── 类型映射 ────────────────────────────────────────────
 const EXT_TYPE_MAP: Record<string, ResourceType> = {
@@ -395,16 +398,16 @@ const TYPE_ICONS: Record<string, string> = {
   document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`,
 }
 
-const TYPES = [
-  { value: 'game',  label: '游戏' },
-  { value: 'app',   label: '应用程序' },
-  { value: 'image', label: '图片' },
-  { value: 'video', label: '视频' },
-  { value: 'music', label: '音乐' },
-  { value: 'comic', label: '漫画' },
-  { value: 'novel', label: '小说' },
-  { value: 'document', label: '文档' },
-]
+const TYPES = computed(() => [
+  { value: 'game',     label: t('resource.types.game') },
+  { value: 'app',      label: t('resource.types.app') },
+  { value: 'image',    label: t('resource.types.image') },
+  { value: 'video',    label: t('resource.types.video') },
+  { value: 'music',    label: t('resource.types.music') },
+  { value: 'comic',    label: t('resource.types.comic') },
+  { value: 'novel',    label: t('resource.types.novel') },
+  { value: 'document', label: t('resource.types.document') },
+])
 
 // ── 单个文件模式状态 ────────────────────────────────────
 const form = ref({ file_path: '', title: '', type: 'app' as ResourceType, note: '' })
@@ -640,7 +643,7 @@ async function submitFile() {
       note: form.value.note.trim() || undefined,
     })
     if (existed) {
-      errorMsg.value = '此文件已在库中'
+      errorMsg.value = t('addModal.errorFileExists')
       submitting.value = false
       return
     }
@@ -651,7 +654,7 @@ async function submitFile() {
     emit('added', resource)
     close()
   } catch (e: any) {
-    errorMsg.value = e?.message ?? '添加失败'
+    errorMsg.value = e?.message ?? t('addModal.errorAddFailed')
   } finally {
     submitting.value = false
   }
@@ -671,7 +674,7 @@ async function submitWebpage() {
       file_path: url,
     })
     if (existed) {
-      errorMsg.value = '此网页已在库中'
+      errorMsg.value = t('addModal.errorWebpageExists')
       submitting.value = false
       return
     }
@@ -687,7 +690,7 @@ async function submitWebpage() {
     emit('added', resource)
     close()
   } catch (e: any) {
-    errorMsg.value = e?.message ?? '添加失败'
+    errorMsg.value = e?.message ?? t('addModal.errorAddFailed')
   } finally {
     submitting.value = false
   }
@@ -723,7 +726,7 @@ async function submitFolder() {
       note: folderForm.value.note.trim() || undefined,
     })
     if (existed) {
-      errorMsg.value = '此文件夹已在库中'
+      errorMsg.value = t('addModal.errorFolderExists')
       submitting.value = false
       return
     }
@@ -734,7 +737,7 @@ async function submitFolder() {
     emit('added', resource)
     close()
   } catch (e: any) {
-    errorMsg.value = e?.message ?? '添加失败'
+    errorMsg.value = e?.message ?? t('addModal.errorAddFailed')
   } finally {
     submitting.value = false
   }
@@ -800,11 +803,9 @@ function relativePath(fullPath: string): string {
 }
 
 function typeLabel(type: string): string {
-  const map: Record<string, string> = {
-    game: '游戏', app: '应用', image: '图片', video: '视频',
-    music: '音乐', comic: '漫画', novel: '小说', document: '文档'
-  }
-  return map[type] ?? type
+  const key = `resource.types.${type}`
+  const label = t(key)
+  return label !== key ? label : type
 }
 
 // ── 系统扫描操作 ────────────────────────────────────────

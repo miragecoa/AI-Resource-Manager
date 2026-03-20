@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { NAV_ITEM_DEFS } from '../config/navItems'
+import { i18n } from '../i18n'
+import type { Locale } from '../i18n'
 
 export type ThemeId = 'dark' | 'light' | 'midnight' | 'aurora' | 'sand' | 'mint'
 
@@ -154,11 +156,12 @@ export const useSettingsStore = defineStore('settings', () => {
   const hotkeyWake = ref('Alt+Space')
   const hotkeyClipboard = ref('Alt+V')
   const themeVars = ref<Record<string, string>>({ ...DARK_THEME })
+  const language = ref<Locale>('zh')
   const loaded = ref(false)
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -177,6 +180,8 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('showOnAutoStart'),
       window.api.hotkey.get(),
       window.api.clipboardHotkey.get(),
+      window.api.settings.get('language'),
+      window.api.settings.get('consent_given'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -201,6 +206,20 @@ export const useSettingsStore = defineStore('settings', () => {
       try { themeVars.value = { ...DARK_THEME, ...JSON.parse(themeVal) } } catch {}
     }
     applyThemeToRoot(themeVars.value)
+
+    // Language: use saved value, or auto-detect for new users, default zh for existing
+    if (langVal === 'zh' || langVal === 'en') {
+      language.value = langVal
+    } else if (!consentVal) {
+      // Brand-new user: auto-detect from system locale
+      language.value = navigator.language.toLowerCase().startsWith('en') ? 'en' : 'zh'
+      await window.api.settings.set('language', language.value)
+    } else {
+      // Existing user upgrading: default to Chinese
+      language.value = 'zh'
+      await window.api.settings.set('language', 'zh')
+    }
+    i18n.global.locale.value = language.value
 
     if (navVal) {
       try {
@@ -320,6 +339,12 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('theme', JSON.stringify(themeVars.value))
   }
 
+  async function setLanguage(lang: Locale) {
+    language.value = lang
+    i18n.global.locale.value = lang
+    await window.api.settings.set('language', lang)
+  }
+
   async function resetToDefaults() {
     zoom.value = 1.0
     viewModeByType.value = {}
@@ -352,5 +377,5 @@ export const useSettingsStore = defineStore('settings', () => {
     ])
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, resetToDefaults }
+  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setLanguage, resetToDefaults }
 })

@@ -341,7 +341,7 @@
 <div class="panel">
   <div class="header">
     <div class="title-row">
-      <span class="title">剪贴板</span>
+      <span class="title" id="cbTitle">剪贴板</span>
       <div class="header-actions">
         <button class="hdr-btn" id="cleanupBtn" title="清理历史">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -378,20 +378,20 @@
   <div class="list" id="list"></div>
   <div class="modal-overlay hidden" id="cleanupOverlay">
     <div class="modal-card">
-      <div class="modal-title">清理历史记录</div>
+      <div class="modal-title" id="modalTitle">清理历史记录</div>
       <div class="modal-hint">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5L8 2l4 3v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5z"/><path d="M6 12V8h4v4"/></svg>
-        已固定的条目不会被清理
+        <span id="pinnedHint">已固定的条目不会被清理</span>
       </div>
       <div class="modal-opts">
-        <button class="clean-opt" data-ms="3600000">1 小时前的记录</button>
-        <button class="clean-opt" data-ms="86400000">24 小时前的记录</button>
-        <button class="clean-opt" data-ms="604800000">7 天前的记录</button>
-        <button class="clean-opt" data-ms="2592000000">30 天前的记录</button>
-        <button class="clean-opt danger" data-ms="0">全部记录</button>
+        <button class="clean-opt" data-ms="3600000" data-lang-key="opt1h">1 小时前的记录</button>
+        <button class="clean-opt" data-ms="86400000" data-lang-key="opt24h">24 小时前的记录</button>
+        <button class="clean-opt" data-ms="604800000" data-lang-key="opt7d">7 天前的记录</button>
+        <button class="clean-opt" data-ms="2592000000" data-lang-key="opt30d">30 天前的记录</button>
+        <button class="clean-opt danger" data-ms="0" data-lang-key="optAll">全部记录</button>
       </div>
       <div class="auto-clean-row">
-        <span class="auto-clean-label">自动清理</span>
+        <span class="auto-clean-label" id="autoCleanLabel">自动清理</span>
         <select class="auto-clean-select" id="autoCleanSelect">
           <option value="0">关闭</option>
           <option value="7">7 天前</option>
@@ -416,6 +416,76 @@ const api = window.clipboardApi
   for (const [k, v] of Object.entries(map)) { const val = p.get(k); if (val) r.style.setProperty(v, val) }
 })()
 
+// ── i18n ─────────────────────────────────────────────────────────────
+const _CB_I18N = {
+  zh: {
+    title: '剪贴板', cleanupTitle: '清理历史', close: '关闭',
+    searchPlaceholder: '搜索剪切板...',
+    filterAll: '全部类型', filterText: '文本', filterImage: '图片',
+    sortRecent: '最新添加', sortLastUsed: '最近使用', sortMostUsed: '使用最多',
+    justNow: '刚刚', minAgo: '{n}分钟前', hrAgo: '{n}小时前', dayAgo: '{n}天前',
+    noResults: '没有匹配结果', noHistory: '暂无记录',
+    typeImage: '图片', typeText: '文本',
+    pinned: '取消固定', pin: '固定', copy: '复制', saveToLib: '保存到图片库', delete: '删除',
+    cleanupModalTitle: '清理历史记录', pinnedNotCleared: '已固定的条目不会被清理',
+    opt1h: '1 小时前的记录', opt24h: '24 小时前的记录', opt7d: '7 天前的记录', opt30d: '30 天前的记录', optAll: '全部记录',
+    autoClean: '自动清理', off: '关闭',
+    autoDay7: '7 天前', autoDay30: '30 天前', autoDay90: '90 天前', autoDay180: '180 天前',
+    cancel: '取消',
+  },
+  en: {
+    title: 'Clipboard', cleanupTitle: 'Clean history', close: 'Close',
+    searchPlaceholder: 'Search clipboard...',
+    filterAll: 'All types', filterText: 'Text', filterImage: 'Image',
+    sortRecent: 'Recently added', sortLastUsed: 'Last used', sortMostUsed: 'Most used',
+    justNow: 'Just now', minAgo: '{n}m ago', hrAgo: '{n}h ago', dayAgo: '{n}d ago',
+    noResults: 'No results', noHistory: 'No history',
+    typeImage: 'Image', typeText: 'Text',
+    pinned: 'Unpin', pin: 'Pin', copy: 'Copy', saveToLib: 'Save to library', delete: 'Delete',
+    cleanupModalTitle: 'Clean history', pinnedNotCleared: 'Pinned items will not be cleared',
+    opt1h: 'Older than 1 hour', opt24h: 'Older than 24 hours', opt7d: 'Older than 7 days', opt30d: 'Older than 30 days', optAll: 'All records',
+    autoClean: 'Auto clean', off: 'Off',
+    autoDay7: '7 days', autoDay30: '30 days', autoDay90: '90 days', autoDay180: '180 days',
+    cancel: 'Cancel',
+  },
+}
+const _cbDp = new URLSearchParams(window.location.search)
+let _cbLang = _cbDp.get('lang') === 'en' ? 'en' : 'zh'
+function _tCb(key) { return (_CB_I18N[_cbLang] || _CB_I18N.zh)[key] ?? key }
+function _applyLang() {
+  document.getElementById('cbTitle').textContent = _tCb('title')
+  document.getElementById('cleanupBtn').title = _tCb('cleanupTitle')
+  document.getElementById('closeBtn').title = _tCb('close')
+  document.getElementById('search').placeholder = _tCb('searchPlaceholder')
+  const tf = document.getElementById('typeFilter')
+  tf.options[0].text = _tCb('filterAll')
+  tf.options[1].text = _tCb('filterText')
+  tf.options[2].text = _tCb('filterImage')
+  const ss = document.getElementById('sortSelect')
+  ss.options[0].text = _tCb('sortRecent')
+  ss.options[1].text = _tCb('sortLastUsed')
+  ss.options[2].text = _tCb('sortMostUsed')
+  document.getElementById('modalTitle').textContent = _tCb('cleanupModalTitle')
+  document.getElementById('pinnedHint').textContent = _tCb('pinnedNotCleared')
+  document.querySelectorAll('.clean-opt[data-lang-key]').forEach(b => {
+    b.textContent = _tCb(b.dataset.langKey)
+  })
+  document.getElementById('autoCleanLabel').textContent = _tCb('autoClean')
+  const ac = document.getElementById('autoCleanSelect')
+  ac.options[0].text = _tCb('off')
+  ac.options[1].text = _tCb('autoDay7')
+  ac.options[2].text = _tCb('autoDay30')
+  ac.options[3].text = _tCb('autoDay90')
+  ac.options[4].text = _tCb('autoDay180')
+  document.getElementById('cleanupCancel').textContent = _tCb('cancel')
+}
+_applyLang()
+window.clipboardApi?.onLanguageChange?.(lang => {
+  _cbLang = lang === 'en' ? 'en' : 'zh'
+  _applyLang()
+  render()
+})
+
 let items = []
 let focusedIdx = -1
 let searchQuery = ''
@@ -432,10 +502,10 @@ const DEL_ICON  = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" s
 
 function timeAgo(ts) {
   const diff = Date.now() - ts
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-  return Math.floor(diff / 86400000) + '天前'
+  if (diff < 60000) return _tCb('justNow')
+  if (diff < 3600000) return _tCb('minAgo').replace('{n}', Math.floor(diff / 60000))
+  if (diff < 86400000) return _tCb('hrAgo').replace('{n}', Math.floor(diff / 3600000))
+  return _tCb('dayAgo').replace('{n}', Math.floor(diff / 86400000))
 }
 
 function escHtml(s) {
@@ -455,7 +525,7 @@ function render() {
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4">
         <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
       </svg>
-      <span>${searchQuery ? '没有匹配结果' : '暂无记录'}</span>
+      <span>${searchQuery ? _tCb('noResults') : _tCb('noHistory')}</span>
     </div>`
     return
   }
@@ -464,12 +534,12 @@ function render() {
     <div class="item ${i === focusedIdx ? 'focused' : ''} ${item.pinned ? 'pinned' : ''}" data-idx="${i}" data-id="${item.id}" data-type="${item.type}" data-pinned="${item.pinned}">
       <div class="item-top">
         <span class="type-icon">${item.type === 'image' ? IMG_ICON : TEXT_ICON}</span>
-        <span class="source-label">${item.type === 'image' ? '图片' : '文本'}</span>
+        <span class="source-label">${item.type === 'image' ? _tCb('typeImage') : _tCb('typeText')}</span>
         <div class="item-actions">
-          <button class="act-btn pin ${item.pinned ? 'is-pinned' : ''}" data-pin="${item.id}" data-pinned="${item.pinned}" title="${item.pinned ? '取消固定' : '固定'}">${PIN_ICON}</button>
-          <button class="act-btn copy" data-id="${item.id}" title="复制">${COPY_ICON}</button>
-          ${item.type === 'image' ? `<button class="act-btn save" data-save="${item.id}" title="保存到图片库">${SAVE_ICON}</button>` : ''}
-          <button class="act-btn del" data-del="${item.id}" title="删除">${DEL_ICON}</button>
+          <button class="act-btn pin ${item.pinned ? 'is-pinned' : ''}" data-pin="${item.id}" data-pinned="${item.pinned}" title="${item.pinned ? _tCb('pinned') : _tCb('pin')}">${PIN_ICON}</button>
+          <button class="act-btn copy" data-id="${item.id}" title="${_tCb('copy')}">${COPY_ICON}</button>
+          ${item.type === 'image' ? `<button class="act-btn save" data-save="${item.id}" title="${_tCb('saveToLib')}">${SAVE_ICON}</button>` : ''}
+          <button class="act-btn del" data-del="${item.id}" title="${_tCb('delete')}">${DEL_ICON}</button>
         </div>
         <span class="time-label">${timeAgo(item.created_at)}</span>
       </div>

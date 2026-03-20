@@ -5,7 +5,7 @@
 
         <!-- 标题栏 -->
         <div class="modal-header">
-          <span class="modal-title">资源详情</span>
+          <span class="modal-title">{{ t('detail.title') }}</span>
           <button class="close-btn" @click="$emit('close')" v-html="closeSvg" />
         </div>
 
@@ -23,24 +23,28 @@
 
             <div class="stats-grid">
               <div class="stat-item">
-                <span class="stat-label">打开次数</span>
-                <span class="stat-value">{{ resource.open_count ?? 0 }} 次</span>
+                <span class="stat-label">{{ t('detail.stats.count') }}</span>
+                <span class="stat-value">{{ resource.open_count ?? 0 }} {{ t('detail.stats.countUnit') }}</span>
               </div>
               <div v-if="resource.total_run_time" class="stat-item">
-                <span class="stat-label">运行时长</span>
+                <span class="stat-label">{{ t('detail.stats.duration') }}</span>
                 <span class="stat-value">{{ formatDuration(resource.total_run_time) }}</span>
               </div>
               <div v-if="resource.last_run_at" class="stat-item">
-                <span class="stat-label">最后运行</span>
+                <span class="stat-label">{{ t('detail.stats.last') }}</span>
                 <span class="stat-value">{{ formatDate(resource.last_run_at) }}</span>
+              </div>
+              <div v-if="resource.added_at" class="stat-item">
+                <span class="stat-label">{{ t('detail.stats.first') }}</span>
+                <span class="stat-value">{{ formatDate(resource.added_at) }}</span>
               </div>
             </div>
 
             <button class="cover-btn" @click="pickCover">
-              <span v-html="imageSvg" />设置封面
+              <span v-html="imageSvg" />{{ t('detail.pickCover') }}
             </button>
             <button v-if="resource.type === 'webpage'" class="cover-btn" :class="{ 'cover-btn-fail': faviconFailed }" @click="refetchFavicon" :disabled="faviconLoading">
-              <span v-html="faviconLoading ? spinSvg : refreshSvg" />{{ faviconLoading ? '获取中…' : faviconFailed ? '未找到图标' : '重新获取图标' }}
+              <span v-html="faviconLoading ? spinSvg : refreshSvg" />{{ faviconLoading ? t('detail.favicon.loading') : faviconFailed ? t('detail.favicon.failed') : t('detail.favicon.refetch') }}
             </button>
           </div>
 
@@ -49,7 +53,7 @@
 
             <!-- 名称 -->
             <div class="field-row">
-              <label class="field-label">名称</label>
+              <label class="field-label">{{ t('detail.name') }}</label>
               <input
                 v-model="editTitle"
                 class="field-input"
@@ -60,18 +64,18 @@
 
             <!-- 类型 + 日期 -->
             <div class="field-row">
-              <label class="field-label">类型</label>
+              <label class="field-label">{{ t('detail.type') }}</label>
               <div class="meta-inline">
                 <select class="type-select" :value="resource.type" @change="onTypeChange">
                   <option v-for="opt in typeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                 </select>
-                <span class="meta-date">添加于 {{ formatDate(resource.added_at) }}</span>
+                <span class="meta-date">{{ t('detail.addedAt') }} {{ formatDate(resource.added_at) }}</span>
               </div>
             </div>
 
             <!-- 评分 -->
             <div class="field-row">
-              <label class="field-label">评分</label>
+              <label class="field-label">{{ t('detail.rating') }}</label>
               <div class="stars-row">
                 <button
                   v-for="n in 5"
@@ -80,13 +84,13 @@
                   :class="{ active: n <= editRating }"
                   @click="setRating(n)"
                 >★</button>
-                <button v-if="editRating > 0" class="clear-rating" @click="setRating(0)">清除</button>
+                <button v-if="editRating > 0" class="clear-rating" @click="setRating(0)">{{ t('detail.clearRating') }}</button>
               </div>
             </div>
 
             <!-- 标签 -->
             <div class="field-row align-start">
-              <label class="field-label">标签</label>
+              <label class="field-label">{{ t('detail.tags') }}</label>
               <div class="tag-col">
                 <div class="tag-area">
                   <span v-for="tag in resource.tags" :key="tag.id" class="tag-chip">
@@ -96,14 +100,14 @@
                   <input
                     v-model="newTagInput"
                     class="tag-input"
-                    placeholder="+ 添加标签"
+                    :placeholder="t('detail.addTag')"
                     @keydown.enter.prevent="addTag"
                     @keydown.188.prevent="addTag"
                   />
                 </div>
                 <!-- 当前品类已有标签，点击快速添加 -->
                 <div v-if="filteredSuggestions.length" class="tag-suggestions">
-                  <span class="sug-label">已有标签</span>
+                  <span class="sug-label">{{ t('detail.existingTags') }}</span>
                   <button
                     v-for="tag in filteredSuggestions"
                     :key="tag.id"
@@ -116,19 +120,19 @@
 
             <!-- 备注 -->
             <div class="field-row align-start">
-              <label class="field-label">备注</label>
+              <label class="field-label">{{ t('detail.note') }}</label>
               <textarea
                 v-model="editNote"
                 class="field-textarea"
                 rows="3"
-                placeholder="添加备注..."
+                :placeholder="t('detail.notePlaceholder')"
                 @input="debounceSave('note', editNote)"
               />
             </div>
 
             <!-- 文件路径 -->
             <div class="field-row align-start">
-              <label class="field-label">路径</label>
+              <label class="field-label">{{ t('detail.path') }}</label>
               <div class="path-col">
                 <input
                   v-model="editPath"
@@ -139,10 +143,13 @@
                 />
                 <div class="path-actions">
                   <button class="action-btn" @click="openFile">
-                    <span v-html="openSvg" />打开文件
+                    <span v-html="openSvg" />{{ t('detail.open') }}
                   </button>
                   <button class="action-btn" @click="showInFolder">
-                    <span v-html="folderSvg" />在文件夹中显示
+                    <span v-html="folderSvg" />{{ t('detail.showInFolder') }}
+                  </button>
+                  <button class="action-btn" @click="copyPath">
+                    <span v-html="copySvg" />{{ pathCopied ? t('detail.pathCopied') : t('detail.copyPath') }}
                   </button>
                 </div>
               </div>
@@ -151,10 +158,10 @@
             <!-- 危险操作 -->
             <div class="danger-row">
               <button class="danger-btn" @click="doRemove">
-                <span v-html="trashSvg" />从库中删除
+                <span v-html="trashSvg" />{{ t('detail.removeFromLibrary') }}
               </button>
               <button class="danger-btn" @click="doIgnore">
-                <span v-html="ignoreSvg" />忽略此文件
+                <span v-html="ignoreSvg" />{{ t('detail.ignore') }}
               </button>
             </div>
 
@@ -164,9 +171,9 @@
         <!-- 底部操作栏 -->
         <div class="modal-footer">
           <div class="footer-actions">
-            <button class="btn-cancel" :class="{ 'btn-dirty': isDirty }" @click="isDirty ? flushAndClose() : $emit('close')">{{ isDirty ? '保存并关闭' : '关闭' }}</button>
+            <button class="btn-cancel" :class="{ 'btn-dirty': isDirty }" @click="isDirty ? flushAndClose() : $emit('close')">{{ isDirty ? t('detail.saveAndClose') : t('detail.close') }}</button>
             <button class="btn-open" @click="openFile">
-              <span v-html="openSvg" />打开文件
+              <span v-html="openSvg" />{{ t('detail.open') }}
             </button>
           </div>
         </div>
@@ -178,8 +185,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, watchEffect, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Resource } from '../stores/resources'
 import { useResourceStore } from '../stores/resources'
+
+const { t } = useI18n()
 
 const props = defineProps<{ resource: Resource }>()
 const emit = defineEmits<{ close: [] }>()
@@ -193,6 +203,7 @@ const editRating  = ref(props.resource.rating)
 const editPath    = ref(props.resource.file_path)
 const newTagInput = ref('')
 const hasEdited   = ref(false)
+const pathCopied  = ref(false)
 
 watch(() => props.resource.id, () => {
   editTitle.value   = props.resource.title
@@ -201,6 +212,7 @@ watch(() => props.resource.id, () => {
   hasEdited.value   = false
   editPath.value    = props.resource.file_path
   newTagInput.value = ''
+  pathCopied.value  = false
   loadTagSuggestions()
 })
 
@@ -336,6 +348,17 @@ function savePath() {
   saveField('file_path', val)
 }
 
+let pathCopiedTimer: ReturnType<typeof setTimeout> | null = null
+function copyPath() {
+  const path = props.resource.file_path
+  if (!path) return
+  navigator.clipboard.writeText(path).then(() => {
+    pathCopied.value = true
+    if (pathCopiedTimer) clearTimeout(pathCopiedTimer)
+    pathCopiedTimer = setTimeout(() => { pathCopied.value = false }, 2000)
+  })
+}
+
 // ─── Danger ────────────────────────────────────────────────────────
 async function doRemove() {
   await store.remove(props.resource.id)
@@ -347,28 +370,25 @@ async function doIgnore() {
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────
-const TYPE_LABELS: Record<string, string> = {
-  image: '图片', game: '游戏', app: '应用程序',
-  video: '视频', comic: '漫画', music: '音乐', novel: '小说',
-  document: '文档', webpage: '网页'
-}
-const typeOptions = [
-  { label: '游戏', value: 'game' },
-  { label: '应用程序', value: 'app' },
-  { label: '图片', value: 'image' },
-  { label: '视频', value: 'video' },
-  { label: '漫画', value: 'comic' },
-  { label: '音乐', value: 'music' },
-  { label: '小说', value: 'novel' },
-  { label: '文档', value: 'document' },
-  { label: '网页', value: 'webpage' },
-  { label: '文件夹', value: 'folder' },
-  { label: '其他', value: 'other' },
-]
+const typeOptions = computed(() => [
+  { label: t('detail.types.game'),     value: 'game' },
+  { label: t('detail.types.app'),      value: 'app' },
+  { label: t('detail.types.image'),    value: 'image' },
+  { label: t('detail.types.video'),    value: 'video' },
+  { label: t('detail.types.comic'),    value: 'comic' },
+  { label: t('detail.types.music'),    value: 'music' },
+  { label: t('detail.types.novel'),    value: 'novel' },
+  { label: t('detail.types.document'), value: 'document' },
+  { label: t('detail.types.webpage'),  value: 'webpage' },
+  { label: t('detail.types.folder'),   value: 'folder' },
+  { label: t('detail.types.other'),    value: 'other' },
+])
+
 function onTypeChange(e: Event) {
   hasEdited.value = true
   saveField('type', (e.target as HTMLSelectElement).value)
 }
+
 const TYPE_ICONS: Record<string, string> = {
   image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
   game:  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 12h4M8 10v4"/><circle cx="15.5" cy="11.5" r=".6" fill="currentColor"/><circle cx="17.5" cy="13.5" r=".6" fill="currentColor"/><path d="M21 12c0 5-2.5 8-9 8S3 17 3 12 5.5 4 12 4s9 3 9 8z"/></svg>`,
@@ -379,19 +399,20 @@ const TYPE_ICONS: Record<string, string> = {
   novel: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
   document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`
 }
-const typeLabel = computed(() => TYPE_LABELS[props.resource.type] ?? props.resource.type)
-const typeIcon  = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.app)
+const typeIcon = computed(() => TYPE_ICONS[props.resource.type] ?? TYPE_ICONS.app)
 
 function formatDate(ts: number): string {
-  return new Date(ts).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+  if (!ts) return t('detail.time.never')
+  return new Date(ts).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds} 秒`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟`
+  if (!seconds || seconds < 0) return t('detail.time.seconds', { n: 0 })
+  if (seconds < 60) return t('detail.time.seconds', { n: seconds })
+  if (seconds < 3600) return t('detail.time.minutes', { n: Math.floor(seconds / 60) })
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
-  return m > 0 ? `${h} 小时 ${m} 分` : `${h} 小时`
+  return m > 0 ? t('detail.time.hoursMinutes', { h, m }) : t('detail.time.hours', { n: h })
 }
 
 // ─── SVG ───────────────────────────────────────────────────────────
@@ -404,6 +425,7 @@ const ignoreSvg  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const imageSvg   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
 const refreshSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`
 const spinSvg    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="animation:spin .8s linear infinite"><circle cx="12" cy="12" r="10" stroke-opacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>`
+const copySvg    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`
 
 // ─── Refetch favicon (webpage only) ────────────────────────────────
 const faviconLoading = ref(false)

@@ -312,6 +312,11 @@ export function registerIpcHandlers(): void {
         if (!wc.isDestroyed()) wc.send('theme:change', value)
       })
     }
+    if (key === 'language') {
+      webContents.getAllWebContents().forEach(wc => {
+        if (!wc.isDestroyed()) wc.send('language:change', value)
+      })
+    }
     return true
   })
 

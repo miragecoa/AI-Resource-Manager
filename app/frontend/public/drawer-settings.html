@@ -159,39 +159,39 @@
 </head>
 <body>
   <div class="panel">
-    <div class="title">悬浮窗设置</div>
+    <div class="title" id="ds-title">悬浮窗设置</div>
 
     <div class="row">
-      <span class="row-label">透明度</span>
+      <span class="row-label" id="ds-opacity">透明度</span>
       <input type="range" id="opacitySlider" min="20" max="100" step="1" value="100" />
       <span class="val" id="opacityVal">100%</span>
     </div>
 
     <div class="row">
-      <span class="row-label">大小</span>
+      <span class="row-label" id="ds-size">大小</span>
       <input type="range" id="sizeSlider" min="0" max="100" step="1" value="40" />
       <span class="val" id="sizeVal">68px</span>
     </div>
 
     <div class="row">
-      <span class="row-label">贴边</span>
+      <span class="row-label" id="ds-edge">贴边</span>
       <div class="edge-btns">
-        <button class="edge-btn active" data-dir="none">关</button>
-        <button class="edge-btn" data-dir="left">左</button>
-        <button class="edge-btn" data-dir="right">右</button>
-        <button class="edge-btn" data-dir="top">上</button>
-        <button class="edge-btn" data-dir="bottom">下</button>
+        <button class="edge-btn active" data-dir="none" id="ds-edge-off">关</button>
+        <button class="edge-btn" data-dir="left" id="ds-edge-left">左</button>
+        <button class="edge-btn" data-dir="right" id="ds-edge-right">右</button>
+        <button class="edge-btn" data-dir="top" id="ds-edge-top">上</button>
+        <button class="edge-btn" data-dir="bottom" id="ds-edge-bottom">下</button>
       </div>
     </div>
 
     <div class="row">
-      <span class="row-label">条长</span>
+      <span class="row-label" id="ds-striplen">条长</span>
       <input type="range" id="stripLenSlider" min="10" max="100" step="5" value="50" />
       <span class="val" id="stripLenVal">50%</span>
     </div>
 
     <div class="row">
-      <span class="row-label">条宽</span>
+      <span class="row-label" id="ds-stripwid">条宽</span>
       <input type="range" id="stripWidSlider" min="6" max="32" step="2" value="14" />
       <span class="val" id="stripWidVal">14px</span>
     </div>
@@ -206,10 +206,57 @@
     <button class="btn" id="showMainBtn">显示主窗口</button>
     <button class="btn danger" id="hideDrawerBtn">隐藏悬浮窗</button>
 
-    <div class="hint">将文件拖入悬浮图标可快速导入</div>
+    <div class="hint" id="ds-hint">将文件拖入悬浮图标可快速导入</div>
   </div>
 
   <script>
+    // ── i18n ─────────────────────────────────────────────────────────────
+    const _DS_I18N = {
+      zh: {
+        title: '悬浮窗设置', opacity: '透明度', size: '大小', edge: '贴边',
+        edgeOff: '关', edgeLeft: '左', edgeRight: '右', edgeTop: '上', edgeBottom: '下',
+        stripLen: '条长', stripWid: '条宽',
+        pickIcon: '自定义图标', clearIcon: '恢复默认图标',
+        showMain: '显示主窗口', hideDrawer: '隐藏悬浮窗',
+        hint: '将文件拖入悬浮图标可快速导入',
+      },
+      en: {
+        title: 'Drawer Settings', opacity: 'Opacity', size: 'Size', edge: 'Edge',
+        edgeOff: 'Off', edgeLeft: 'L', edgeRight: 'R', edgeTop: 'T', edgeBottom: 'B',
+        stripLen: 'Length', stripWid: 'Width',
+        pickIcon: 'Custom icon', clearIcon: 'Reset icon',
+        showMain: 'Show window', hideDrawer: 'Hide drawer',
+        hint: 'Drag files onto the drawer icon to quickly import',
+      },
+    }
+    const _dsp = new URLSearchParams(window.location.search)
+    let _dsLang = _dsp.get('lang') === 'en' ? 'en' : 'zh'
+    function _tDs(key) { return (_DS_I18N[_dsLang] || _DS_I18N.zh)[key] || key }
+    function _applyDsLang() {
+      const T = _DS_I18N[_dsLang] || _DS_I18N.zh
+      document.getElementById('ds-title').textContent = T.title
+      document.getElementById('ds-opacity').textContent = T.opacity
+      document.getElementById('ds-size').textContent = T.size
+      document.getElementById('ds-edge').textContent = T.edge
+      document.getElementById('ds-edge-off').textContent = T.edgeOff
+      document.getElementById('ds-edge-left').textContent = T.edgeLeft
+      document.getElementById('ds-edge-right').textContent = T.edgeRight
+      document.getElementById('ds-edge-top').textContent = T.edgeTop
+      document.getElementById('ds-edge-bottom').textContent = T.edgeBottom
+      document.getElementById('ds-striplen').textContent = T.stripLen
+      document.getElementById('ds-stripwid').textContent = T.stripWid
+      document.getElementById('pickIconBtn').textContent = T.pickIcon
+      document.getElementById('clearIconBtn').textContent = T.clearIcon
+      document.getElementById('showMainBtn').textContent = T.showMain
+      document.getElementById('hideDrawerBtn').textContent = T.hideDrawer
+      document.getElementById('ds-hint').textContent = T.hint
+    }
+    _applyDsLang()
+    window.settingsApi?.onLanguageChange?.(lang => {
+      _dsLang = lang === 'en' ? 'en' : 'zh'
+      _applyDsLang()
+    })
+
     function sizeToWidth(v) {
       return Math.round(32 * Math.pow(8, v / 100))  // 32px → 256px
     }

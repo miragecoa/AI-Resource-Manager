@@ -1,24 +1,37 @@
 <template>
   <div class="settings">
     <div class="settings-header">
-      <h1 class="page-title">设置</h1>
+      <h1 class="page-title">{{ t('settings.title') }}</h1>
     </div>
 
     <div class="settings-body">
+      <!-- 语言 -->
+      <section class="section">
+        <h2 class="section-title">{{ t('settings.language.title') }}</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">{{ t('settings.language.title') }}</div>
+          </div>
+          <div class="lang-btns">
+            <button class="lang-btn" :class="{ active: settingsStore.language === 'zh' }" @click="settingsStore.setLanguage('zh')">{{ t('settings.language.zh') }}</button>
+            <button class="lang-btn" :class="{ active: settingsStore.language === 'en' }" @click="settingsStore.setLanguage('en')">{{ t('settings.language.en') }}</button>
+          </div>
+        </div>
+      </section>
+
       <!-- 监控设置 -->
       <section class="section">
-        <h2 class="section-title">文件监控</h2>
+        <h2 class="section-title">{{ t('settings.monitor.title') }}</h2>
 
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">自动收录最近打开的文件</div>
-            <div class="setting-desc">监听 Windows 最近使用记录，自动将图片、视频、游戏和应用添加到资源库</div>
+            <div class="setting-label">{{ t('settings.monitor.autoImport') }}</div>
+            <div class="setting-desc">{{ t('settings.monitor.autoImportDesc') }}</div>
           </div>
           <button
             class="toggle"
             :class="{ on: settingsStore.monitorEnabled }"
             @click="settingsStore.setMonitor(!settingsStore.monitorEnabled)"
-            :aria-label="settingsStore.monitorEnabled ? '关闭监控' : '开启监控'"
           >
             <span class="toggle-thumb" />
           </button>
@@ -26,14 +39,13 @@
 
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">开机自动启动</div>
-            <div class="setting-desc">登录 Windows 时自动在后台启动，持续收录文件</div>
+            <div class="setting-label">{{ t('settings.monitor.autoStart') }}</div>
+            <div class="setting-desc">{{ t('settings.monitor.autoStartDesc') }}</div>
           </div>
           <button
             class="toggle"
             :class="{ on: settingsStore.autostartEnabled }"
             @click="settingsStore.setAutostart(!settingsStore.autostartEnabled)"
-            :aria-label="settingsStore.autostartEnabled ? '关闭自启' : '开启自启'"
           >
             <span class="toggle-thumb" />
           </button>
@@ -41,14 +53,13 @@
 
         <div class="setting-row" :class="{ 'row-disabled': !settingsStore.autostartEnabled }">
           <div class="setting-info">
-            <div class="setting-label">开机后自动显示窗口</div>
-            <div class="setting-desc">默认关闭，开机后静默驻留后台；开启后恢复弹出主窗口</div>
+            <div class="setting-label">{{ t('settings.monitor.showOnStart') }}</div>
+            <div class="setting-desc">{{ t('settings.monitor.showOnStartDesc') }}</div>
           </div>
           <button
             class="toggle"
             :class="{ on: settingsStore.showOnAutoStart }"
             @click="settingsStore.setShowOnAutoStart(!settingsStore.showOnAutoStart)"
-            :aria-label="settingsStore.showOnAutoStart ? '关闭开机弹窗' : '开启开机弹窗'"
             :disabled="!settingsStore.autostartEnabled"
           >
             <span class="toggle-thumb" />
@@ -58,11 +69,11 @@
 
       <!-- 快捷键 -->
       <section class="section">
-        <h2 class="section-title">快捷键</h2>
+        <h2 class="section-title">{{ t('settings.hotkey.title') }}</h2>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">唤醒窗口</div>
-            <div class="setting-desc">全局快捷键，显示或隐藏主窗口（默认 Alt+Space）</div>
+            <div class="setting-label">{{ t('settings.hotkey.wake') }}</div>
+            <div class="setting-desc">{{ t('settings.hotkey.wakeDesc') }}</div>
           </div>
           <div class="hotkey-input-wrap">
             <div
@@ -73,17 +84,17 @@
               @keydown.prevent="onHotkeyKeydown"
               @blur="cancelRecording"
             >
-              {{ hotkeyRecording ? (pendingHotkey || '请按下快捷键…') : settingsStore.hotkeyWake }}
+              {{ hotkeyRecording ? (pendingHotkey || t('settings.hotkey.recording')) : settingsStore.hotkeyWake }}
             </div>
-            <button v-if="!hotkeyRecording" class="hotkey-reset" @click="resetHotkey" title="恢复默认">
+            <button v-if="!hotkeyRecording" class="hotkey-reset" @click="resetHotkey" :title="t('settings.hotkey.resetDefault')">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg>
             </button>
           </div>
         </div>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">剪贴板历史</div>
-            <div class="setting-desc">呼出剪贴板历史面板（默认 Alt+V）</div>
+            <div class="setting-label">{{ t('settings.hotkey.clipboard') }}</div>
+            <div class="setting-desc">{{ t('settings.hotkey.clipboardDesc') }}</div>
           </div>
           <div class="hotkey-input-wrap">
             <div
@@ -94,9 +105,9 @@
               @keydown.prevent="onClipboardHotkeyKeydown"
               @blur="cancelClipboardRecording"
             >
-              {{ clipboardHotkeyRecording ? (pendingClipboardHotkey || '请按下快捷键…') : settingsStore.hotkeyClipboard }}
+              {{ clipboardHotkeyRecording ? (pendingClipboardHotkey || t('settings.hotkey.recording')) : settingsStore.hotkeyClipboard }}
             </div>
-            <button v-if="!clipboardHotkeyRecording" class="hotkey-reset" @click="resetClipboardHotkey" title="恢复默认">
+            <button v-if="!clipboardHotkeyRecording" class="hotkey-reset" @click="resetClipboardHotkey" :title="t('settings.hotkey.resetDefault')">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg>
             </button>
           </div>
@@ -106,11 +117,11 @@
 
       <!-- 离线模式 -->
       <section class="section">
-        <h2 class="section-title">AI 功能</h2>
+        <h2 class="section-title">{{ t('settings.ai.title') }}</h2>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">离线模式</div>
-            <div class="setting-desc">开启后仅接收软件更新，所有 AI 功能将提示「当前为离线模式」</div>
+            <div class="setting-label">{{ t('settings.ai.offline') }}</div>
+            <div class="setting-desc">{{ t('settings.ai.offlineDesc') }}</div>
           </div>
           <button
             class="toggle"
@@ -124,11 +135,11 @@
 
       <!-- 界面缩放 -->
       <section class="section">
-        <h2 class="section-title">界面缩放</h2>
+        <h2 class="section-title">{{ t('settings.zoom.title') }}</h2>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">缩放比例</div>
-            <div class="setting-desc">调整整体界面大小，确认后生效</div>
+            <div class="setting-label">{{ t('settings.zoom.label') }}</div>
+            <div class="setting-desc">{{ t('settings.zoom.labelDesc') }}</div>
           </div>
           <div class="zoom-controls">
             <div class="zoom-group">
@@ -162,8 +173,8 @@
               <span class="zoom-unit">%</span>
             </div>
             <div v-if="pendingZoom !== settingsStore.zoom" class="zoom-confirm-row">
-              <button class="zoom-apply-btn" @click="applyZoom">应用</button>
-              <button class="zoom-cancel-btn" @click="pendingZoom = settingsStore.zoom">取消</button>
+              <button class="zoom-apply-btn" @click="applyZoom">{{ t('settings.zoom.apply') }}</button>
+              <button class="zoom-cancel-btn" @click="pendingZoom = settingsStore.zoom">{{ t('settings.zoom.cancel') }}</button>
             </div>
           </div>
         </div>
@@ -171,7 +182,7 @@
 
       <!-- 外观主题 -->
       <section class="section">
-        <h2 class="section-title">外观主题</h2>
+        <h2 class="section-title">{{ t('settings.theme.title') }}</h2>
 
         <div class="theme-presets-grid">
           <button
@@ -186,7 +197,7 @@
               <span class="swatch-surface" :style="{ background: preset.vars['surface'] }" />
               <span class="swatch-accent" :style="{ background: preset.vars['accent'] }" />
             </span>
-            <span class="preset-name">{{ preset.name }}</span>
+            <span class="preset-name">{{ t('settings.theme.presets.' + preset.id) }}</span>
           </button>
         </div>
 
@@ -195,7 +206,7 @@
             <svg width="12" height="12" viewBox="0 0 12 12" :style="{ transform: showColors ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }">
               <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            自定义颜色
+            {{ t('settings.theme.custom') }}
           </button>
 
           <div v-if="showColors" class="theme-colors-body">
@@ -211,14 +222,14 @@
 
             <div class="theme-io-row">
               <div class="theme-io-group">
-                <span class="theme-io-label">导出</span>
+                <span class="theme-io-label">{{ t('settings.theme.export') }}</span>
                 <input class="theme-io-input" readonly :value="exportCode" @focus="($event.target as HTMLInputElement).select()" />
-                <button class="theme-io-btn" @click="copyExportCode">{{ copied ? '已复制' : '复制' }}</button>
+                <button class="theme-io-btn" @click="copyExportCode">{{ copied ? t('settings.theme.copied') : t('settings.theme.copy') }}</button>
               </div>
               <div class="theme-io-group">
-                <span class="theme-io-label">导入</span>
-                <input class="theme-io-input" v-model="importCode" placeholder="粘贴主题代码…" />
-                <button class="theme-io-btn" @click="importTheme" :disabled="!importCode">导入</button>
+                <span class="theme-io-label">{{ t('settings.theme.import') }}</span>
+                <input class="theme-io-input" v-model="importCode" :placeholder="t('settings.theme.importPlaceholder')" />
+                <button class="theme-io-btn" @click="importTheme" :disabled="!importCode">{{ t('settings.theme.import') }}</button>
               </div>
             </div>
           </div>
@@ -227,12 +238,12 @@
 
       <!-- 显示设置 -->
       <section class="section">
-        <h2 class="section-title">显示</h2>
+        <h2 class="section-title">{{ t('settings.display.title') }}</h2>
 
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">显示文件后缀</div>
-            <div class="setting-desc">在资源卡片标题中显示文件扩展名（如 .exe、.sai2）</div>
+            <div class="setting-label">{{ t('settings.display.showExt') }}</div>
+            <div class="setting-desc">{{ t('settings.display.showExtDesc') }}</div>
           </div>
           <button
             class="toggle"
@@ -246,25 +257,25 @@
 
       <!-- 数据管理 -->
       <section class="section">
-        <h2 class="section-title">数据管理</h2>
+        <h2 class="section-title">{{ t('settings.data.title') }}</h2>
 
         <!-- 配置文件选择 -->
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">配置文件</div>
-            <div class="setting-desc">每个配置文件拥有独立的资源库和设置</div>
+            <div class="setting-label">{{ t('settings.data.profile') }}</div>
+            <div class="setting-desc">{{ t('settings.data.profileDesc') }}</div>
           </div>
           <div class="profile-controls">
             <select v-model="activeProfileId" @change="onSwitchProfile" class="profile-select">
               <option v-for="p in profiles" :key="p.id" :value="p.id">{{ p.name }}</option>
             </select>
-            <button class="profile-btn" @click="showCreateDialog = true" title="新建配置">+ 新建</button>
+            <button class="profile-btn" @click="showCreateDialog = true" :title="t('settings.data.newProfileTitle')">{{ t('settings.data.newProfile') }}</button>
             <button
               class="profile-btn danger"
               @click="onDeleteProfile"
               :disabled="profiles.length <= 1 || activeProfileId === 'default'"
-              title="删除当前配置"
-            >删除</button>
+              :title="t('settings.data.deleteProfileTitle')"
+            >{{ t('settings.data.deleteProfile') }}</button>
           </div>
         </div>
 
@@ -273,37 +284,37 @@
           <input
             v-model="newProfileName"
             class="profile-input"
-            placeholder="输入配置名称"
+            :placeholder="t('settings.data.profileNamePlaceholder')"
             maxlength="30"
             @keyup.enter="onCreateProfile"
             ref="createInput"
           />
           <div class="create-actions">
-            <button class="profile-btn" @click="onCreateProfile" :disabled="!newProfileName.trim()">确定</button>
-            <button class="profile-btn" @click="showCreateDialog = false; newProfileName = ''">取消</button>
+            <button class="profile-btn" @click="onCreateProfile" :disabled="!newProfileName.trim()">{{ t('settings.data.confirm') }}</button>
+            <button class="profile-btn" @click="showCreateDialog = false; newProfileName = ''">{{ t('settings.data.cancel') }}</button>
           </div>
         </div>
 
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">数据库位置</div>
+            <div class="setting-label">{{ t('settings.data.dbPath') }}</div>
             <div class="setting-desc mono">{{ dbPath }}</div>
           </div>
         </div>
 
         <div class="setting-row reset-row">
           <div class="setting-info">
-            <div class="setting-label">恢复默认设置</div>
-            <div class="setting-desc">重置外观、视图、缩放、快捷键、排序等偏好项，不影响资源库数据和自启配置</div>
+            <div class="setting-label">{{ t('settings.data.reset') }}</div>
+            <div class="setting-desc">{{ t('settings.data.resetDesc') }}</div>
           </div>
           <div class="reset-actions">
             <template v-if="!confirmReset">
-              <button class="profile-btn danger" @click="confirmReset = true">恢复默认</button>
+              <button class="profile-btn danger" @click="confirmReset = true">{{ t('settings.data.resetBtn') }}</button>
             </template>
             <template v-else>
-              <span class="reset-confirm-hint">确认恢复？</span>
-              <button class="profile-btn danger" @click="doResetDefaults">确认</button>
-              <button class="profile-btn" @click="confirmReset = false">取消</button>
+              <span class="reset-confirm-hint">{{ t('settings.data.resetConfirm') }}</span>
+              <button class="profile-btn danger" @click="doResetDefaults">{{ t('settings.data.resetConfirmBtn') }}</button>
+              <button class="profile-btn" @click="confirmReset = false">{{ t('settings.data.resetCancelBtn') }}</button>
             </template>
           </div>
         </div>
@@ -311,10 +322,10 @@
 
       <!-- 更新日志 -->
       <section class="section">
-        <h2 class="section-title">更新日志</h2>
+        <h2 class="section-title">{{ t('settings.changelog.title') }}</h2>
         <div class="changelog-wrap">
-          <div v-if="changelogStatus === 'loading'" class="changelog-empty">加载中…</div>
-          <div v-else-if="changelogStatus === 'error'" class="changelog-empty">加载失败，请检查网络</div>
+          <div v-if="changelogStatus === 'loading'" class="changelog-empty">{{ t('settings.changelog.loading') }}</div>
+          <div v-else-if="changelogStatus === 'error'" class="changelog-empty">{{ t('settings.changelog.error') }}</div>
           <template v-else>
             <!-- 最新版本 -->
             <div
@@ -328,13 +339,13 @@
                 <span class="changelog-date">{{ formatDate(changelog[0].publishedAt) }}</span>
                 <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
-              <div class="changelog-body" v-if="expandedChangelog === 0">{{ changelog[0].body || '（无详细说明）' }}</div>
+              <div class="changelog-body" v-if="expandedChangelog === 0">{{ changelog[0].body || t('settings.changelog.noDetail') }}</div>
             </div>
             <!-- 更早版本（折叠组） -->
             <div v-if="changelog.length > 1" class="changelog-item changelog-older" :class="{ expanded: showOlderChangelog }" @click="showOlderChangelog = !showOlderChangelog">
               <div class="changelog-header">
-                <span class="changelog-older-label">查看更早版本</span>
-                <span class="changelog-date">v{{ changelog[1].tag }} 及更早</span>
+                <span class="changelog-older-label">{{ t('settings.changelog.viewOlder') }}</span>
+                <span class="changelog-date">v{{ changelog[1].tag }} {{ t('settings.changelog.andOlder') }}</span>
                 <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
               <template v-if="showOlderChangelog">
@@ -350,7 +361,7 @@
                     <span class="changelog-date">{{ formatDate(rel.publishedAt) }}</span>
                     <svg class="changelog-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
                   </div>
-                  <div class="changelog-body" v-if="expandedChangelog === i + 1">{{ rel.body || '（无详细说明）' }}</div>
+                  <div class="changelog-body" v-if="expandedChangelog === i + 1">{{ rel.body || t('settings.changelog.noDetail') }}</div>
                 </div>
               </template>
             </div>
@@ -360,11 +371,11 @@
 
       <!-- 软件更新 -->
       <section class="section">
-        <h2 class="section-title">软件更新</h2>
+        <h2 class="section-title">{{ t('settings.update.title') }}</h2>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">自动检查更新</div>
-            <div class="setting-desc">启动时自动检查 GitHub Releases 上的新版本</div>
+            <div class="setting-label">{{ t('settings.update.autoCheck') }}</div>
+            <div class="setting-desc">{{ t('settings.update.autoCheckDesc') }}</div>
           </div>
           <button class="toggle" :class="{ on: settingsStore.autoUpdate }" @click="settingsStore.setAutoUpdate(!settingsStore.autoUpdate)">
             <span class="toggle-thumb" />
@@ -372,41 +383,41 @@
         </div>
         <div class="setting-row">
           <div class="setting-info">
-            <div class="setting-label">当前版本 v{{ appVersion }}</div>
-            <div class="setting-desc" v-if="updateCheckStatus === 'checking'">正在检查更新…</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'up-to-date'" style="color: #4ade80;">已是最新版本</div>
+            <div class="setting-label">{{ t('settings.update.currentVersion', { version: appVersion }) }}</div>
+            <div class="setting-desc" v-if="updateCheckStatus === 'checking'">{{ t('settings.update.checking') }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'up-to-date'" style="color: #4ade80;">{{ t('settings.update.upToDate') }}</div>
             <div class="setting-desc" v-else-if="updateCheckStatus === 'available'">
-              {{ updateCheckInfo?.isNewVersion ? `发现新版本 v${updateCheckInfo.remoteVersion}` : `v${updateCheckInfo?.remoteVersion} 有更新` }}
-              ({{ ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB)
+              {{ t(updateCheckInfo?.isNewVersion ? 'settings.update.available' : 'settings.update.availableUpdate', { version: updateCheckInfo?.remoteVersion }) }}
+              {{ t('settings.update.downloadSize', { size: ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }) }}
             </div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">正在下载… {{ updateDownloadPercent }}%，请耐心等待</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">下载完成，点击「重启并更新」完成安装（若无响应可多点几次）</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">操作失败，请重试或点击「前往下载页」手动更新</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.downloading', { percent: updateDownloadPercent }) }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">{{ t('settings.update.ready') }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">{{ t('settings.update.error') }}</div>
           </div>
           <div class="setting-actions">
-            <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">下载并更新</button>
-            <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">重启并更新</button>
-            <button v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">检查更新</button>
-            <button class="profile-btn" @click="openGitHubRelease">前往下载页</button>
-            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">强制更新</button>
+            <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">{{ t('settings.update.btnDownload') }}</button>
+            <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">{{ t('settings.update.btnApply') }}</button>
+            <button v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">{{ t('settings.update.btnCheck') }}</button>
+            <button class="profile-btn" @click="openGitHubRelease">{{ t('settings.update.btnGithub') }}</button>
+            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.btnForce') }}</button>
           </div>
         </div>
       </section>
 
       <!-- 关于 -->
       <section class="section">
-        <h2 class="section-title">关于</h2>
+        <h2 class="section-title">{{ t('settings.about.title') }}</h2>
         <div class="about-card">
-          <div class="about-name">AI资源管家</div>
-          <div class="about-version">v{{ appVersion }} — 免费版</div>
-          <div class="about-desc" v-if="lastUpdateTime">更新于 {{ lastUpdateTime }}</div>
-          <div class="about-desc">本地优先的多媒体资源管理器</div>
+          <div class="about-name">{{ t('app.title') }}</div>
+          <div class="about-version">v{{ appVersion }} — {{ t('settings.about.freeTier') }}</div>
+          <div class="about-desc" v-if="lastUpdateTime">{{ t('settings.about.updatedAt', { time: lastUpdateTime }) }}</div>
+          <div class="about-desc">{{ t('settings.about.desc') }}</div>
         </div>
       </section>
 
       <!-- 社区 -->
       <section class="section">
-        <h2 class="section-title">社区</h2>
+        <h2 class="section-title">{{ t('settings.community.title') }}</h2>
         <div class="community-links">
           <div class="community-link qq-block">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4.5 9.5C4.5 5.36 7.86 2 12 2s7.5 3.36 7.5 7.5c0 1.5-.5 3-1.3 4.2l1.3 4.3-4.3-1.3c-1 .5-2.1.8-3.2.8-4.14 0-7.5-3.36-7.5-7.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -444,10 +455,12 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore, DARK_THEME, LIGHT_THEME, THEME_PRESETS } from '../stores/settings'
 import type { ThemeId } from '../stores/settings'
 
 const settingsStore = useSettingsStore()
+const { t } = useI18n()
 
 // ── 快捷键录制 ──
 const hotkeyRecording = ref(false)
@@ -644,7 +657,7 @@ async function onCreateProfile() {
 async function onDeleteProfile() {
   if (activeProfileId.value === 'default' || profiles.value.length <= 1) return
   const current = profiles.value.find(p => p.id === activeProfileId.value)
-  if (!confirm(`确定删除配置「${current?.name}」？所有资源数据将被永久删除。`)) return
+  if (!confirm(t('settings.data.deleteConfirm', { name: current?.name }))) return
   await window.api.profiles.delete(activeProfileId.value)
   // 切换到第一个剩余配置
   const remaining = profiles.value.filter(p => p.id !== activeProfileId.value)
@@ -723,23 +736,23 @@ function importTheme() {
     settingsStore.setTheme({ ...DARK_THEME, ...parsed })
     importCode.value = ''
   } catch {
-    alert('无效的主题代码')
+    alert(t('settings.theme.invalidCode'))
   }
 }
 
-const themeVarDefs = [
-  { key: 'bg',        label: '主背景' },
-  { key: 'surface',   label: '卡片背景' },
-  { key: 'surface-2', label: '次级背景' },
-  { key: 'surface-3', label: '深次级背景' },
-  { key: 'border',    label: '边框' },
-  { key: 'text',      label: '主文字' },
-  { key: 'text-2',    label: '次级文字' },
-  { key: 'text-3',    label: '辅助文字' },
-  { key: 'accent',    label: '强调色' },
-  { key: 'accent-2',  label: '强调色2' },
-  { key: 'danger',    label: '危险色' },
-]
+const themeVarDefs = computed(() => [
+  { key: 'bg',        label: t('settings.theme.vars.bg') },
+  { key: 'surface',   label: t('settings.theme.vars.surface') },
+  { key: 'surface-2', label: t('settings.theme.vars.surface-2') },
+  { key: 'surface-3', label: t('settings.theme.vars.surface-3') },
+  { key: 'border',    label: t('settings.theme.vars.border') },
+  { key: 'text',      label: t('settings.theme.vars.text') },
+  { key: 'text-2',    label: t('settings.theme.vars.text-2') },
+  { key: 'text-3',    label: t('settings.theme.vars.text-3') },
+  { key: 'accent',    label: t('settings.theme.vars.accent') },
+  { key: 'accent-2',  label: t('settings.theme.vars.accent-2') },
+  { key: 'danger',    label: t('settings.theme.vars.danger') },
+])
 
 const currentPreset = computed(() => {
   const v = settingsStore.themeVars
@@ -1564,5 +1577,31 @@ function onColorChange(key: string, e: Event) {
   max-height: 80vh;
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* Language buttons */
+.lang-btns {
+  display: flex;
+  gap: 6px;
+}
+.lang-btn {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.lang-btn:hover {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+.lang-btn.active {
+  border-color: var(--accent);
+  color: var(--accent-2);
+  background: rgba(99, 102, 241, 0.1);
 }
 </style>

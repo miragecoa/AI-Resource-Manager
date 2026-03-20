@@ -20,7 +20,7 @@
         <button
           class="edit-btn"
           :class="{ active: editing }"
-          :title="editing ? '完成编辑' : '自定义侧边栏'"
+          :title="editing ? t('sidebar.editDone') : t('sidebar.editTitle')"
           @click="editing = !editing"
         >
           <span v-html="editing ? doneIcon : editIcon" />
@@ -37,7 +37,7 @@
           @click="select(item.type)"
         >
           <span class="nav-icon" v-html="item.svg" />
-          <span class="nav-label">{{ item.label }}</span>
+          <span class="nav-label">{{ t('nav.' + item.type) }}</span>
           <span v-if="store.counts[item.type]" class="nav-count">
             {{ store.counts[item.type] }}
           </span>
@@ -46,7 +46,7 @@
 
       <!-- 编辑模式 -->
       <div v-else class="nav-section edit-mode">
-        <div class="edit-hint">拖拽排序 · 点击眼睛显隐</div>
+        <div class="edit-hint">{{ t('sidebar.editHint') }}</div>
         <div
           v-for="(cfg, idx) in settingsStore.sidebarNav"
           :key="cfg.type"
@@ -60,8 +60,8 @@
         >
           <span class="drag-handle" v-html="dragHandleIcon" />
           <span class="edit-icon" v-html="getNavDef(cfg.type)?.svg" />
-          <span class="edit-label">{{ getNavDef(cfg.type)?.label }}</span>
-          <button class="vis-btn" @click="toggleVisible(idx)" :title="cfg.visible ? '隐藏' : '显示'">
+          <span class="edit-label">{{ t('nav.' + cfg.type) }}</span>
+          <button class="vis-btn" @click="toggleVisible(idx)" :title="cfg.visible ? t('sidebar.hide') : t('sidebar.show')">
             <span v-html="cfg.visible ? eyeIcon : eyeOffIcon" />
           </button>
         </div>
@@ -70,7 +70,7 @@
       <div class="sidebar-footer">
         <RouterLink to="/settings" class="nav-item">
           <span class="nav-icon" v-html="settingsIcon" />
-          <span class="nav-label">设置</span>
+          <span class="nav-label">{{ t('nav.settings') }}</span>
         </RouterLink>
       </div>
     </div>
@@ -80,7 +80,7 @@
     <button
       class="panel-toggle"
       @click="toggleCollapse"
-      :title="settingsStore.sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'"
+      :title="settingsStore.sidebarCollapsed ? t('sidebar.expand') : t('sidebar.collapse')"
     >
       <span v-html="settingsStore.sidebarCollapsed ? chevronRightSvg : chevronLeftSvg" />
     </button>
@@ -89,6 +89,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 const sidebarWidth = ref(210)
 const isResizing = ref(false)
@@ -98,6 +99,7 @@ import { useSettingsStore } from '../stores/settings'
 import { NAV_ITEM_DEFS } from '../config/navItems'
 import type { ResourceType } from '../stores/resources'
 
+const { t } = useI18n()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
 const router = useRouter()

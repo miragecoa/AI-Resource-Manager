@@ -7,8 +7,17 @@
           <span class="icon" v-html="appIcon" />
         </div>
 
-        <h1 class="title">AI资源管家</h1>
-        <p class="subtitle">你的本地媒体资源助手</p>
+        <h1 class="title">{{ t('app.title') }}</h1>
+        <p class="subtitle">{{ t('consent.tagline') }}</p>
+
+        <!-- 语言切换 -->
+        <div class="lang-row">
+          <span class="lang-label">{{ t('consent.langLabel') }}</span>
+          <div class="lang-btns">
+            <button class="lang-btn" :class="{ active: settingsStore.language === 'zh' }" @click="setLang('zh')">中文</button>
+            <button class="lang-btn" :class="{ active: settingsStore.language === 'en' }" @click="setLang('en')">English</button>
+          </div>
+        </div>
 
         <div class="divider" />
 
@@ -17,8 +26,8 @@
           <button class="mode" :class="{ selected: mode === 'auto' }" @click="mode = 'auto'">
             <span class="mode-icon" v-html="autoIcon" />
             <div class="mode-body">
-              <div class="mode-title">自动收录 <span class="badge">推荐</span></div>
-              <div class="mode-desc">打开文件时自动入库，无需手动操作</div>
+              <div class="mode-title">{{ t('consent.modeAuto') }} <span class="badge">{{ t('consent.modeAutoBadge') }}</span></div>
+              <div class="mode-desc">{{ t('consent.modeAutoDesc') }}</div>
             </div>
             <span class="mode-check" :class="{ visible: mode === 'auto' }" v-html="checkIcon" />
           </button>
@@ -26,8 +35,8 @@
           <button class="mode" :class="{ selected: mode === 'manual' }" @click="mode = 'manual'">
             <span class="mode-icon" v-html="manualIcon" />
             <div class="mode-body">
-              <div class="mode-title">手动管理</div>
-              <div class="mode-desc">由我来决定哪些文件要添加</div>
+              <div class="mode-title">{{ t('consent.modeManual') }}</div>
+              <div class="mode-desc">{{ t('consent.modeManualDesc') }}</div>
             </div>
             <span class="mode-check" :class="{ visible: mode === 'manual' }" v-html="checkIcon" />
           </button>
@@ -36,8 +45,8 @@
         <!-- 离线模式 -->
         <div class="offline-row">
           <div class="offline-info">
-            <div class="offline-label">离线模式</div>
-            <div class="offline-desc">仅接收软件更新，AI 功能不可用</div>
+            <div class="offline-label">{{ t('consent.offlineMode') }}</div>
+            <div class="offline-desc">{{ t('consent.offlineDesc') }}</div>
           </div>
           <button class="toggle" :class="{ on: offlineMode }" @click="offlineMode = !offlineMode">
             <span class="toggle-thumb" />
@@ -47,13 +56,13 @@
         <!-- 隐私说明 -->
         <p class="privacy">
           <span class="privacy-icon" v-html="lockIcon" />
-          所有数据仅存储在本机，绝不上传。可随时在设置中切换模式。
+          {{ t('consent.privacy') }}
         </p>
 
         <!-- 操作按钮 -->
         <div class="actions">
-          <button class="btn-quit" @click="quit">退出</button>
-          <button class="btn-start" @click="start">开始使用</button>
+          <button class="btn-quit" @click="quit">{{ t('consent.quit') }}</button>
+          <button class="btn-start" @click="start">{{ t('consent.start') }}</button>
         </div>
       </div>
 
@@ -62,23 +71,23 @@
         <div class="right-header">
           <span class="right-title-icon" v-html="lockIcon" />
           <div>
-            <div class="right-title">排除隐私目录</div>
-            <div class="right-hint">选填 · 如私人照片、工作合同等</div>
+            <div class="right-title">{{ t('consent.excludeDir') }}</div>
+            <div class="right-hint">{{ t('consent.excludeDirHint') }}</div>
           </div>
         </div>
-        <div class="right-desc">以下目录中的文件不会被自动收录</div>
+        <div class="right-desc">{{ t('consent.excludeDirDesc') }}</div>
 
         <div class="blocked-list">
-          <div v-if="blockedDirs.length === 0" class="blocked-empty">暂无，点击下方添加</div>
+          <div v-if="blockedDirs.length === 0" class="blocked-empty">{{ t('consent.dirEmpty') }}</div>
           <div v-for="dir in blockedDirs" :key="dir" class="blocked-row">
             <span class="blocked-path">{{ dir }}</span>
-            <button class="blocked-remove" @click="removeDir(dir)" title="移除">
+            <button class="blocked-remove" @click="removeDir(dir)" :title="t('common.delete')">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         </div>
 
-        <button class="blocked-add" @click="addDir">+ 添加目录</button>
+        <button class="blocked-add" @click="addDir">{{ t('consent.addDir') }}</button>
       </div>
     </div>
   </div>
@@ -86,12 +95,22 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '../stores/settings'
+import type { Locale } from '../i18n'
+
+const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 const emit = defineEmits<{ (e: 'consent', mode: 'auto' | 'manual'): void }>()
 
 const mode = ref<'auto' | 'manual'>('auto')
 const offlineMode = ref(false)
 const blockedDirs = ref<string[]>([])
+
+async function setLang(lang: Locale) {
+  await settingsStore.setLanguage(lang)
+}
 
 const appIcon   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8l3 3 4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const autoIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke-linecap="round" stroke-linejoin="round"/></svg>`
@@ -141,7 +160,7 @@ async function quit() {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  width: 620px;
+  width: 640px;
   display: flex;
   overflow: hidden;
 }
@@ -149,7 +168,7 @@ async function quit() {
 /* Left column */
 .col-left {
   flex: 1;
-  padding: 36px 28px 28px;
+  padding: 28px 28px 28px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -181,14 +200,57 @@ async function quit() {
 .subtitle {
   font-size: 13px;
   color: var(--text-3);
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+}
+
+/* 语言切换 */
+.lang-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.lang-label {
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+.lang-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.lang-btn {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.lang-btn:hover {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+
+.lang-btn.active {
+  border-color: var(--accent);
+  color: var(--accent-2);
+  background: rgba(99, 102, 241, 0.1);
 }
 
 .divider {
   width: 100%;
   height: 1px;
   background: var(--border);
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 /* 模式卡片 */

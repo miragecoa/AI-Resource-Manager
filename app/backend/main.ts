@@ -229,7 +229,8 @@ function createClipboardWindow(): void {
     bg = t['bg'] ?? bg; surface = t['surface'] ?? surface; surface2 = t['surface-2'] ?? surface2
     border = t['border'] ?? border; text = t['text'] ?? text; text2 = t['text-2'] ?? text2
   } catch {}
-  const themeQuery = { accent, accent2, bg, surface, surface2, border, text, text2 }
+  const lang = getSetting('language') ?? 'zh'
+  const themeQuery = { accent, accent2, bg, surface, surface2, border, text, text2, lang }
   if (process.env['ELECTRON_RENDERER_URL']) {
     clipboardWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/clipboard.html?' + new URLSearchParams(themeQuery).toString())
   } else {
@@ -415,11 +416,12 @@ function createDrawerWindow(): void {
   const dEdge = getSetting('drawerEdge') ?? 'none'
   const dStripLen = getSetting('drawerStripLen') ?? '50'
   const dStripWid = getSetting('drawerStripWid') ?? '14'
-  const drawerQuery = '?' + new URLSearchParams({ accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid }).toString()
+  const dLang = getSetting('language') ?? 'zh'
+  const drawerQuery = '?' + new URLSearchParams({ accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid, lang: dLang }).toString()
   if (process.env['ELECTRON_RENDERER_URL']) {
     drawerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer.html' + drawerQuery)
   } else {
-    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'), { query: { accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid } })
+    drawerWindow.loadFile(join(__dirname, '../renderer/drawer.html'), { query: { accent: dAccent, accent2: dAccent2, edge: dEdge, stripLen: dStripLen, stripWid: dStripWid, lang: dLang } })
   }
 }
 
@@ -456,7 +458,8 @@ function openDrawerSettings(): void {
     bg = t['bg'] ?? bg; surface = t['surface'] ?? surface; border = t['border'] ?? border
     text = t['text'] ?? text; text2 = t['text-2'] ?? text2
   } catch {}
-  const _q = new URLSearchParams({ accent, accent2, bg, surface, border, text, text2 }).toString()
+  const dsLang = getSetting('language') ?? 'zh'
+  const _q = new URLSearchParams({ accent, accent2, bg, surface, border, text, text2, lang: dsLang }).toString()
   const query = '?' + _q
   drawerSettingsWindow = new BrowserWindow({
     width: sw, height: sh, x: sx, y: sy,
@@ -472,7 +475,7 @@ function openDrawerSettings(): void {
   if (process.env['ELECTRON_RENDERER_URL']) {
     drawerSettingsWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/drawer-settings.html' + query)
   } else {
-    drawerSettingsWindow.loadFile(join(__dirname, '../renderer/drawer-settings.html'), { query: { accent, accent2, bg, surface, border, text, text2 } })
+    drawerSettingsWindow.loadFile(join(__dirname, '../renderer/drawer-settings.html'), { query: { accent, accent2, bg, surface, border, text, text2, lang: dsLang } })
   }
 }
 

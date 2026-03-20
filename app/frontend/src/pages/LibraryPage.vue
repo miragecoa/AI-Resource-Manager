@@ -3,14 +3,14 @@
     <!-- 顶部工具栏 -->
     <div v-if="!batchMode" class="toolbar-wrap" @keydown.esc.stop="selectedId = null">
       <div class="toolbar-row">
-        <button v-if="!showIgnored" class="add-btn" @click="showAddModal = true" title="手动添加资源">
+        <button v-if="!showIgnored" class="add-btn" @click="showAddModal = true" :title="t('library.addTitle')">
           <span class="btn-icon" v-html="addSvg" />
-          <span class="btn-text">添加</span>
+          <span class="btn-text">{{ t('library.add') }}</span>
         </button>
 
-        <button v-if="!showIgnored" class="add-btn batch-enter-btn" @click="enterBatchMode" title="批量操作">
+        <button v-if="!showIgnored" class="add-btn batch-enter-btn" @click="enterBatchMode" :title="t('library.batchTitle')">
           <span class="btn-icon" v-html="batchSvg" />
-          <span class="btn-text">批量</span>
+          <span class="btn-text">{{ t('library.batch') }}</span>
         </button>
 
         <div class="search-wrap combined" v-if="!showIgnored">
@@ -18,20 +18,20 @@
           <input
             v-model="store.searchQuery"
             class="search combine-left"
-            placeholder="搜索资源..."
+            :placeholder="t('library.searchPlaceholder')"
             type="search"
           />
-          <button v-if="store.searchQuery" class="search-clear" @click="store.searchQuery = ''" title="清除搜索">
+          <button v-if="store.searchQuery" class="search-clear" @click="store.searchQuery = ''" :title="t('library.clearSearch')">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
-          <button class="ai-btn combine-right" @click="showAiSearchComingSoon = true" title="AI 模糊搜索资源：通过自然语言描述轻松找到文件">
+          <button class="ai-btn combine-right" @click="showAiSearchComingSoon = true" :title="t('library.aiSearchTitle')">
             <span class="btn-icon" v-html="searchSvg" />
-            <span class="btn-text">AI 搜索</span>
+            <span class="btn-text">{{ t('library.aiSearch') }}</span>
           </button>
         </div>
 
         <div class="toolbar-right">
-          <div class="zoom-slider-wrap" v-if="!showIgnored" title="调整卡片大小">
+          <div class="zoom-slider-wrap" v-if="!showIgnored" :title="t('library.adjustCard')">
             <span class="zoom-icon" v-html="gridSvg" />
             <input
               type="range"
@@ -60,31 +60,31 @@
             @click="toggleIgnored"
           >
             <span class="btn-icon" v-html="ignoreListSvg" />
-            <span class="btn-text">已忽略{{ ignoredFiltered.length ? ` (${ignoredFiltered.length})` : '' }}</span>
+            <span class="btn-text">{{ t('library.ignored') }}{{ ignoredFiltered.length ? ` (${ignoredFiltered.length})` : '' }}</span>
           </button>
         </div>
       </div>
 
       <div class="toolbar-row" v-if="!showIgnored">
-        <button class="ai-btn" @click="showAiComingSoon = true" title="AI 智能设置">
+        <button class="ai-btn" @click="showAiComingSoon = true" :title="t('library.aiSettings')">
           <span class="btn-icon" v-html="aiSvg" />
-          <span class="btn-text">AI 智能设置</span>
+          <span class="btn-text">{{ t('library.aiSettings') }}</span>
         </button>
         <div class="toolbar-right">
           <div class="view-toggle">
-            <button class="view-toggle-btn" :class="{ active: viewMode === 'grid' }" @click="settingsStore.setViewMode(store.activeType, 'grid')" title="网格视图">
+            <button class="view-toggle-btn" :class="{ active: viewMode === 'grid' }" @click="settingsStore.setViewMode(store.activeType, 'grid')" :title="t('library.viewGrid')">
               <span v-html="gridViewSvg" />
             </button>
-            <button class="view-toggle-btn" :class="{ active: viewMode === 'list' }" @click="settingsStore.setViewMode(store.activeType, 'list')" title="列表视图">
+            <button class="view-toggle-btn" :class="{ active: viewMode === 'list' }" @click="settingsStore.setViewMode(store.activeType, 'list')" :title="t('library.viewList')">
               <span v-html="listViewSvg" />
             </button>
-            <button class="view-toggle-btn" :class="{ active: viewMode === 'heat' }" @click="settingsStore.setViewMode(store.activeType, 'heat')" title="热力图">
+            <button class="view-toggle-btn" :class="{ active: viewMode === 'heat' }" @click="settingsStore.setViewMode(store.activeType, 'heat')" :title="t('library.viewHeat')">
               <span v-html="heatViewSvg" />
             </button>
           </div>
-          <button class="scan-sys-toolbar-btn" @click="openScanModal" title="读取 Windows 使用历史，导入最近打开的文件记录">
+          <button class="scan-sys-toolbar-btn" @click="openScanModal" :title="t('library.scanHistoryTitle')">
             <span class="btn-icon" v-html="scanSysSvg" />
-            <span class="btn-text">使用历史</span>
+            <span class="btn-text">{{ t('library.scanHistory') }}</span>
           </button>
         </div>
       </div>
@@ -95,27 +95,27 @@
     <div v-else class="toolbar batch-toolbar">
       <div class="batch-row-1">
         <button class="batch-select-all" @click="toggleSelectAll">
-          {{ selectedIds.size === store.filtered.length ? '取消全选' : '全选' }}
+          {{ selectedIds.size === store.filtered.length ? t('library.batchDeselectAll') : t('library.batchSelectAll') }}
         </button>
-        <span class="batch-count">已选 {{ selectedIds.size }} 项</span>
+        <span class="batch-count">{{ t('library.batchSelected', { n: selectedIds.size }) }}</span>
         <span class="batch-spacer" />
-        <button class="batch-cancel-btn" @click="exitBatchMode">取消</button>
+        <button class="batch-cancel-btn" @click="exitBatchMode">{{ t('library.batchCancel') }}</button>
       </div>
       <div class="batch-row-2">
         <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="showBatchType = true">
-          <span class="btn-icon" v-html="typeSvg" />改分类
+          <span class="btn-icon" v-html="typeSvg" />{{ t('library.batchChangeType') }}
         </button>
         <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="openBatchTag">
-          <span class="btn-icon" v-html="tagBatchSvg" />加标签
+          <span class="btn-icon" v-html="tagBatchSvg" />{{ t('library.batchAddTag') }}
         </button>
         <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="showBatchPath = true">
-          <span class="btn-icon" v-html="pathSvg" />换路径
+          <span class="btn-icon" v-html="pathSvg" />{{ t('library.batchChangePath') }}
         </button>
         <button class="batch-action-btn batch-warn" :disabled="selectedIds.size === 0" @click="showBatchIgnore = true">
-          <span class="btn-icon" v-html="ignoreSvg" />忽略
+          <span class="btn-icon" v-html="ignoreSvg" />{{ t('library.batchIgnore') }}
         </button>
         <button class="batch-action-btn batch-danger" :disabled="selectedIds.size === 0" @click="showBatchDelete = true">
-          <span class="btn-icon" v-html="deleteSvg" />删除
+          <span class="btn-icon" v-html="deleteSvg" />{{ t('library.batchDelete') }}
         </button>
       </div>
     </div>
@@ -138,36 +138,36 @@
         <!-- 拖放覆盖层 -->
         <div v-if="dropOver" class="drop-overlay">
           <span class="drop-icon" v-html="dropSvg" />
-          <div class="drop-text">松开以导入文件</div>
+          <div class="drop-text">{{ t('library.dropOverlay') }}</div>
         </div>
         <!-- 已忽略文件视图 -->
         <template v-if="showIgnored">
           <!-- Tab 切换 -->
           <div class="ignored-tabs">
-            <button class="ignored-tab" :class="{ active: ignoredTab === 'files' }" @click="ignoredTab = 'files'">文件忽略</button>
-            <button class="ignored-tab" :class="{ active: ignoredTab === 'dirs' }" @click="switchToBlockedDirs">隐私目录</button>
+            <button class="ignored-tab" :class="{ active: ignoredTab === 'files' }" @click="ignoredTab = 'files'">{{ t('library.ignoredTab.files') }}</button>
+            <button class="ignored-tab" :class="{ active: ignoredTab === 'dirs' }" @click="switchToBlockedDirs">{{ t('library.ignoredTab.dirs') }}</button>
           </div>
 
           <!-- 文件忽略 tab -->
           <template v-if="ignoredTab === 'files'">
             <div v-if="ignoredFiltered.length === 0" class="empty-state">
               <span class="empty-icon" v-html="ignoreListSvg" />
-              <div class="empty-text">暂无已忽略文件</div>
-              <div class="empty-hint">右键资源卡片 → 「忽略此文件」后会在这里出现</div>
+              <div class="empty-text">{{ t('library.ignoredEmpty') }}</div>
+              <div class="empty-hint">{{ t('library.ignoredEmptyHint') }}</div>
             </div>
             <div v-else class="ignored-list">
               <div class="ignored-bulk-bar">
                 <div class="ignored-bulk-btns">
-                  <button class="bulk-unignore-btn" @click="unignoreAll">全部取消忽略</button>
-                  <button class="bulk-delete-btn" @click="deleteAllIgnored">全部删除</button>
+                  <button class="bulk-unignore-btn" @click="unignoreAll">{{ t('library.unignoreAll') }}</button>
+                  <button class="bulk-delete-btn" @click="deleteAllIgnored">{{ t('library.deleteAll') }}</button>
                 </div>
-                <span class="ignored-delete-hint">* 删除仅从数据库移除记录，不影响磁盘文件</span>
+                <span class="ignored-delete-hint">{{ t('library.deleteHint') }}</span>
               </div>
               <div v-for="p in ignoredFiltered" :key="p" class="ignored-row">
                 <span class="ignored-name" :title="p">{{ getBasename(p) }}</span>
                 <span class="ignored-path" :title="p">{{ p }}</span>
-                <button class="unignore-btn" @click="unignore(p)">取消忽略</button>
-                <button class="delete-ignored-btn" @click="deleteIgnored(p)">删除</button>
+                <button class="unignore-btn" @click="unignore(p)">{{ t('library.unignore') }}</button>
+                <button class="delete-ignored-btn" @click="deleteIgnored(p)">{{ t('library.delete') }}</button>
               </div>
             </div>
           </template>
@@ -176,14 +176,14 @@
           <template v-else>
             <div class="ignored-list">
               <div v-if="blockedDirs.length === 0" class="blocked-empty-hint">
-                以下目录中的文件不会被自动收录（已收录的不受影响）。暂无黑名单目录。
+                {{ t('library.blockedEmpty') }}
               </div>
-              <div v-else class="blocked-desc">以下目录中的文件不会被自动收录（已收录的不受影响）</div>
+              <div v-else class="blocked-desc">{{ t('library.blockedDesc') }}</div>
               <div v-for="dir in blockedDirs" :key="dir" class="ignored-row">
                 <span class="ignored-path" style="flex:1" :title="dir">{{ dir }}</span>
-                <button class="delete-ignored-btn" @click="removeBlockedDir(dir)">移除</button>
+                <button class="delete-ignored-btn" @click="removeBlockedDir(dir)">{{ t('library.removeDir') }}</button>
               </div>
-              <button class="blocked-add-btn" @click="addBlockedDir">+ 添加目录</button>
+              <button class="blocked-add-btn" @click="addBlockedDir">{{ t('library.addDir') }}</button>
             </div>
           </template>
         </template>
@@ -192,19 +192,19 @@
         <template v-else>
           <!-- 排序栏 -->
           <div v-if="!store.loading && store.filtered.length > 0" class="sort-bar">
-            <span class="sort-bar-count">共 {{ listSortedFiltered.length }} 个</span>
+            <span class="sort-bar-count">{{ t('library.count', { n: listSortedFiltered.length }) }}</span>
             <div class="sort-bar-spacer" />
             <div class="sort-bar-right">
               <!-- 瀑布流按钮（仅图片分类） -->
-              <button v-if="store.activeType === 'image'" class="masonry-popup-btn" @click="openMasonryWindow" title="瀑布流预览">
+              <button v-if="store.activeType === 'image'" class="masonry-popup-btn" @click="openMasonryWindow" :title="t('library.masonryTitle')">
                 <span v-html="masonryViewSvg" />
-                瀑布流
+                {{ t('library.masonry') }}
               </button>
               <!-- 高级筛选下拉 -->
               <div class="qf-wrap">
                 <button class="qf-trigger" :class="{ active: quickFilters.length > 0 }" @click.stop="showQfDropdown = !showQfDropdown">
                   <span class="sort-icon" v-html="sortSvg" />
-                  筛选
+                  {{ t('library.filter') }}
                   <span class="qf-badge" v-if="quickFilters.length > 0">{{ quickFilters.length }}</span>
                   <span class="type-filter-caret" v-html="chevronDownSvg" :class="{ open: showQfDropdown }" />
                 </button>
@@ -214,17 +214,17 @@
                     <span class="tfi-label">{{ qf.label }}</span>
                   </label>
                   <div v-if="quickFilters.length > 0" class="type-filter-footer">
-                    <button class="tfi-clear-btn" @click="quickFilters = []">清除</button>
+                    <button class="tfi-clear-btn" @click="quickFilters = []">{{ t('library.filterClear') }}</button>
                   </div>
                 </div>
               </div>
               <span class="sort-icon" v-html="sortSvg" />
               <select class="sort-select-inline" :value="settingsStore.resourceSort" @change="onSortChange">
-                <option value="lastUsed">最近使用</option>
-                <option value="recentlyAdded">最近添加</option>
-                <option value="openCount">使用次数</option>
-                <option value="totalTime">使用时间</option>
-                <option value="modifiedAt">修改时间</option>
+                <option value="lastUsed">{{ t('library.sortLastUsed') }}</option>
+                <option value="recentlyAdded">{{ t('library.sortRecentlyAdded') }}</option>
+                <option value="openCount">{{ t('library.sortOpenCount') }}</option>
+                <option value="totalTime">{{ t('library.sortTotalTime') }}</option>
+                <option value="modifiedAt">{{ t('library.sortModifiedAt') }}</option>
               </select>
             </div>
           </div>
@@ -235,22 +235,22 @@
 
           <div v-else-if="store.filtered.length === 0" class="empty-state">
             <span class="empty-icon" v-html="emptyIcon" />
-            <div class="empty-text">暂无资源</div>
+            <div class="empty-text">{{ t('library.empty') }}</div>
             <div v-if="store.activeType === 'webpage'" class="empty-hint">
-              收藏网页链接，或一键导入 Chrome/Edge 书签
+              {{ t('library.emptyWebpageHint') }}
               <button class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
-                {{ browserImporting ? '导入中...' : '导入 Chrome/Edge 书签' }}
+                {{ browserImporting ? t('library.importingBookmarks') : t('library.importBookmarks') }}
               </button>
             </div>
             <div v-else-if="store.activeType === 'app'" class="empty-hint">
-              一键添加 Windows 常用系统工具
+              {{ t('library.emptyAppHint') }}
               <button class="import-footer-btn" @click="addPresetApps" :disabled="presetAdding">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                {{ presetAdding ? '添加中...' : '添加常用工具' }}
+                {{ presetAdding ? t('library.addingPresetApps') : t('library.addPresetApps') }}
               </button>
             </div>
-            <div v-else class="empty-hint">打开图片、视频或程序后，AI资源管家会自动记录</div>
+            <div v-else class="empty-hint">{{ t('library.emptyDefaultHint') }}</div>
           </div>
 
           <div v-else ref="gridScrollRef" class="grid-scroll">
@@ -277,11 +277,11 @@
             <div v-else-if="viewMode === 'list'" class="list-view" :style="{ '--list-zoom': cardZoom }">
               <div class="list-header" :style="colStyle">
                 <span class="lh-thumb"></span>
-                <span class="lh-name sortable-col" :class="{ active: listSortCol === 'name' }" @click="onColSort('name')" title="点击排序">
-                  名称<span class="sort-arrow" v-show="listSortCol === 'name'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                <span class="lh-name sortable-col" :class="{ active: listSortCol === 'name' }" @click="onColSort('name')" :title="t('library.listSortTitle')">
+                  {{ t('library.listCols.name') }}<span class="sort-arrow" v-show="listSortCol === 'name'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
                 </span><div class="col-resizer" @mousedown="startColResize('name', $event)" />
-                <span class="lh-type type-filter-col" :class="{ 'filter-active': activeFilterCount > 0 }" @click.stop="toggleTypeFilter($event)" title="点击过滤类型/后缀">
-                  类型
+                <span class="lh-type type-filter-col" :class="{ 'filter-active': activeFilterCount > 0 }" @click.stop="toggleTypeFilter($event)" :title="t('library.listFilterTitle')">
+                  {{ t('library.listCols.type') }}
                   <span class="type-filter-badge" v-if="activeFilterCount > 0">{{ activeFilterCount }}</span>
                   <span class="type-filter-caret" v-html="chevronDownSvg" :class="{ open: showTypeFilter }" />
                 </span><div class="col-resizer" @mousedown="startColResize('type', $event)" />
@@ -289,25 +289,25 @@
                 <div v-if="showTypeFilter" class="type-filter-dropdown" :style="{ top: typeFilterPos.top + 'px', left: typeFilterPos.left + 'px' }" @click.stop>
                   <!-- 顶部：排序 + 清除 -->
                   <div class="tfi-sort-row">
-                    <span class="tfi-sort-label">排序</span>
+                    <span class="tfi-sort-label">{{ t('library.listSort.title') }}</span>
                     <button class="tfi-sort-btn" :class="{ active: typeSortDir === 'asc' }" @click="typeSortDir = typeSortDir === 'asc' ? null : 'asc'">
-                      <span v-html="arrowUpSvg" />升序
+                      <span v-html="arrowUpSvg" />{{ t('library.listSort.asc') }}
                     </button>
                     <button class="tfi-sort-btn" :class="{ active: typeSortDir === 'desc' }" @click="typeSortDir = typeSortDir === 'desc' ? null : 'desc'">
-                      <span v-html="arrowDownSvg" />降序
+                      <span v-html="arrowDownSvg" />{{ t('library.listSort.desc') }}
                     </button>
-                    <button v-if="activeFilterCount > 0" class="tfi-clear-btn tfi-clear-inline" @click="typeFilterArr = []; extFilterArr = []; typeSortDir = null">清除</button>
+                    <button v-if="activeFilterCount > 0" class="tfi-clear-btn tfi-clear-inline" @click="typeFilterArr = []; extFilterArr = []; typeSortDir = null">{{ t('library.filterClear') }}</button>
                   </div>
                   <!-- 类型 section -->
-                  <div class="tfi-section-label tfi-section-sep">类型</div>
-                  <label v-for="t in availableTypes" :key="t.value" class="type-filter-item">
-                    <input type="checkbox" :value="t.value" v-model="typeFilterArr" />
-                    <span class="tfi-label">{{ t.label }}</span>
-                    <span class="tfi-count">{{ t.count }}</span>
+                  <div class="tfi-section-label tfi-section-sep">{{ t('library.listCols.type') }}</div>
+                  <label v-for="typeItem in availableTypes" :key="typeItem.value" class="type-filter-item">
+                    <input type="checkbox" :value="typeItem.value" v-model="typeFilterArr" />
+                    <span class="tfi-label">{{ typeItem.label }}</span>
+                    <span class="tfi-count">{{ typeItem.count }}</span>
                   </label>
                   <!-- 后缀 section -->
                   <template v-if="availableExts.length > 0">
-                    <div class="tfi-section-label tfi-section-sep">后缀</div>
+                    <div class="tfi-section-label tfi-section-sep">{{ t('library.listExt') }}</div>
                     <label v-for="e in availableExts" :key="e.ext" class="type-filter-item">
                       <input type="checkbox" :value="e.ext" v-model="extFilterArr" />
                       <span class="tfi-label tfi-ext">{{ e.ext }}</span>
@@ -315,13 +315,13 @@
                     </label>
                   </template>
                 </div>
-                <span class="lh-date sortable-col" :class="{ active: listSortCol === 'date' }" @click="onColSort('date')" title="点击排序">
-                  修改日期<span class="sort-arrow" v-show="listSortCol === 'date'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                <span class="lh-date sortable-col" :class="{ active: listSortCol === 'date' }" @click="onColSort('date')" :title="t('library.listSortTitle')">
+                  {{ t('library.listCols.date') }}<span class="sort-arrow" v-show="listSortCol === 'date'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
                 </span><div class="col-resizer" @mousedown="startColResize('date', $event)" />
-                <span class="lh-count sortable-col" :class="{ active: listSortCol === 'count' }" @click="onColSort('count')" title="点击排序">
-                  打开次数<span class="sort-arrow" v-show="listSortCol === 'count'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
+                <span class="lh-count sortable-col" :class="{ active: listSortCol === 'count' }" @click="onColSort('count')" :title="t('library.listSortTitle')">
+                  {{ t('library.listCols.count') }}<span class="sort-arrow" v-show="listSortCol === 'count'" v-html="listSortDesc ? arrowDownSvg : arrowUpSvg" />
                 </span><div class="col-resizer" @mousedown="startColResize('count', $event)" />
-                <span class="lh-tags">标签</span>
+                <span class="lh-tags">{{ t('library.listCols.tags') }}</span>
               </div>
               <div
                 v-for="item in visibleItems"
@@ -339,7 +339,7 @@
                   class="lr-play-btn"
                   :class="{ 'is-running': store.runningMap.has(item.id) }"
                   @click.stop="store.runningMap.has(item.id) ? (listMenuKillTarget = item) : openResource(item)"
-                  :title="store.runningMap.has(item.id) ? '强制结束' : '打开'"
+                  :title="store.runningMap.has(item.id) ? t('resource.killConfirm') : t('detail.open')"
                 >
                   <span v-html="store.runningMap.has(item.id) ? ctxIcons.kill : ctxIcons.play" />
                 </button>
@@ -357,7 +357,7 @@
                   <span class="lr-type-ext">{{ getFileExt(item.file_path) || listTypeLabel(item.type) }}</span>
                 </span>
                 <span class="lr-date">{{ formatListDate(item.updated_at) }}</span>
-                <span class="lr-count">{{ item.open_count }}次</span>
+                <span class="lr-count">{{ t('resource.stats.count', { n: item.open_count }) }}</span>
                 <span class="lr-tags">
                   <span v-for="tag in (item.tags || []).slice(0, 3)" :key="tag.id" class="lr-tag">{{ tag.name }}</span>
                 </span>
@@ -369,33 +369,33 @@
               <div v-if="listMenu.show" class="ctx-backdrop" @mousedown="listMenu.show = false" />
               <div v-if="listMenu.show" ref="listMenuRef" class="context-menu" :style="{ left: listMenu.x + 'px', top: listMenu.y + 'px' }">
                 <button @click="onCardSelect(listMenu.item!); listMenu.show = false">
-                  <span v-html="ctxIcons.detail" />查看/修改
+                  <span v-html="ctxIcons.detail" />{{ t('resource.detail') }}
                 </button>
                 <button @click="openResource(listMenu.item!); listMenu.show = false">
-                  <span v-html="ctxIcons.open" />打开
+                  <span v-html="ctxIcons.open" />{{ t('resource.open') }}
                 </button>
                 <button v-if="isExeFile(listMenu.item!)" @click="listMenuAdminRun">
-                  <span v-html="ctxIcons.shield" />以管理员身份运行
+                  <span v-html="ctxIcons.shield" />{{ t('resource.admin') }}
                 </button>
                 <button v-if="listMenu.item!.type !== 'webpage'" @click="listMenuShowInFolder">
-                  <span v-html="ctxIcons.folder" />在文件夹中显示
+                  <span v-html="ctxIcons.folder" />{{ t('resource.showInFolder') }}
                 </button>
                 <button v-if="store.runningMap.has(listMenu.item!.id)" @click="listMenuKillTarget = listMenu.item!; listMenu.show = false" class="danger">
-                  <span v-html="ctxIcons.kill" />强制结束进程
+                  <span v-html="ctxIcons.kill" />{{ t('resource.kill') }}
                 </button>
                 <hr />
                 <button @click="ignoreResource(listMenu.item!); listMenu.show = false" class="danger">
-                  <span v-html="ctxIcons.ignore" />忽略此文件
+                  <span v-html="ctxIcons.ignore" />{{ t('resource.ignore') }}
                 </button>
               </div>
               <!-- 强制结束确认对话框 -->
               <div v-if="listMenuKillTarget" class="kill-overlay" @mousedown.self="listMenuKillTarget = null">
                 <div class="kill-dialog">
-                  <div class="kill-title">强制结束进程</div>
-                  <div class="kill-msg">确定要强制结束「{{ listMenuKillTarget.title }}」吗？</div>
+                  <div class="kill-title">{{ t('resource.killTitle') }}</div>
+                  <div class="kill-msg">{{ t('resource.killMsg', { title: listMenuKillTarget.title }) }}</div>
                   <div class="kill-actions">
-                    <button class="kill-cancel" @click="listMenuKillTarget = null">取消</button>
-                    <button class="kill-confirm" @click="doListKill">强制结束</button>
+                    <button class="kill-cancel" @click="listMenuKillTarget = null">{{ t('resource.killCancel') }}</button>
+                    <button class="kill-confirm" @click="doListKill">{{ t('resource.killConfirm') }}</button>
                   </div>
                 </div>
               </div>
@@ -409,12 +409,12 @@
                 </div>
                 <div v-if="store.runningMap.has(listTooltip.item.id)" class="lt-tt-running-row">
                   <span class="lt-tt-dot" />
-                  <span class="lt-tt-running">运行中 · 本次 {{ ltFmtDuration(Math.floor((store.clockTick - (store.runningMap.get(listTooltip.item.id) ?? store.clockTick)) / 1000)) }}</span>
+                  <span class="lt-tt-running">{{ t('resource.running') }} · {{ t('resource.stats.session') }} {{ ltFmtDuration(Math.floor((store.clockTick - (store.runningMap.get(listTooltip.item.id) ?? store.clockTick)) / 1000)) }}</span>
                 </div>
                 <div class="lt-tt-stats">
-                  <span v-if="listTooltip.item.total_run_time > 0"><span class="lt-tt-label">时长</span>{{ ltFmtDuration(listTooltip.item.total_run_time) }}</span>
-                  <span v-if="listTooltip.item.open_count > 0"><span class="lt-tt-label">次数</span>{{ listTooltip.item.open_count }}次</span>
-                  <span v-if="listTooltip.item.last_run_at && !store.runningMap.has(listTooltip.item.id)"><span class="lt-tt-label">上次</span>{{ ltFmtRelDate(listTooltip.item.last_run_at) }}</span>
+                  <span v-if="listTooltip.item.total_run_time > 0"><span class="lt-tt-label">{{ t('resource.stats.duration') }}</span>{{ ltFmtDuration(listTooltip.item.total_run_time) }}</span>
+                  <span v-if="listTooltip.item.open_count > 0"><span class="lt-tt-label">{{ t('library.listCols.count') }}</span>{{ t('resource.stats.count', { n: listTooltip.item.open_count }) }}</span>
+                  <span v-if="listTooltip.item.last_run_at && !store.runningMap.has(listTooltip.item.id)"><span class="lt-tt-label">{{ t('resource.stats.last') }}</span>{{ ltFmtRelDate(listTooltip.item.last_run_at) }}</span>
                 </div>
                 <div v-if="listTooltip.item.tags?.length" class="lt-tt-tags">
                   <span v-for="tag in listTooltip.item.tags.slice(0, 4)" :key="tag.id" class="lt-tt-tag">{{ tag.name }}</span>
@@ -431,11 +431,11 @@
             >
               <button v-if="store.activeType === 'webpage'" class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
-                {{ browserImporting ? '导入中...' : '导入 Chrome/Edge 书签' }}
+                {{ browserImporting ? t('library.importingBookmarks') : t('library.importBookmarks') }}
               </button>
               <button v-if="store.activeType === 'app'" class="import-footer-btn" @click="addPresetApps" :disabled="presetAdding">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                {{ presetAdding ? '添加中...' : '添加常用工具' }}
+                {{ presetAdding ? t('library.addingPresetApps') : t('library.addPresetApps') }}
               </button>
             </div>
           </div>
@@ -448,7 +448,7 @@
         <button
           class="panel-toggle"
           @click="tagPanelCollapsed = !tagPanelCollapsed"
-          :title="tagPanelCollapsed ? '展开标签筛选' : '收起标签筛选'"
+          :title="tagPanelCollapsed ? t('sidebar.expand') : t('sidebar.collapse')"
         >
           <span v-html="tagPanelCollapsed ? chevronLeftSvg : chevronRightSvg" />
         </button>
@@ -459,19 +459,19 @@
         <!-- 面板内容 -->
         <div class="tag-panel-inner">
           <div class="tag-panel-header">
-            <span class="tag-panel-title">标签筛选</span>
+            <span class="tag-panel-title">{{ t('library.tagPanel.title') }}</span>
             <div class="tag-header-right">
               <select class="tag-sort-select" :value="settingsStore.tagSort" @change="onTagSortChange">
-                <option value="lastUsed">最近使用</option>
-                <option value="count">数量最多</option>
-                <option value="name">名称</option>
+                <option value="lastUsed">{{ t('library.tagPanel.sort.lastUsed') }}</option>
+                <option value="count">{{ t('library.tagPanel.sort.count') }}</option>
+                <option value="name">{{ t('library.tagPanel.sort.name') }}</option>
               </select>
               <button v-if="store.activeTags.length || store.excludedTags.length" class="clear-tags-btn" @click="store.activeTags.splice(0); store.excludedTags.splice(0)">
-                清除
+                {{ t('library.filterClear') }}
               </button>
             </div>
           </div>
-          <input v-model="tagSearch" class="tag-search-input" placeholder="搜索标签…" />
+          <input v-model="tagSearch" class="tag-search-input" :placeholder="t('library.tagPanel.title')" />
           <div v-if="availableTags.length" class="tag-list">
             <button
               v-for="tag in availableTags"
@@ -480,13 +480,13 @@
               :class="{ active: store.activeTags.includes(tag.id), excluded: store.excludedTags.includes(tag.id) }"
               @click="toggleTag(tag.id)"
               @contextmenu.prevent="toggleExcludeTag(tag.id)"
-              :title="`左键：包含\n右键：排除`"
+              :title="t('library.tagChipTitle')"
             >
               <span class="tag-chip-name">{{ tag.name }}</span>
               <span class="tag-chip-count">{{ tag.count }}</span>
             </button>
           </div>
-          <div v-else class="no-tags">暂无标签</div>
+          <div v-else class="no-tags">{{ t('library.noTags') }}</div>
         </div>
       </div>
     </div>
@@ -504,8 +504,8 @@
         <div v-if="dropHintVisible" class="toast-wrap">
           <div class="toast-card">
             <div class="toast-body">
-              <span class="toast-label" style="color:#f59e0b">提示</span>
-              <span class="toast-filename">请从框选中排除回收站等特殊项目后重试</span>
+              <span class="toast-label" style="color:#f59e0b">{{ t('library.dropHintLabel') }}</span>
+              <span class="toast-filename">{{ t('library.dropHintMsg') }}</span>
             </div>
             <button class="toast-close-btn" @click="dropHintVisible = false" v-html="closeSvg" />
           </div>
@@ -519,7 +519,7 @@
         <div v-if="importToastVisible" class="toast-wrap">
           <div class="toast-card">
             <div class="toast-body">
-              <span class="toast-label" style="color:var(--accent)">导入</span>
+              <span class="toast-label" style="color:var(--accent)">{{ t('addModal.scan.import') }}</span>
               <span class="toast-filename">{{ importToastMsg }}</span>
             </div>
             <button class="toast-close-btn" @click="importToastVisible = false" v-html="closeSvg" />
@@ -534,10 +534,10 @@
         <div v-if="toastResource" class="toast-wrap">
           <div class="toast-card">
             <div class="toast-body">
-              <span class="toast-label">已忽略</span>
+              <span class="toast-label">{{ t('library.toastIgnored') }}</span>
               <span class="toast-filename" :title="toastResource.file_path">{{ getBasename(toastResource.file_path) }}</span>
             </div>
-            <button class="toast-undo-btn" @click="undoIgnore">撤销</button>
+            <button class="toast-undo-btn" @click="undoIgnore">{{ t('library.toastUndo') }}</button>
             <button class="toast-close-btn" @click="dismissToast" v-html="closeSvg" />
             <div class="toast-progress-bar">
               <div :key="toastKey" class="toast-progress-fill" />
@@ -552,20 +552,20 @@
     <Teleport to="body">
       <div v-if="showBatchType" class="modal-overlay" @mousedown.self="showBatchType = false">
         <div class="batch-modal">
-          <div class="batch-modal-title">批量改分类</div>
-          <div class="batch-modal-hint">将 {{ selectedIds.size }} 个资源改为：</div>
+          <div class="batch-modal-title">{{ t('library.batchTypeTitle') }}</div>
+          <div class="batch-modal-hint">{{ t('library.batchTypeHint', { n: selectedIds.size }) }}</div>
           <div class="type-grid">
             <button
-              v-for="t in typeOptions"
-              :key="t.value"
+              v-for="typeOpt in typeOptions"
+              :key="typeOpt.value"
               class="type-opt"
-              :class="{ active: batchTargetType === t.value }"
-              @click="batchTargetType = t.value"
-            >{{ t.label }}</button>
+              :class="{ active: batchTargetType === typeOpt.value }"
+              @click="batchTargetType = typeOpt.value"
+            >{{ typeOpt.label }}</button>
           </div>
           <div class="batch-modal-actions">
-            <button class="bm-cancel" @click="showBatchType = false">取消</button>
-            <button class="bm-confirm" :disabled="!batchTargetType" @click="doBatchType">确认</button>
+            <button class="bm-cancel" @click="showBatchType = false">{{ t('library.cancelBtn') }}</button>
+            <button class="bm-confirm" :disabled="!batchTargetType" @click="doBatchType">{{ t('library.confirmBtn') }}</button>
           </div>
         </div>
       </div>
@@ -575,19 +575,19 @@
     <Teleport to="body">
       <div v-if="showBatchTag" class="modal-overlay" @mousedown.self="showBatchTag = false">
         <div class="batch-modal">
-          <div class="batch-modal-title">批量加标签</div>
-          <div class="batch-modal-hint">为 {{ selectedIds.size }} 个资源添加标签</div>
+          <div class="batch-modal-title">{{ t('library.batchTagTitle') }}</div>
+          <div class="batch-modal-hint">{{ t('library.batchTagHint', { n: selectedIds.size }) }}</div>
           <div class="batch-tag-area">
-            <span v-for="t in batchTags" :key="t.id" class="tag-chip">
-              {{ t.name }}
-              <button class="tag-remove" @click="batchTags = batchTags.filter(x => x.id !== t.id)">
+            <span v-for="bt in batchTags" :key="bt.id" class="tag-chip">
+              {{ bt.name }}
+              <button class="tag-remove" @click="batchTags = batchTags.filter(x => x.id !== bt.id)">
                 <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l8 8M12 4l-8 8"/></svg>
               </button>
             </span>
             <input
               v-model="batchTagInput"
               class="tag-input"
-              placeholder="输入标签名，回车添加"
+              :placeholder="t('library.batchTagPlaceholder')"
               @keydown.enter.prevent="addBatchTag"
               @keydown.188.prevent="addBatchTag"
             />
@@ -601,8 +601,8 @@
             >{{ tag.name }}<span class="sug-count">{{ tag.count }}</span></button>
           </div>
           <div class="batch-modal-actions">
-            <button class="bm-cancel" @click="showBatchTag = false">取消</button>
-            <button class="bm-confirm" :disabled="batchTags.length === 0" @click="doBatchTag">确认</button>
+            <button class="bm-cancel" @click="showBatchTag = false">{{ t('library.cancelBtn') }}</button>
+            <button class="bm-confirm" :disabled="batchTags.length === 0" @click="doBatchTag">{{ t('library.confirmBtn') }}</button>
           </div>
         </div>
       </div>
@@ -612,44 +612,44 @@
     <Teleport to="body">
       <div v-if="showBatchPath" class="modal-overlay" @mousedown.self="showBatchPath = false">
         <div class="batch-modal">
-          <div class="batch-modal-title">批量换路径</div>
+          <div class="batch-modal-title">{{ t('library.batchPath.title') }}</div>
           <!-- 模式切换 -->
           <div class="path-mode-tabs">
-            <button class="path-mode-tab" :class="{ active: pathMode === 'drive' }" @click="pathMode = 'drive'">换盘符</button>
-            <button class="path-mode-tab" :class="{ active: pathMode === 'prefix' }" @click="pathMode = 'prefix'">换前缀</button>
+            <button class="path-mode-tab" :class="{ active: pathMode === 'drive' }" @click="pathMode = 'drive'">{{ t('library.batchPath.modeDrive') }}</button>
+            <button class="path-mode-tab" :class="{ active: pathMode === 'prefix' }" @click="pathMode = 'prefix'">{{ t('library.batchPath.modePrefix') }}</button>
           </div>
           <!-- 换盘符模式 -->
           <template v-if="pathMode === 'drive'">
-            <div class="batch-modal-hint">将所有资源的盘符从一个替换为另一个</div>
+            <div class="batch-modal-hint">{{ t('library.batchPath.driveHint') }}</div>
             <div class="drive-row">
               <select v-model="driveFrom" class="drive-select">
-                <option value="" disabled>原盘符</option>
+                <option value="" disabled>{{ t('library.batchPath.driveFrom') }}</option>
                 <option v-for="d in driveLetters" :key="d" :value="d">{{ d }}:</option>
               </select>
               <span class="drive-arrow" v-html="arrowSvg" />
               <select v-model="driveTo" class="drive-select">
-                <option value="" disabled>新盘符</option>
+                <option value="" disabled>{{ t('library.batchPath.driveTo') }}</option>
                 <option v-for="d in driveLetters" :key="d" :value="d">{{ d }}:</option>
               </select>
             </div>
           </template>
           <!-- 换前缀模式 -->
           <template v-else>
-            <div class="batch-modal-hint">替换路径中的任意前缀部分</div>
+            <div class="batch-modal-hint">{{ t('library.batchPath.prefixHint') }}</div>
             <div class="path-inputs">
               <label>
-                <span class="path-label">原前缀</span>
+                <span class="path-label">{{ t('library.batchPath.oldPrefix') }}</span>
                 <input v-model="batchOldPath" class="path-input" placeholder="D:\Games" />
               </label>
               <label>
-                <span class="path-label">新前缀</span>
+                <span class="path-label">{{ t('library.batchPath.newPrefix') }}</span>
                 <input v-model="batchNewPath" class="path-input" placeholder="E:\Games" />
               </label>
             </div>
           </template>
           <div class="batch-modal-actions">
-            <button class="bm-cancel" @click="showBatchPath = false">取消</button>
-            <button class="bm-confirm" :disabled="!canConfirmPath" @click="doBatchPath">确认</button>
+            <button class="bm-cancel" @click="showBatchPath = false">{{ t('library.cancelBtn') }}</button>
+            <button class="bm-confirm" :disabled="!canConfirmPath" @click="doBatchPath">{{ t('library.confirmBtn') }}</button>
           </div>
         </div>
       </div>
@@ -659,11 +659,11 @@
     <Teleport to="body">
       <div v-if="showBatchIgnore" class="modal-overlay" @mousedown.self="showBatchIgnore = false">
         <div class="batch-modal">
-          <div class="batch-modal-title batch-warn-title">批量忽略</div>
-          <div class="batch-modal-hint">确定忽略 {{ selectedIds.size }} 个资源？忽略后可在「已忽略」列表中恢复。</div>
+          <div class="batch-modal-title batch-warn-title">{{ t('library.batchIgnoreTitle') }}</div>
+          <div class="batch-modal-hint">{{ t('library.batchIgnoreHint', { n: selectedIds.size }) }}</div>
           <div class="batch-modal-actions">
-            <button class="bm-cancel" @click="showBatchIgnore = false">取消</button>
-            <button class="bm-confirm bm-warn" @click="doBatchIgnore">确认忽略</button>
+            <button class="bm-cancel" @click="showBatchIgnore = false">{{ t('library.cancelBtn') }}</button>
+            <button class="bm-confirm bm-warn" @click="doBatchIgnore">{{ t('library.batchIgnoreConfirm') }}</button>
           </div>
         </div>
       </div>
@@ -673,11 +673,11 @@
     <Teleport to="body">
       <div v-if="showBatchDelete" class="modal-overlay" @mousedown.self="showBatchDelete = false">
         <div class="batch-modal">
-          <div class="batch-modal-title batch-danger-title">从库中删除</div>
-          <div class="batch-modal-hint">确定删除 {{ selectedIds.size }} 个资源？仅移除管理器中的索引记录，不会删除原始文件。</div>
+          <div class="batch-modal-title batch-danger-title">{{ t('library.batchDeleteTitle') }}</div>
+          <div class="batch-modal-hint">{{ t('library.batchDeleteHint', { n: selectedIds.size }) }}</div>
           <div class="batch-modal-actions">
-            <button class="bm-cancel" @click="showBatchDelete = false">取消</button>
-            <button class="bm-confirm bm-danger" @click="doBatchDelete">确认删除</button>
+            <button class="bm-cancel" @click="showBatchDelete = false">{{ t('library.cancelBtn') }}</button>
+            <button class="bm-confirm bm-danger" @click="doBatchDelete">{{ t('library.batchDeleteConfirm') }}</button>
           </div>
         </div>
       </div>
@@ -688,13 +688,10 @@
       <div v-if="showAiComingSoon" class="modal-overlay" @mousedown.self="showAiComingSoon = false">
         <div class="ai-coming-modal">
           <span class="ai-coming-icon" v-html="aiLargeSvg" />
-          <div class="ai-coming-title">AI 智能设置</div>
-          <div class="ai-coming-desc">
-            标一张照片的标签，AI 自动帮你把剩下几百张都打上。<br>
-            导入一堆 exe，AI 自动分辨游戏和工具，分好类、打好标签。
-          </div>
-          <div class="ai-coming-badge">即将上线</div>
-          <button class="ai-coming-close" @click="showAiComingSoon = false">知道了</button>
+          <div class="ai-coming-title">{{ t('library.aiModal.title') }}</div>
+          <div class="ai-coming-desc" style="white-space: pre-line">{{ t('library.aiModal.desc') }}</div>
+          <div class="ai-coming-badge">{{ t('library.aiModal.badge') }}</div>
+          <button class="ai-coming-close" @click="showAiComingSoon = false">{{ t('library.aiModal.close') }}</button>
         </div>
       </div>
     </Teleport>
@@ -704,16 +701,10 @@
       <div v-if="showAiSearchComingSoon" class="modal-overlay" @mousedown.self="showAiSearchComingSoon = false">
         <div class="ai-coming-modal" style="width: 420px;">
           <span class="ai-coming-icon" v-html="aiLargeSvg" />
-          <div class="ai-coming-title">很快将会上线 AI 搜索功能</div>
-          <div class="ai-coming-desc" style="text-align: left; padding: 0 10px;">
-            想象一下，你可以直接搜：<br><br>
-            • 我去年用过的剪辑软件<br>
-            • 我昨天处理的文件<br>
-            • 上周老板发我的让我填的公司报表<br>
-            • 上次我们公司参展使用的ppt
-          </div>
-          <div class="ai-coming-badge">即将上线</div>
-          <button class="ai-coming-close" @click="showAiSearchComingSoon = false">期待一下</button>
+          <div class="ai-coming-title">{{ t('library.aiSearchModal.title') }}</div>
+          <div class="ai-coming-desc" style="text-align: left; padding: 0 10px; white-space: pre-line">{{ t('library.aiSearchModal.desc') }}</div>
+          <div class="ai-coming-badge">{{ t('library.aiModal.badge') }}</div>
+          <button class="ai-coming-close" @click="showAiSearchComingSoon = false">{{ t('library.aiSearchModal.close') }}</button>
         </div>
       </div>
     </Teleport>
@@ -725,24 +716,24 @@
           <!-- 初始状态 -->
           <template v-if="!sysScanning && sysScanResult === null">
             <span class="scan-modal-icon" v-html="scanSysSvg" />
-            <p class="scan-modal-desc">读取 Windows 使用历史，导入最近打开的文件记录</p>
-            <button class="scan-modal-btn" @click="doSystemScan">开始读取</button>
+            <p class="scan-modal-desc">{{ t('library.scanModal.desc') }}</p>
+            <button class="scan-modal-btn" @click="doSystemScan">{{ t('library.scanModal.start') }}</button>
           </template>
           <!-- 扫描中 -->
           <template v-else-if="sysScanning">
             <div class="spinner lg" />
-            <p class="scan-modal-desc">正在读取使用历史…</p>
-            <button class="scan-modal-btn secondary" @click="cancelScan">取消</button>
+            <p class="scan-modal-desc">{{ t('library.scanModal.scanning') }}</p>
+            <button class="scan-modal-btn secondary" @click="cancelScan">{{ t('library.scanModal.cancel') }}</button>
           </template>
           <!-- 完成 -->
           <template v-else>
             <span class="scan-modal-done" v-html="checkSvg" />
             <p class="scan-modal-desc">
-              {{ sysScanResult! > 0 ? `发现 ${sysScanResult} 个新资源` : '未发现新资源' }}
+              {{ sysScanResult! > 0 ? t('library.scanModal.foundNew', { n: sysScanResult }) : t('library.scanModal.noNew') }}
             </p>
             <div class="scan-modal-actions">
-              <button class="scan-modal-btn secondary" @click="doSystemScan">重新读取</button>
-              <button class="scan-modal-btn" @click="showScanModal = false">完成</button>
+              <button class="scan-modal-btn secondary" @click="doSystemScan">{{ t('library.scanModal.rescan') }}</button>
+              <button class="scan-modal-btn" @click="showScanModal = false">{{ t('library.scanModal.done') }}</button>
             </div>
           </template>
         </div>
@@ -756,18 +747,18 @@
           <template v-if="updatePhase === 'available'">
             <span class="update-modal-icon" v-html="updateSvg" />
             <div class="update-modal-title">
-              {{ pendingUpdate?.isNewVersion ? `发现新版本 v${pendingUpdate.remoteVersion}` : `v${pendingUpdate?.remoteVersion} 有更新` }}
+              {{ pendingUpdate?.isNewVersion ? t('library.updateModal.newVersion', { v: pendingUpdate.remoteVersion }) : t('library.updateModal.update', { v: pendingUpdate?.remoteVersion }) }}
             </div>
             <div class="update-modal-size">{{ ((pendingUpdate?.assetSize || 0) / 1024 / 1024).toFixed(1) }} MB</div>
             <div class="update-modal-actions">
-              <button class="update-modal-btn secondary" @click="doSkipUpdate">跳过此版本</button>
-              <button class="update-modal-btn" @click="doDownloadUpdate">后台下载</button>
+              <button class="update-modal-btn secondary" @click="doSkipUpdate">{{ t('library.updateModal.skip') }}</button>
+              <button class="update-modal-btn" @click="doDownloadUpdate">{{ t('library.updateModal.download') }}</button>
             </div>
           </template>
           <template v-else-if="updatePhase === 'error'">
-            <div class="update-modal-title">更新失败</div>
-            <div class="update-modal-size" style="color: #ef4444;">请稍后重试</div>
-            <button class="update-modal-btn secondary" @click="showUpdateModal = false">关闭</button>
+            <div class="update-modal-title">{{ t('library.updateModal.error') }}</div>
+            <div class="update-modal-size" style="color: #ef4444;">{{ t('library.updateModal.errorHint') }}</div>
+            <button class="update-modal-btn secondary" @click="showUpdateModal = false">{{ t('library.updateModal.close') }}</button>
           </template>
         </div>
       </div>
@@ -778,9 +769,9 @@
       <Transition name="update-float">
         <div v-if="updatePhase === 'downloading' || updatePhase === 'ready'" class="update-float">
           <div class="update-float-info">
-            <span>{{ updatePhase === 'ready' ? '更新已就绪' : '正在后台下载更新' }}</span>
+            <span>{{ updatePhase === 'ready' ? t('library.updateFloat.ready') : t('library.updateFloat.downloading') }}</span>
             <span v-if="updatePhase === 'downloading'" class="update-float-pct">{{ updatePercent }}%</span>
-            <button v-if="updatePhase === 'ready'" class="update-float-btn" @click="doApplyUpdate">重启安装</button>
+            <button v-if="updatePhase === 'ready'" class="update-float-btn" @click="doApplyUpdate">{{ t('library.updateFloat.install') }}</button>
           </div>
           <div v-if="updatePhase === 'downloading'" class="update-progress-bar" style="height:4px;margin-top:2px">
             <div class="update-progress-fill" :style="{ width: updatePercent + '%' }" />
@@ -793,6 +784,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, reactive, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useResourceStore } from '../stores/resources'
 import type { Resource, ResourceType } from '../stores/resources'
 import { useSettingsStore } from '../stores/settings'
@@ -805,6 +797,7 @@ import type { DropItem } from '../components/DropImportModal.vue'
 import ResourceDetailPanel from '../components/ResourceDetailPanel.vue'
 import { match as pinyinMatch } from 'pinyin-pro'
 
+const { t, locale } = useI18n()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
 const showAddModal = ref(false)
@@ -842,7 +835,7 @@ async function importBrowserBookmarks() {
   try {
     const bookmarks = await window.api.webpage.importBrowserBookmarks()
     if (!bookmarks.length) {
-      alert('未找到浏览器书签（Chrome / Edge）')
+      alert(t('library.bookmarkNotFound'))
       return
     }
     const items = bookmarks.map(b => ({
@@ -871,7 +864,7 @@ async function importBrowserBookmarks() {
 
     // 标签关联完成后刷新列表
     await store.loadAll()
-    alert(`已导入 ${added.length} 个书签${existing.length > 0 ? `，${existing.length} 个已存在` : ''}`)
+    alert(existing.length > 0 ? t('library.bookmarkImported', { n: added.length, e: existing.length }) : t('library.bookmarkImportedOnly', { n: added.length }))
     // 后台批量获取 favicon（仅新增的）
     for (const resource of added) {
       window.api.webpage.fetchFavicon(resource.file_path).then(async icon => {
@@ -883,7 +876,7 @@ async function importBrowserBookmarks() {
       }).catch(() => {})
     }
   } catch (e: any) {
-    alert('导入失败: ' + (e?.message ?? ''))
+    alert(t('library.bookmarkFailed', { msg: e?.message ?? '' }))
   } finally {
     browserImporting.value = false
   }
@@ -894,7 +887,7 @@ async function addPresetApps() {
   presetAdding.value = true
   try {
     const presets = await window.api.resources.getPresetApps()
-    if (!presets.length) { alert('未找到可添加的工具'); return }
+    if (!presets.length) { alert(t('library.presetNotFound')); return }
     const { added, existing } = await window.api.resources.batchAdd(
       presets.map(p => ({ type: p.type, title: p.title, file_path: p.file_path }))
     )
@@ -906,7 +899,7 @@ async function addPresetApps() {
       .map(r => ({ resourceId: r.id, tagNames: pathToTags.get(r.file_path)! }))
     if (assignments.length) await window.api.tags.batchAssign(assignments, 'preset')
     await store.loadAll()
-    importToastMsg.value = `已添加 ${added.length} 个工具${existing.length ? `，${existing.length} 个已存在` : ''}`
+    importToastMsg.value = existing.length ? t('library.presetAdded', { n: added.length, e: existing.length }) : t('library.presetAddedOnly', { n: added.length })
     importToastVisible.value = true
     // 后台获取图标（仅新增）
     for (const r of added) {
@@ -920,7 +913,7 @@ async function addPresetApps() {
       }).catch(() => {})
     }
   } catch (e: any) {
-    alert('添加失败: ' + (e?.message ?? ''))
+    alert(t('library.presetFailed', { msg: e?.message ?? '' }))
   } finally {
     presetAdding.value = false
   }
@@ -1180,16 +1173,16 @@ async function onDropConfirm(dropItems: DropItem[]) {
     const { added, skipped } = await window.api.resources.batchAdd(plain)
     for (const r of added) store.addOrUpdate(r)
     if (added.length > 0 && skipped > 0) {
-      showImportToast(`成功导入 ${added.length} 项，跳过 ${skipped} 项（已存在）`)
+      showImportToast(t('library.dropImportedSkipped', { n: added.length, s: skipped }))
     } else if (added.length > 0) {
-      showImportToast(`成功导入 ${added.length} 项`)
+      showImportToast(t('library.dropImported', { n: added.length }))
     } else if (skipped > 0) {
-      showImportToast(`${skipped} 项已存在，跳过导入`)
+      showImportToast(t('library.dropSkipped', { n: skipped }))
     }
   } catch (e: any) {
     const msg = e?.message || String(e)
     console.error('Import failed:', msg, e)
-    showImportToast(`导入失败: ${msg}`, 8000)
+    showImportToast(t('library.dropFailed', { msg }), 8000)
   }
 }
 
@@ -1225,15 +1218,19 @@ function onListRowEnter(e: MouseEvent, item: Resource) {
 }
 function onListRowLeave() { listTooltip.show = false }
 function ltFmtDuration(secs: number): string {
-  if (!secs || secs < 0) return '0分'
+  if (!secs || secs < 0) return t('resource.time.minutes', { n: 0 })
   const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60
-  if (h > 0) return `${h}时`; if (m > 0) return `${m}分`; return `${s}秒`
+  if (h > 0) return t('resource.time.hours', { n: h })
+  if (m > 0) return t('resource.time.minutes', { n: m })
+  return t('resource.time.seconds', { n: s })
 }
 function ltFmtRelDate(ts: number): string {
   const days = Math.floor((Date.now() - ts) / 86400000)
-  if (days === 0) return '今天'; if (days === 1) return '昨天'
-  if (days < 7) return `${days}天前`
-  return new Date(ts).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
+  if (days === 0) return t('resource.stats.today')
+  if (days === 1) return t('resource.stats.yesterday')
+  if (days < 7) return t('resource.stats.daysAgo', { n: days })
+  const dateLocale = locale.value === 'en' ? 'en-US' : 'zh-CN'
+  return new Date(ts).toLocaleDateString(dateLocale, { month: 'long', day: 'numeric' })
 }
 const ctxIcons = {
   play:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
@@ -1305,10 +1302,10 @@ const batchTags = ref<Array<{ id: number; name: string }>>([])
 const batchTagAllSuggestions = ref<Array<{ id: number; name: string; count: number }>>([])
 
 const batchTagSuggestions = computed(() => {
-  const addedIds = new Set(batchTags.value.map(t => t.id))
+  const addedIds = new Set(batchTags.value.map(bt => bt.id))
   const q = batchTagInput.value.trim().toLowerCase()
-  const available = batchTagAllSuggestions.value.filter(t => !addedIds.has(t.id))
-  return q ? available.filter(t => t.name.toLowerCase().includes(q)) : available.slice(0, 12)
+  const available = batchTagAllSuggestions.value.filter(bt => !addedIds.has(bt.id))
+  return q ? available.filter(bt => bt.name.toLowerCase().includes(q)) : available.slice(0, 12)
 })
 const batchTargetType = ref<ResourceType | ''>('')
 const pathMode = ref<'drive' | 'prefix'>('drive')
@@ -1323,18 +1320,18 @@ const canConfirmPath = computed(() => {
   return batchOldPath.value.trim() && batchNewPath.value.trim()
 })
 
-const typeOptions: Array<{ label: string; value: ResourceType }> = [
-  { label: '游戏', value: 'game' },
-  { label: '应用程序', value: 'app' },
-  { label: '图片', value: 'image' },
-  { label: '视频', value: 'video' },
-  { label: '漫画', value: 'comic' },
-  { label: '音乐', value: 'music' },
-  { label: '小说', value: 'novel' },
-  { label: '文档', value: 'document' },
-  { label: '文件夹', value: 'folder' },
-  { label: '其他', value: 'other' }
-]
+const typeOptions = computed<Array<{ label: string; value: ResourceType }>>(() => [
+  { label: t('resource.types.game'),     value: 'game' },
+  { label: t('resource.types.app'),      value: 'app' },
+  { label: t('resource.types.image'),    value: 'image' },
+  { label: t('resource.types.video'),    value: 'video' },
+  { label: t('resource.types.comic'),    value: 'comic' },
+  { label: t('resource.types.music'),    value: 'music' },
+  { label: t('resource.types.novel'),    value: 'novel' },
+  { label: t('resource.types.document'), value: 'document' },
+  { label: t('resource.types.folder'),   value: 'folder' },
+  { label: t('resource.types.other'),    value: 'other' },
+])
 
 function enterBatchMode() {
   batchMode.value = true
@@ -1502,8 +1499,8 @@ const tagCounts = computed(() => {
   const counts = new Map<number, number>()
   for (const item of store.filtered) {
     if (item.tags) {
-      for (const t of item.tags) {
-        counts.set(t.id, (counts.get(t.id) || 0) + 1)
+      for (const tag of item.tags) {
+        counts.set(tag.id, (counts.get(tag.id) || 0) + 1)
       }
     }
   }
@@ -1523,26 +1520,26 @@ const availableTags = computed(() => {
   let tags = dbTags.value
 
   // 1. 根据当前筛选出来的列表（store.filtered），实时更新各标签的剩余数量
-  tags = tags.map(t => ({
-    ...t,
-    count: tagCounts.value.get(t.id) || 0
+  tags = tags.map(tg => ({
+    ...tg,
+    count: tagCounts.value.get(tg.id) || 0
   }))
 
   // 2. 如果处于筛选状态（有选择标签，或者输入了搜索词），隐藏无关标签（即 count = 0 且未被选中的）
-  // 达到“层层递进”的体验
+  // 达到”层层递进”的体验
   if (store.activeTags.length > 0 || store.excludedTags.length > 0 || store.searchQuery.trim().length > 0) {
-    tags = tags.filter(t => t.count > 0 || store.activeTags.includes(t.id) || store.excludedTags.includes(t.id))
+    tags = tags.filter(tg => tg.count > 0 || store.activeTags.includes(tg.id) || store.excludedTags.includes(tg.id))
   }
 
   // 3. 标签面板顶部的输入框过滤（按名字全拼或拼音首字母匹配）
   if (tagSearch.value) {
     const q = tagSearch.value.trim().toLowerCase()
-    tags = tags.filter(t => t.name.toLowerCase().includes(q) || pinyinMatch(t.name, q) !== null)
+    tags = tags.filter(tg => tg.name.toLowerCase().includes(q) || pinyinMatch(tg.name, q) !== null)
   }
 
   // 4. 追加“未分类”虚拟项（如果有符合条件的项，或它已被勾选）
   if (!tagSearch.value && (untaggedCount.value > 0 || store.activeTags.includes(0) || store.excludedTags.includes(0))) {
-    return [{ id: 0, name: '未分类', count: untaggedCount.value }, ...tags]
+    return [{ id: 0, name: t('library.untagged'), count: untaggedCount.value }, ...tags]
   }
 
   return tags
@@ -1594,12 +1591,13 @@ function onDocDragOver(e: Event) {
 }
 
 // ── 快速筛选（sort bar）───────────────────────
-const quickFilterDefs = [
-  { key: 'neverOpened', label: '从未打开' },
-  { key: 'untagged',    label: '未分类'   },
-  { key: 'hasTag',      label: '有标签'   },
-] as const
-type QuickFilterKey = typeof quickFilterDefs[number]['key']
+const QUICK_FILTER_KEYS = ['neverOpened', 'untagged', 'hasTag'] as const
+type QuickFilterKey = typeof QUICK_FILTER_KEYS[number]
+const quickFilterDefs = computed(() => [
+  { key: 'neverOpened' as QuickFilterKey, label: t('library.quickFilter.neverOpened') },
+  { key: 'untagged'    as QuickFilterKey, label: t('library.quickFilter.untagged') },
+  { key: 'hasTag'      as QuickFilterKey, label: t('library.quickFilter.hasTag') },
+])
 const quickFilters = ref<QuickFilterKey[]>([])
 const showQfDropdown = ref(false)
 function toggleQuickFilter(key: QuickFilterKey) {
@@ -1724,15 +1722,6 @@ function onSortChange(e: Event) {
   settingsStore.setResourceSort((e.target as HTMLSelectElement).value as ResourceSortField)
 }
 
-const sortOptions: Array<{ value: ResourceSortField; label: string }> = [
-  { value: 'lastUsed',       label: '最近使用' },
-  { value: 'recentlyAdded', label: '最近添加' },
-  { value: 'name',           label: '名称'     },
-  { value: 'openCount',      label: '打开次数' },
-  { value: 'totalTime',      label: '累计时长' },
-  { value: 'modifiedAt',     label: '修改时间' },
-]
-
 const showIgnored = ref(false)
 const ignoredTab = ref<'files' | 'dirs'>('files')
 const ignoredPaths = ref<string[]>([])
@@ -1757,12 +1746,7 @@ function getBasename(filePath: string): string {
   return filePath.replace(/^.*[\\/]/, '')
 }
 
-const LIST_TYPE_LABELS: Record<string, string> = {
-  image: '图片', game: '游戏', app: '应用程序', video: '视频',
-  comic: '漫画', music: '音乐', novel: '小说', document: '文档', webpage: '网页',
-  folder: '文件夹', other: '其他'
-}
-function listTypeLabel(type: string) { return LIST_TYPE_LABELS[type] ?? type }
+function listTypeLabel(type: string) { return t(`resource.types.${type}` as any) || type }
 
 const LIST_TYPE_ICONS: Record<string, string> = {
   image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,

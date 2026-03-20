@@ -17,4 +17,7 @@ contextBridge.exposeInMainWorld('settingsApi', {
       try { const t = JSON.parse(json); cb({ accent: t['accent'] ?? '#6366F1', accent2: t['accent-2'] ?? '#818CF8' }) } catch {}
     })
   },
+  onLanguageChange: (cb: (lang: string) => void) => {
+    ipcRenderer.on('language:change', (_e, lang) => cb(lang))
+  },
 })

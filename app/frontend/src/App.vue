@@ -13,20 +13,20 @@
     <div class="titlebar" :class="{ 'is-pinned': isPinned }">
       <div class="titlebar-drag" />
       <div class="titlebar-btns">
-        <button class="tb-btn" @click="winTogglePin" :title="isPinned ? '取消锁定' : '锁定置顶'" :class="{ 'tb-pinned': isPinned }">
+        <button class="tb-btn" @click="winTogglePin" :title="isPinned ? t('app.unpin') : t('app.pin')" :class="{ 'tb-pinned': isPinned }">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
             <path d="M4.146.146A.5.5 0 0 1 4.5 0h7a.5.5 0 0 1 .5.5c0 .68-.342 1.174-.646 1.479-.126.125-.25.224-.354.298v4.431l.078.048c.203.127.476.314.751.555C12.36 7.775 13 8.527 13 9.5a.5.5 0 0 1-.5.5h-4v4.5c0 .276-.224 1.5-.5 1.5s-.5-1.224-.5-1.5V10h-4a.5.5 0 0 1-.5-.5c0-.973.64-1.725 1.17-2.189A6 6 0 0 1 5 6.708V2.277a3 3 0 0 1-.354-.298C4.342 1.674 4 1.179 4 .5a.5.5 0 0 1 .146-.354m1.58 1.408-.002-.001zm-.002-.001.002.001A.5.5 0 0 1 6 2v5a.5.5 0 0 1-.276.447h-.002l-.012.007-.054.03a5 5 0 0 0-.827.58c-.318.278-.585.596-.725.936h7.792c-.14-.34-.407-.658-.725-.936a5 5 0 0 0-.881-.61l-.012-.006h-.002A.5.5 0 0 1 10 7V2a.5.5 0 0 1 .295-.458 1.8 1.8 0 0 0 .351-.271c.08-.08.155-.17.214-.271H5.14q.091.15.214.271a1.8 1.8 0 0 0 .37.282"/>
           </svg>
         </button>
         <template v-if="!isPinned">
-          <button class="tb-btn" @click="winMinimize" title="最小化">
+          <button class="tb-btn" @click="winMinimize" :title="t('app.minimize')">
             <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor"/></svg>
           </button>
-          <button class="tb-btn" @click="winMaximize" :title="isMaximized ? '还原' : '最大化'">
+          <button class="tb-btn" @click="winMaximize" :title="isMaximized ? t('app.restore') : t('app.maximize')">
             <svg v-if="!isMaximized" width="10" height="10" viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" rx="1" fill="none" stroke="currentColor"/></svg>
             <svg v-else width="10" height="10" viewBox="0 0 10 10"><rect x="2.5" y=".5" width="7" height="7" rx="1" fill="none" stroke="currentColor"/><rect x=".5" y="2.5" width="7" height="7" rx="1" fill="var(--bg)" stroke="currentColor"/></svg>
           </button>
-          <button class="tb-btn tb-close" @click="winClose" title="关闭">
+          <button class="tb-btn tb-close" @click="winClose" :title="t('app.close')">
             <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.2"/></svg>
           </button>
         </template>
@@ -44,6 +44,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useResourceStore } from './stores/resources'
 import { useSettingsStore } from './stores/settings'
 import Sidebar from './components/Sidebar.vue'
@@ -55,6 +56,7 @@ const windowParam = new URLSearchParams(window.location.search).get('window')
 const isMasonryWindow = windowParam === 'masonry'
 const isDropWindow = windowParam === 'drop-import'
 
+const { t } = useI18n()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
 const showConsent = ref(false)

@@ -20,4 +20,7 @@ contextBridge.exposeInMainWorld('clipboardApi', {
       try { cb(JSON.parse(json)) } catch { /* ignore */ }
     })
   },
+  onLanguageChange: (cb: (lang: string) => void) => {
+    ipcRenderer.on('language:change', (_e, lang) => cb(lang))
+  },
 })

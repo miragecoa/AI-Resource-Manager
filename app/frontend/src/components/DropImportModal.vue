@@ -3,8 +3,8 @@
     <div v-if="modelValue" class="overlay" @mousedown.self="close">
       <div class="modal">
         <div class="modal-header">
-          <span class="modal-title">导入文件</span>
-          <span class="modal-count">{{ items.length }} 项</span>
+          <span class="modal-title">{{ t('import.title') }}</span>
+          <span class="modal-count">{{ items.length }}</span>
           <button class="close-btn" @click="close" v-html="closeIcon" />
         </div>
 
@@ -19,18 +19,18 @@
               <div class="item-path" :title="item.file_path">{{ item.file_path }}</div>
             </div>
             <select class="item-type" :value="item.type" @change="onTypeChange(idx, $event)">
-              <option v-for="t in TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
+              <option v-for="ty in TYPES" :key="ty.value" :value="ty.value">{{ ty.label }}</option>
             </select>
-            <button class="item-remove" @click="removeItem(idx)" title="移除" v-html="removeSvg" />
+            <button class="item-remove" @click="removeItem(idx)" :title="t('common.delete')" v-html="removeSvg" />
           </div>
         </div>
 
-        <div v-if="items.length === 0" class="empty-hint">没有可导入的文件</div>
+        <div v-if="items.length === 0" class="empty-hint">{{ t('dropImport.title') }}</div>
 
         <div class="modal-footer">
-          <button class="btn-cancel" @click="close">取消</button>
+          <button class="btn-cancel" @click="close">{{ t('import.cancel') }}</button>
           <button class="btn-confirm" :disabled="items.length === 0" @click="confirm">
-            确认导入{{ items.length > 0 ? ` (${items.length} 项)` : '' }}
+            {{ t('import.confirm') }}{{ items.length > 0 ? ` (${items.length})` : '' }}
           </button>
         </div>
       </div>
@@ -39,7 +39,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 export interface DropItem {
   type: string
@@ -91,18 +94,18 @@ function confirm() {
   close()
 }
 
-const TYPES = [
-  { value: 'game',  label: '游戏' },
-  { value: 'app',   label: '应用程序' },
-  { value: 'image', label: '图片' },
-  { value: 'video', label: '视频' },
-  { value: 'music', label: '音乐' },
-  { value: 'comic', label: '漫画' },
-  { value: 'novel', label: '小说' },
-  { value: 'document', label: '文档' },
-  { value: 'folder', label: '文件夹' },
-  { value: 'other',  label: '其他' },
-]
+const TYPES = computed(() => [
+  { value: 'game',     label: t('resource.types.game') },
+  { value: 'app',      label: t('resource.types.app') },
+  { value: 'image',    label: t('resource.types.image') },
+  { value: 'video',    label: t('resource.types.video') },
+  { value: 'music',    label: t('resource.types.music') },
+  { value: 'comic',    label: t('resource.types.comic') },
+  { value: 'novel',    label: t('resource.types.novel') },
+  { value: 'document', label: t('resource.types.document') },
+  { value: 'folder',   label: t('resource.types.folder') },
+  { value: 'other',    label: t('resource.types.other') },
+])
 
 const TYPE_ICONS: Record<string, string> = {
   image: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
