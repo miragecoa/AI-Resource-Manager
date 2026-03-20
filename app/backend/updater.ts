@@ -2,7 +2,7 @@ import { app, BrowserWindow, WebContents } from 'electron'
 import { net } from 'electron'
 import { dirname, join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, unlinkSync, statSync, writeFileSync } from 'fs'
-import { spawn, execFile } from 'child_process'
+import { spawn } from 'child_process'
 import { get as httpsGet } from 'https'
 import { get as httpGet } from 'http'
 import { getSetting, setSetting } from './db/queries'
@@ -106,6 +106,7 @@ function followDownload(url: string, totalSize: number, wc: WebContents | null =
     getter(url, { headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }, (res) => {
       // Follow redirects (GitHub 302 → CDN)
       if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location) {
+        res.destroy()
         return followDownload(res.headers.location, totalSize, wc).then(resolve, reject)
       }
       if (res.statusCode !== 200) return reject(new Error(`Download failed: ${res.statusCode}`))
@@ -171,24 +172,6 @@ export async function downloadUpdate(wc: WebContents | null): Promise<string> {
 
 // ── Apply and restart ────────────────────────────────────
 
-// Inline fallback updater script (used when R2 script is unavailable)
-function buildInlineScript(zipPath: string, appDir: string, exePath: string, pid: number): string {
-  return [
-    `$host.UI.RawUI.WindowTitle='AI Resource Manager Updater'`,
-    `Write-Host 'Waiting for app to exit...' -ForegroundColor Cyan`,
-    `while(Get-Process -Id ${pid} -EA SilentlyContinue){Start-Sleep 1}`,
-    `Start-Sleep 2`,
-    `$oldExeName=[System.IO.Path]::GetFileName('${exePath}')`,
-    `$beforeExes=Get-ChildItem -Path '${appDir}' -Filter '*.exe' -File | Select-Object -ExpandProperty Name`,
-    `Write-Host 'Extracting update...'`,
-    `try { Expand-Archive -Path '${zipPath}' -DestinationPath '${appDir}' -Force -EA Stop; Write-Host 'OK' -ForegroundColor Green } catch { Write-Host "FAILED: $_" -ForegroundColor Red; Read-Host 'Press Enter to exit'; exit 1 }`,
-    `$newExe=Get-ChildItem -Path '${appDir}' -Filter '*.exe' -File | Where-Object { $beforeExes -notcontains $_.Name } | Select-Object -First 1`,
-    `if($newExe){ Remove-Item '${exePath}' -Force -EA SilentlyContinue; Rename-Item $newExe.FullName $oldExeName -Force }`,
-    `Remove-Item '${zipPath}' -Force -EA SilentlyContinue`,
-    `Start-Process '${exePath}'`,
-  ].join('; ')
-}
-
 export async function applyAndRestart(): Promise<void> {
   if (!downloadedZipPath || !existsSync(downloadedZipPath)) {
     throw new Error('No downloaded update to apply')
@@ -198,26 +181,20 @@ export async function applyAndRestart(): Promise<void> {
   const exePath = app.isPackaged ? process.execPath : join(appDir, 'AI资源管家.exe')
   const pid = process.pid
 
-  // Try to fetch the latest updater script from R2 so that even old app versions
-  // get the newest update logic (exe rename, Win11 conhost fix, etc.) without
-  // needing to ship a new release just for updater changes.
-  let script: string
-  try {
-    const resp = await net.fetch(
-      `${R2_PUBLIC_URL}/updater.ps1?_t=${Date.now()}`,
-      { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
-    )
-    if (!resp.ok) throw new Error(`status ${resp.status}`)
-    const template = await resp.text()
-    script = template
-      .replace(/__ZIP_PATH__/g, downloadedZipPath)
-      .replace(/__APP_DIR__/g, appDir)
-      .replace(/__EXE_PATH__/g, exePath)
-      .replace(/__PID__/g, String(pid))
-  } catch (e) {
-    console.warn('[Updater] Failed to fetch remote updater script, using inline fallback:', e)
-    script = buildInlineScript(downloadedZipPath, appDir, exePath, pid)
-  }
+  // Fetch updater script from R2. This allows updating the install logic without
+  // shipping a new app release. R2 must be reachable — no fallback.
+  const resp = await net.fetch(
+    `${R2_PUBLIC_URL}/updater.ps1?_t=${Date.now()}`,
+    { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
+  )
+  if (!resp.ok) throw new Error(`[Updater] Failed to fetch updater script from R2: HTTP ${resp.status}`)
+
+  const template = await resp.text()
+  const script = template
+    .replace(/__ZIP_PATH__/g, downloadedZipPath)
+    .replace(/__APP_DIR__/g, appDir)
+    .replace(/__EXE_PATH__/g, exePath)
+    .replace(/__PID__/g, String(pid))
 
   // Encode as UTF-16LE Base64 → avoids encoding issues with Chinese paths
   const encoded = Buffer.from(script, 'utf16le').toString('base64')
@@ -228,12 +205,22 @@ export async function applyAndRestart(): Promise<void> {
   // exit — including the newly launched Electron app — causing startup logs to leak
   // into the update window. Conhost.exe uses classic behavior and closes on script exit.
   const batPath = join(dirname(downloadedZipPath), 'update.cmd')
-  writeFileSync(batPath, `@powershell.exe -NonInteractive -EncodedCommand ${encoded}\n`)
+  // No -NonInteractive: the window is intentionally interactive (shows progress, pauses on error)
+  // `if errorlevel 1 pause` keeps the window open so the user can read any error output
+  writeFileSync(batPath, `@powershell.exe -EncodedCommand ${encoded}\r\n@if errorlevel 1 pause\r\n`)
 
-  spawn('conhost.exe', ['cmd.exe', '/c', batPath], {
-    detached: true,
-    stdio: 'ignore',
-  }).unref()
+  try {
+    spawn('conhost.exe', ['cmd.exe', '/c', batPath], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref()
+  } catch {
+    // conhost unavailable — fall back to cmd.exe directly
+    spawn('cmd.exe', ['/c', batPath], {
+      detached: true,
+      stdio: 'ignore',
+    }).unref()
+  }
 
   app.quit()
 }

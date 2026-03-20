@@ -650,7 +650,8 @@ export function registerIpcHandlers(): void {
     return null
   })
   ipcMain.handle('updater:apply', () => {
-    applyAndRestart().catch(e => console.error('[Updater] applyAndRestart failed:', e))
+    // Let the promise propagate — ipcMain serialises rejections back to the renderer
+    return applyAndRestart()
   })
   ipcMain.handle('updater:skip', () => {
     skipUpdate()
