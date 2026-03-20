@@ -3,10 +3,10 @@
 </p>
 
 <p align="center">
-  <img src="app/resources/icon.png" width="120" alt="AI Resource Manager">
+  <img src="app/resources/icon.png" width="120" alt="AI Cubby">
 </p>
 
-<h1 align="center">AI Resource Manager</h1>
+<h1 align="center">AI Cubby</h1>
 
 <p align="center">
   <b>Everything you've ever opened — always findable.</b>
@@ -32,9 +32,9 @@
 
 Your desktop is buried under screenshots, installers, and random files. Finding anything takes forever, and the mess itself is exhausting. You tell yourself you'll organize it — spend an afternoon building folders — and three days later it's chaos again. So you give up, and next time you still have to dig.
 
-**With AI Resource Manager:**
+**With AI Cubby:**
 1. Create one folder on your desktop, drag everything into it — desktop instantly clean
-2. Drag that folder into Resource Manager to import it in one click
+2. Drag that folder into AI Cubby to import it in one click
 3. Next time you need something, just search — it appears instantly
 
 No categories needed. No folder hierarchy. Desktop stays clean, nothing is lost.
@@ -43,7 +43,7 @@ No categories needed. No folder hierarchy. Desktop stays clean, nothing is lost.
 
 You found a great tool that fixed your corrupted MP4. Used it once, problem solved. Six months later the same issue comes up — what was that tool called? Where did you install it? No idea.
 
-Sound familiar? AI Resource Manager silently logs every program and file you open during normal computer use. Next time you need it, one search is all it takes.
+Sound familiar? AI Cubby silently logs every program and file you open during normal computer use. Next time you need it, one search is all it takes.
 
 ### The compound effect
 
@@ -69,7 +69,7 @@ You can also drag files or folders directly into the window for instant import.
 
 Not just *what* you used — but *how*: open count, total runtime, live timer, last opened time.
 
-That game from three months ago, that batch of photos from last week — open Resource Manager and see it all at a glance.
+That game from three months ago, that batch of photos from last week — open AI Cubby and see it all at a glance.
 
 ### 3. AI features (coming soon)
 
@@ -89,7 +89,7 @@ That game from three months ago, that batch of photos from last week — open Re
 
 ## How it compares
 
-|  | AI Resource Manager | Everything | Playnite |
+|  | AI Cubby | Everything | Playnite |
 |---|:---:|:---:|:---:|
 | Auto-records usage history | **Yes** | No | No |
 | Zero configuration | Works out of the box | Filename search only | Requires plugin setup |
@@ -169,14 +169,14 @@ Electron 29 + Vue 3 + TypeScript + SQLite (better-sqlite3) + electron-vite
 <details>
 <summary><b>Does it compromise my privacy?</b></summary>
 
-No. All data is stored 100% locally on your machine — nothing is uploaded to any server. Resource Manager only records programs and files you actively open; it does not capture screenshots or read file contents. You can delete any record at any time from the ignored list.
+No. All data is stored 100% locally on your machine — nothing is uploaded to any server. AI Cubby only records programs and files you actively open; it does not capture screenshots or read file contents. You can delete any record at any time from the ignored list.
 
 </details>
 
 <details>
 <summary><b>Will antivirus software flag it?</b></summary>
 
-No. Resource Manager uses the Windows native filesystem watch API (`fs.watch`) to detect recently opened files — a standard system API. Process detection uses WMI event subscriptions, not process list polling.
+No. AI Cubby uses the Windows native filesystem watch API (`fs.watch`) to detect recently opened files — a standard system API. Process detection uses WMI event subscriptions, not process list polling.
 
 </details>
 

@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'AI资源管家',
+    title: 'AI小抽屉',
     pin: '锁定置顶',
     unpin: '取消锁定',
     minimize: '最小化',
@@ -234,7 +234,7 @@ export default {
     emptyAppHint: '一键添加 Windows 常用系统工具',
     addPresetApps: '添加常用工具',
     addingPresetApps: '添加中...',
-    emptyDefaultHint: '打开图片、视频或程序后，AI资源管家会自动记录',
+    emptyDefaultHint: '打开图片、视频或程序后，AI小抽屉会自动记录',
     batchSelectAll: '全选',
     batchDeselectAll: '取消全选',
     batchSelected: '已选 {n} 项',

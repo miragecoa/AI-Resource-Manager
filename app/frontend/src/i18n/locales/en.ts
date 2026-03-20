@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'Resource Manager',
+    title: 'AI Cubby',
     pin: 'Pin on top',
     unpin: 'Unpin',
     minimize: 'Minimize',

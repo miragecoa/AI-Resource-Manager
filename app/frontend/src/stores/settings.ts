@@ -150,7 +150,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const showFileExt = ref(true)
   const autoUpdate = ref(true)
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
-  const appTitle = ref('AI资源管家')
+  const appTitle = ref('AI小抽屉')
   const offlineMode = ref(false)
   const showOnAutoStart = ref(false)
   const hotkeyWake = ref('Alt+Space')
@@ -307,7 +307,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   async function setAppTitle(title: string) {
-    appTitle.value = title || 'AI资源管家'
+    appTitle.value = title || 'AI小抽屉'
     await window.api.settings.set('appTitle', appTitle.value)
   }
 

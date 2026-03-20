@@ -340,7 +340,7 @@ function buildTrayMenu(): Electron.Menu {
 
 function createTray(): void {
   tray = new Tray(createTrayIcon())
-  tray.setToolTip('AI资源管家')
+  tray.setToolTip('AI小抽屉')
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => mainWindow?.show())
 }
@@ -579,7 +579,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     frame: false,
-    title: 'AI资源管家',
+    title: 'AI小抽屉',
     backgroundColor: '#0C0C18',
     ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
     webPreferences: {
