@@ -582,6 +582,7 @@ function createWindow(): void {
     minHeight: 600,
     show: false,
     frame: false,
+    skipTaskbar: true,   // 默认不在任务栏，显示时再 setSkipTaskbar(false)
     title: 'AI小抽屉',
     backgroundColor: '#0C0C18',
     ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
@@ -595,8 +596,17 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     const showOnAutoStart = getSetting('showOnAutoStart') === 'true'
     if (!launchedHidden || showOnAutoStart) {
+      mainWindow?.setSkipTaskbar(false)
       mainWindow?.show()
+      drawerWindow?.hide()
     }
+  })
+
+  // 最小化 → 隐藏主窗口 + 显示抽屉 + 从任务栏移除
+  mainWindow.on('minimize', () => {
+    mainWindow?.setSkipTaskbar(true)
+    mainWindow?.hide()
+    drawerWindow?.show()
   })
 
   // 最大化/还原事件转发给渲染进程（用于更新自定义标题栏按钮图标）
@@ -620,7 +630,9 @@ function createWindow(): void {
   mainWindow.on('close', (event) => {
     if (!willQuit) {
       event.preventDefault()
+      mainWindow?.setSkipTaskbar(true)
       mainWindow?.hide()
+      drawerWindow?.show()
     }
   })
 
@@ -647,9 +659,10 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.setSkipTaskbar(false)
       mainWindow.show()
       mainWindow.focus()
+      drawerWindow?.hide()
     }
   })
 }
@@ -780,14 +793,19 @@ app.whenReady().then(() => {
     mainWindow?.focus()
   })
   ipcMain.handle('drawer:toggleMain', () => {
-    if (mainWindow && mainWindow.isVisible() && !mainWindow.isMinimized()) {
-      mainWindow.minimize()
+    if (mainWindow && mainWindow.isVisible()) {
+      // 隐藏主窗口 → 抽屉模式
+      mainWindow.setSkipTaskbar(true)
+      mainWindow.hide()
+      drawerWindow?.show()
     } else {
-      // Briefly setAlwaysOnTop to force foreground on Windows (prevents being hidden behind other windows)
+      // 显示主窗口 → 任务栏可见，隐藏抽屉
+      mainWindow?.setSkipTaskbar(false)
       mainWindow?.setAlwaysOnTop(true)
       mainWindow?.show()
       mainWindow?.focus()
       mainWindow?.setAlwaysOnTop(false)
+      drawerWindow?.hide()
     }
   })
   ipcMain.handle('drawer:filesDropped', async (_e, paths: string[]) => {
@@ -1130,10 +1148,14 @@ function registerWakeShortcut(accelerator: string): void {
     const ok = globalShortcut.register(accelerator, () => {
       if (!mainWindow) return
       if (mainWindow.isVisible() && mainWindow.isFocused()) {
+        mainWindow.setSkipTaskbar(true)
         mainWindow.hide()
+        drawerWindow?.show()
       } else {
+        mainWindow.setSkipTaskbar(false)
         mainWindow.show()
         mainWindow.focus()
+        drawerWindow?.hide()
       }
     })
     if (ok) _wakeAccelerator = accelerator
