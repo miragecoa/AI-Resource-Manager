@@ -229,6 +229,7 @@
       if (dir === 'none') {
         peekStrip.style.opacity = '0'
         peekStrip.innerHTML = ''
+        window.drawerApi?.setIgnoreMouseEvents?.(false)
         return
       }
 
@@ -246,6 +247,15 @@
       else if (currentEdge === 'top')    tab.style.transform = `translateY(calc(-100% + ${PEEK_PX}px))`
       else if (currentEdge === 'bottom') tab.style.transform = `translateY(calc(100% - ${PEEK_PX}px))`
       peekStrip.style.opacity = '0.92'
+      
+      // CRITICAL: Wait for CSS transition (0.22s) to finish!
+      // Otherwise, the transparent hit-test logic bounces immediately back onto #tab,
+      // creating a fake mouseenter event which instantly aborts the collapse!
+      setTimeout(() => {
+        if (peekStrip.style.opacity === '0.92') {
+          window.drawerApi?.setIgnoreMouseEvents?.(true)
+        }
+      }, 250)
     }
 
     // Expand: show the drawer, strip drops back to ghost opacity
@@ -253,6 +263,7 @@
       if (currentEdge === 'none') return
       tab.style.transform = ''
       peekStrip.style.opacity = '0.22'
+      window.drawerApi?.setIgnoreMouseEvents?.(false)
     }
 
     // Settings changed edge direction
@@ -285,12 +296,50 @@
       expandFromEdge()
     })
 
+    // Polyfill: When window is in ignore-mouse mode (collapsed), `mouseenter` won't fire.
+    // But `mousemove` still arrives thanks to `{ forward: true }`.
+    // Detect cursor over peek strip area and re-expand.
+    let _isIgnoreMode = false
+    const _origSetIgnore = window.drawerApi?.setIgnoreMouseEvents
+    if (_origSetIgnore) {
+      window.drawerApi.setIgnoreMouseEvents = (ignore) => {
+        _isIgnoreMode = ignore
+        return _origSetIgnore(ignore)
+      }
+    }
+    window.addEventListener('mousemove', (e) => {
+      if (!_isIgnoreMode || currentEdge === 'none' || isDragging) return
+      // Check if cursor is within the peek strip's bounding box
+      const stripRect = peekStrip.getBoundingClientRect()
+      if (stripRect.width === 0 && stripRect.height === 0) return
+      if (e.clientX >= stripRect.left && e.clientX <= stripRect.right &&
+          e.clientY >= stripRect.top  && e.clientY <= stripRect.bottom) {
+        if (peekLeaveTimer) { clearTimeout(peekLeaveTimer); peekLeaveTimer = null }
+        expandFromEdge()
+      }
+    })
+
     tab.addEventListener('mouseleave', () => {
       if (currentEdge === 'none' || isDragging) return
       peekLeaveTimer = setTimeout(() => {
         collapseToEdge()
         peekLeaveTimer = null
       }, 400)
+    })
+
+    window.drawerApi?.onForceLeave?.(() => {
+      if (currentEdge === 'none' || isDragging) return
+      if (peekLeaveTimer) { clearTimeout(peekLeaveTimer); peekLeaveTimer = null }
+      peekLeaveTimer = setTimeout(() => {
+        collapseToEdge()
+        peekLeaveTimer = null
+      }, 100) // Much shorter grace because the OS explicitly confirms the cursor has physically departed
+    })
+
+    window.drawerApi?.onForceEnter?.(() => {
+      if (currentEdge === 'none' || isDragging) return
+      if (peekLeaveTimer) { clearTimeout(peekLeaveTimer); peekLeaveTimer = null }
+      expandFromEdge()
     })
 
     // ── IPC-based drag ────────────────────────────────────────────────────

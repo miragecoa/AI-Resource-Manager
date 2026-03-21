@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('drawerApi', {
   openMain:     () => ipcRenderer.invoke('drawer:openMain'),
   toggleMain:   () => ipcRenderer.invoke('drawer:toggleMain'),
   showContextMenu: () => ipcRenderer.invoke('drawer:showContextMenu'),
+  setIgnoreMouseEvents: (ignore: boolean) => ipcRenderer.invoke('drawer:setIgnoreMouseEvents', ignore),
   dragStart:      (sx: number, sy: number) => ipcRenderer.invoke('drawer:dragStart', sx, sy),
   dragMove:       (sx: number, sy: number) => ipcRenderer.invoke('drawer:dragMove', sx, sy),
   dragEnd:        () => ipcRenderer.invoke('drawer:dragEnd'),
@@ -19,6 +20,12 @@ contextBridge.exposeInMainWorld('drawerApi', {
   },
   onSetStripSize:(cb: (v: { len: number; wid: number }) => void) => {
     ipcRenderer.on('drawer:setStripSize', (_e, v) => cb(v))
+  },
+  onForceLeave:  (cb: () => void) => {
+    ipcRenderer.on('drawer:forceLeave', () => cb())
+  },
+  onForceEnter:  (cb: () => void) => {
+    ipcRenderer.on('drawer:forceEnter', () => cb())
   },
   onThemeChange:  (cb: (vars: { accent: string; accent2: string }) => void) => {
     ipcRenderer.on('theme:change', (_e, json) => {

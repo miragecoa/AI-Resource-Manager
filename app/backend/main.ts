@@ -789,6 +789,83 @@ app.whenReady().then(() => {
     if (!items.length) return
     openDropImportWindow(items)
   })
+  let _drawerHoverTimer: ReturnType<typeof setInterval> | null = null
+  let _drawerReenterTimer: ReturnType<typeof setInterval> | null = null
+  ipcMain.handle('drawer:setIgnoreMouseEvents', (_e, ignore: boolean) => {
+    if (drawerWindow && !drawerWindow.isDestroyed()) {
+      drawerWindow.setIgnoreMouseEvents(ignore, { forward: true })
+      
+      if (!ignore) {
+        // EXPANDED: poll to detect cursor physically leaving window bounds
+        if (_drawerReenterTimer) { clearInterval(_drawerReenterTimer); _drawerReenterTimer = null }
+        if (!_drawerHoverTimer) {
+          _drawerHoverTimer = setInterval(() => {
+            if (!drawerWindow || drawerWindow.isDestroyed()) {
+              clearInterval(_drawerHoverTimer!); _drawerHoverTimer = null; return
+            }
+            const pt = screen.getCursorScreenPoint()
+            const b = drawerWindow.getBounds()
+            const isInside = pt.x >= b.x - 2 && pt.x <= (b.x + b.width + 2) && 
+                             pt.y >= b.y - 2 && pt.y <= (b.y + b.height + 2)
+            if (!isInside) {
+              clearInterval(_drawerHoverTimer!); _drawerHoverTimer = null
+              drawerWindow.webContents.send('drawer:forceLeave')
+            }
+          }, 100)
+        }
+      } else {
+        // COLLAPSED: poll to detect cursor returning to peek strip area
+        if (_drawerHoverTimer) { clearInterval(_drawerHoverTimer); _drawerHoverTimer = null }
+        if (!_drawerReenterTimer) {
+          _drawerReenterTimer = setInterval(() => {
+            if (!drawerWindow || drawerWindow.isDestroyed()) {
+              clearInterval(_drawerReenterTimer!); _drawerReenterTimer = null; return
+            }
+            const pt = screen.getCursorScreenPoint()
+            const b = drawerWindow.getBounds()
+            const edge = getSetting('drawerEdge') ?? 'none'
+            if (edge === 'none') { clearInterval(_drawerReenterTimer!); _drawerReenterTimer = null; return }
+            
+            // Calculate peek strip screen rect based on edge direction
+            const stripLenPct = parseInt(getSetting('drawerStripLen') ?? '50') / 100
+            const stripWid = parseInt(getSetting('drawerStripWid') ?? '14')
+            let sx: number, sy: number, sw: number, sh: number
+            
+            if (edge === 'right') {
+              sw = stripWid
+              sh = Math.round(b.height * stripLenPct)
+              sx = b.x + b.width - stripWid
+              sy = b.y + Math.round((b.height - sh) / 2)
+            } else if (edge === 'left') {
+              sw = stripWid
+              sh = Math.round(b.height * stripLenPct)
+              sx = b.x
+              sy = b.y + Math.round((b.height - sh) / 2)
+            } else if (edge === 'top') {
+              sw = Math.round(b.width * stripLenPct)
+              sh = stripWid
+              sx = b.x + Math.round((b.width - sw) / 2)
+              sy = b.y
+            } else { // bottom
+              sw = Math.round(b.width * stripLenPct)
+              sh = stripWid
+              sx = b.x + Math.round((b.width - sw) / 2)
+              sy = b.y + b.height - stripWid
+            }
+            
+            // Add a few pixels of tolerance for easier re-entry
+            const tolerance = 4
+            const isOverStrip = pt.x >= sx - tolerance && pt.x <= sx + sw + tolerance &&
+                                pt.y >= sy - tolerance && pt.y <= sy + sh + tolerance
+            if (isOverStrip) {
+              clearInterval(_drawerReenterTimer!); _drawerReenterTimer = null
+              drawerWindow.webContents.send('drawer:forceEnter')
+            }
+          }, 80)
+        }
+      }
+    }
+  })
   // Fallback: Chromium can't handle Windows Shell IDList drag format for .lnk shortcuts
   // → files array empty → open native file picker instead
   ipcMain.handle('drawer:openFilePicker', async () => {
