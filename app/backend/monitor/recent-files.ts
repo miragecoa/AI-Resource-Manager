@@ -342,11 +342,16 @@ function startProcessWatcher(onNewEntry: (entry: Resource) => void): void {
       const lnkTitle = exeToLnkName.get(lower)
       const title = lnkTitle ?? basename(exePath, extname(exePath))
 
-      // 已入库但标题还是裸 exe 名 → 有 lnk 映射时升级为友好名称（chrome → Google Chrome）
-      if (existingResource && lnkTitle && existingResource.title.toLowerCase() !== lnkTitle.toLowerCase()) {
-        console.log(`[Monitor] Title upgraded: "${existingResource.title}" → "${lnkTitle}"`)
-        updateResource(existingResource.id, { title: lnkTitle })
-        existingResource.title = lnkTitle
+      // 已入库但标题是裸 exe 名 → 有 lnk 映射时升级为友好名称（chrome → Google Chrome）
+      // 只升级自动生成的标题，用户手动改过的跳过
+      if (existingResource && lnkTitle && !lnkTitle.toLowerCase().endsWith('.exe')) {
+        const exeBase = basename(lower, '.exe')
+        const isAutoTitle = existingResource.title.toLowerCase() === exeBase || existingResource.title.toLowerCase() === exeBase + '.exe'
+        if (isAutoTitle) {
+          console.log(`[Monitor] Title upgraded: "${existingResource.title}" → "${lnkTitle}"`)
+          updateResource(existingResource.id, { title: lnkTitle })
+          existingResource.title = lnkTitle
+        }
       }
 
       try {
@@ -541,10 +546,14 @@ export function startMonitor(onNewEntry: (entry: Resource) => void, onRunningCha
   for (const resource of getAllAppResources()) {
     const lower = resource.file_path.toLowerCase()
     const lnkTitle = exeToLnkName.get(lower)
-    if (lnkTitle && !lnkTitle.toLowerCase().endsWith('.exe') && resource.title.toLowerCase() !== lnkTitle.toLowerCase()) {
-      updateResource(resource.id, { title: lnkTitle })
-      upgraded++
-    }
+    if (!lnkTitle || lnkTitle.toLowerCase().endsWith('.exe')) continue
+    if (resource.title.toLowerCase() === lnkTitle.toLowerCase()) continue
+    // 只升级自动生成的标题（等于 exe 名），用户手动改过的跳过
+    const exeBase = basename(lower, '.exe')
+    const isAutoTitle = resource.title.toLowerCase() === exeBase || resource.title.toLowerCase() === exeBase + '.exe'
+    if (!isAutoTitle) continue
+    updateResource(resource.id, { title: lnkTitle })
+    upgraded++
   }
   if (upgraded > 0) console.log(`[Monitor] Upgraded ${upgraded} resource title(s) from lnk mappings`)
 
