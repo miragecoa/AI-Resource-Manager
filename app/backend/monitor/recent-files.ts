@@ -82,11 +82,13 @@ const BLOCKED_EXE_NAMES = new Set([
   'searchprotocolhost', 'searchfilterhost', 'searchindexer',
   'steamwebhelper', 'gameoverlayui64', 'gameoverlayrenderer64',  // Steam overlay
   'crashpad_handler', 'chrome_crashpad_handler',
-  'git', 'updater', 'setup', 'installer', 'uninstall', 'uninstaller',
+  'git', 'updater', 'update', 'setup', 'installer', 'uninstall', 'uninstaller',
   'onedrive', 'onedriveupdater', 'filecoauth',  // OneDrive 后台进程
   'conda', 'pip',      // Python 包管理工具（conda/pip 本身不是用户资源）
   'ealocalhostsvc', 'eacefsubprocess', 'eadesktop', 'ealaunchhelper',  // EA App 后台
   'igoproxy32', 'igoproxy64',  // 输入法代理
+  'logipluginservice',          // Logi Options+ 插件服务（无下划线，单独加）
+  'microsoftedgeupdate',        // Edge 更新程序（无下划线，单独加）
 ])
 
 // 系统文件扩展名黑名单
