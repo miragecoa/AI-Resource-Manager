@@ -75,6 +75,8 @@ export default {
       clipboardDesc: 'Open the clipboard history panel (default: Alt+V)',
       recording: 'Press a shortcut key…',
       resetDefault: 'Reset to default',
+      clear: 'Clear shortcut',
+      notSet: 'Not set',
     },
     ai: {
       title: 'AI Features',

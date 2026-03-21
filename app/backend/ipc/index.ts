@@ -558,9 +558,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('hotkey:get', () => getSetting('hotkeyWake') || 'Alt+Space')
   ipcMain.handle('hotkey:set', (e, accelerator: string) => {
     // 只注销当前唤醒快捷键，不影响剪贴板快捷键
-    const prev = getSetting('hotkeyWake') || 'Alt+Space'
+    const prev = getSetting('hotkeyWake') ?? 'Alt+Space'
     try { globalShortcut.unregister(prev) } catch { /* */ }
-    if (!accelerator) return false
+    if (!accelerator) {
+      setSetting('hotkeyWake', '')  // 明确保存空串（区别于从未设置的 null）
+      return true
+    }
     // 用 e.sender 精确引用发起请求的主窗口，避免 getAllWindows()[0] 非确定性问题
     const mainWin = BrowserWindow.fromWebContents(e.sender)
     try {

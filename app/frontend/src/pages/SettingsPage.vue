@@ -78,14 +78,17 @@
           <div class="hotkey-input-wrap">
             <div
               class="hotkey-input"
-              :class="{ recording: hotkeyRecording, error: hotkeyError }"
+              :class="{ recording: hotkeyRecording, error: hotkeyError, 'is-unset': !hotkeyRecording && !settingsStore.hotkeyWake }"
               tabindex="0"
               @click="startRecording"
               @keydown.prevent="onHotkeyKeydown"
               @blur="cancelRecording"
             >
-              {{ hotkeyRecording ? (pendingHotkey || t('settings.hotkey.recording')) : settingsStore.hotkeyWake }}
+              {{ hotkeyRecording ? (pendingHotkey || t('settings.hotkey.recording')) : (settingsStore.hotkeyWake || t('settings.hotkey.notSet')) }}
             </div>
+            <button v-if="!hotkeyRecording && settingsStore.hotkeyWake" class="hotkey-reset" @click="clearHotkey" :title="t('settings.hotkey.clear')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>
+            </button>
             <button v-if="!hotkeyRecording" class="hotkey-reset" @click="resetHotkey" :title="t('settings.hotkey.resetDefault')">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg>
             </button>
@@ -99,14 +102,17 @@
           <div class="hotkey-input-wrap">
             <div
               class="hotkey-input"
-              :class="{ recording: clipboardHotkeyRecording, error: clipboardHotkeyError }"
+              :class="{ recording: clipboardHotkeyRecording, error: clipboardHotkeyError, 'is-unset': !clipboardHotkeyRecording && !settingsStore.hotkeyClipboard }"
               tabindex="0"
               @click="startClipboardRecording"
               @keydown.prevent="onClipboardHotkeyKeydown"
               @blur="cancelClipboardRecording"
             >
-              {{ clipboardHotkeyRecording ? (pendingClipboardHotkey || t('settings.hotkey.recording')) : settingsStore.hotkeyClipboard }}
+              {{ clipboardHotkeyRecording ? (pendingClipboardHotkey || t('settings.hotkey.recording')) : (settingsStore.hotkeyClipboard || t('settings.hotkey.notSet')) }}
             </div>
+            <button v-if="!clipboardHotkeyRecording && settingsStore.hotkeyClipboard" class="hotkey-reset" @click="clearClipboardHotkey" :title="t('settings.hotkey.clear')">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M2.146 2.854a.5.5 0 1 1 .708-.708L8 7.293l5.146-5.147a.5.5 0 0 1 .708.708L8.707 8l5.147 5.146a.5.5 0 0 1-.708.708L8 8.707l-5.146 5.147a.5.5 0 0 1-.708-.708L7.293 8z"/></svg>
+            </button>
             <button v-if="!clipboardHotkeyRecording" class="hotkey-reset" @click="resetClipboardHotkey" :title="t('settings.hotkey.resetDefault')">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/></svg>
             </button>
@@ -513,6 +519,10 @@ async function onHotkeyKeydown(e: KeyboardEvent) {
   }
 }
 
+async function clearHotkey() {
+  await settingsStore.setHotkeyWake('')
+}
+
 async function resetHotkey() {
   await settingsStore.setHotkeyWake('Alt+Space')
 }
@@ -546,6 +556,10 @@ async function onClipboardHotkeyKeydown(e: KeyboardEvent) {
     clipboardHotkeyError.value = true
     setTimeout(() => { clipboardHotkeyError.value = false }, 1500)
   }
+}
+
+async function clearClipboardHotkey() {
+  await settingsStore.setHotkeyClipboard('')
 }
 
 async function resetClipboardHotkey() {
@@ -867,6 +881,10 @@ function onColorChange(key: string, e: Event) {
 .hotkey-input.error {
   border-color: var(--danger);
   color: var(--danger);
+}
+.hotkey-input.is-unset {
+  color: var(--text-2);
+  font-style: italic;
 }
 @keyframes pulse-border {
   0%, 100% { opacity: 1; }

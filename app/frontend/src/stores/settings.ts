@@ -199,8 +199,8 @@ export const useSettingsStore = defineStore('settings', () => {
     if (appTitleVal) appTitle.value = appTitleVal
     if (offlineModeVal === 'true') offlineMode.value = true
     if (showOnAutoStartVal === 'true') showOnAutoStart.value = true
-    if (hotkeyWakeVal) hotkeyWake.value = hotkeyWakeVal
-    if (hotkeyClipboardVal) hotkeyClipboard.value = hotkeyClipboardVal
+    if (hotkeyWakeVal !== null) hotkeyWake.value = hotkeyWakeVal
+    if (hotkeyClipboardVal !== null) hotkeyClipboard.value = hotkeyClipboardVal
 
     if (themeVal) {
       try { themeVars.value = { ...DARK_THEME, ...JSON.parse(themeVal) } } catch {}

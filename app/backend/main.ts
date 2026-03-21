@@ -210,6 +210,8 @@ function createClipboardWindow(): void {
     minWidth: 320, minHeight: 400,
     show: false,
     frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
     resizable: true,
     skipTaskbar: true,
     alwaysOnTop: false,
@@ -1054,15 +1056,15 @@ app.whenReady().then(() => {
     })
   }
 
-  registerWakeShortcut(getSetting('hotkeyWake') || 'Alt+Space')
-  registerClipboardShortcut(getSetting('hotkeyClipboard') || 'Alt+V')
+  registerWakeShortcut(getSetting('hotkeyWake') ?? 'Alt+Space')
+  registerClipboardShortcut(getSetting('hotkeyClipboard') ?? 'Alt+V')
   startClipboardPolling()
 
   // 剪贴板快捷键 IPC（在 main.ts 注册，可直接调用 registerClipboardShortcut）
-  ipcMain.handle('clipboard:getHotkey', () => getSetting('hotkeyClipboard') || 'Alt+V')
+  ipcMain.handle('clipboard:getHotkey', () => getSetting('hotkeyClipboard') ?? 'Alt+V')
   ipcMain.handle('clipboard:setHotkey', (_e, accelerator: string) => {
     registerClipboardShortcut(accelerator)
-    if (_clipboardAccelerator === accelerator) {
+    if (!accelerator || _clipboardAccelerator === accelerator) {
       setSetting('hotkeyClipboard', accelerator)
       return true
     }

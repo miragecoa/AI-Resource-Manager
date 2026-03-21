@@ -75,6 +75,8 @@ export default {
       clipboardDesc: '呼出剪贴板历史面板（默认 Alt+V）',
       recording: '请按下快捷键…',
       resetDefault: '恢复默认',
+      clear: '清空快捷键',
+      notSet: '未设置',
     },
     ai: {
       title: 'AI 功能',
