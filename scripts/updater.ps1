@@ -118,9 +118,7 @@ if ($newExeInSource -and $newExeInSource.Name -ne $oldExeName) {
     }
 }
 
-# Cleanup: remove zip and extracted folder, but keep .update-temp directory
-Remove-Item $zipPath -Force -EA SilentlyContinue
-Remove-Item $extractDir -Recurse -Force -EA SilentlyContinue
+# Keep .update-temp directory and its contents (zip + extracted) for user reference
 
 Write-Host 'Done! Launching...' -ForegroundColor Green
 Start-Process $exePath
