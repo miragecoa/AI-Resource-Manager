@@ -721,13 +721,20 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('webpage:importBrowserBookmarks', () => {
     const localAppData = process.env.LOCALAPPDATA || ''
-    const chrome = readBrowserBookmarks(join(localAppData, 'Google', 'Chrome', 'User Data'))
-    const edge   = readBrowserBookmarks(join(localAppData, 'Microsoft', 'Edge', 'User Data'))
+    const appData = process.env.APPDATA || ''
+    const sources = [
+      readBrowserBookmarks(join(localAppData, 'Google', 'Chrome', 'User Data')),
+      readBrowserBookmarks(join(localAppData, 'Microsoft', 'Edge', 'User Data')),
+      readBrowserBookmarks(join(localAppData, 'Tencent', 'QQBrowser', 'User Data')),
+      readBrowserBookmarks(join(appData, 'SogouExplorer', 'Webkit')),
+    ]
     // Merge, deduplicate by URL
-    const seen = new Set(chrome.map(b => b.url))
-    const merged = [...chrome]
-    for (const b of edge) {
-      if (!seen.has(b.url)) { merged.push(b); seen.add(b.url) }
+    const seen = new Set<string>()
+    const merged: Array<{ name: string; url: string; folder: string }> = []
+    for (const list of sources) {
+      for (const b of list) {
+        if (!seen.has(b.url)) { merged.push(b); seen.add(b.url) }
+      }
     }
     return merged
   })
