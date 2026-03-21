@@ -170,6 +170,9 @@ export default {
       btnCheck: '检查更新',
       btnGithub: '前往下载页',
       btnForce: '强制更新',
+      tipsTitle: '更新提示',
+      tipsLine1: '下载的压缩包保存在软件目录下的 .update-temp 文件夹中',
+      tipsLine2: '若脚本自动解压失败，可手动将压缩包解压并覆盖到软件目录',
     },
     about: {
       title: '关于',

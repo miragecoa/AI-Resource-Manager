@@ -402,6 +402,11 @@
             <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.btnForce') }}</button>
           </div>
         </div>
+        <div class="update-tips-box">
+          <div class="update-tips-title">{{ t('settings.update.tipsTitle') }}</div>
+          <div class="update-tips-line">{{ t('settings.update.tipsLine1') }}</div>
+          <div class="update-tips-line">{{ t('settings.update.tipsLine2') }}</div>
+        </div>
       </section>
 
       <!-- 关于 -->
@@ -1308,6 +1313,25 @@ function onColorChange(key: string, e: Event) {
   display: flex;
   gap: 8px;
 }
+.update-tips-box {
+  margin-top: 8px;
+  padding: 10px 14px;
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 8px;
+}
+.update-tips-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-2, #818cf8);
+  margin-bottom: 5px;
+}
+.update-tips-line {
+  font-size: 12px;
+  color: var(--text-muted, rgba(255,255,255,0.45));
+  line-height: 1.6;
+}
+
 .update-action-btn {
   background: var(--accent) !important;
   border-color: var(--accent) !important;

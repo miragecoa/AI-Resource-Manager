@@ -170,6 +170,9 @@ export default {
       btnCheck: 'Check for updates',
       btnGithub: 'Download page',
       btnForce: 'Force update',
+      tipsTitle: 'Update Tips',
+      tipsLine1: 'The downloaded zip is saved in the .update-temp folder inside the app directory',
+      tipsLine2: 'If auto-extraction fails, manually extract the zip and overwrite the app directory',
     },
     about: {
       title: 'About',

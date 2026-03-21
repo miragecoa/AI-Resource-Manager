@@ -164,7 +164,7 @@ async function followDownload(url: string, totalSize: number, wc: WebContents | 
 }
 
 /** 强制拉取最新 Release（无视版本号），下载并应用 */
-export async function forceUpdate(): Promise<void> {
+export async function forceUpdate(wc: WebContents | null = null): Promise<void> {
   const resp = await fetchWithTimeout(
     `${R2_PUBLIC_URL}/latest.json?_t=${Date.now()}`,
     { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
@@ -172,7 +172,7 @@ export async function forceUpdate(): Promise<void> {
   if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`)
   const latest = await resp.json() as LatestJson
   const downloadUrl = `${R2_PUBLIC_URL}/${latest.tag}/${latest.filename}`
-  downloadedZipPath = await followDownload(downloadUrl, latest.size)
+  downloadedZipPath = await followDownload(downloadUrl, latest.size, wc)
   await applyAndRestart()
 }
 

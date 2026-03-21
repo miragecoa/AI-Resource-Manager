@@ -657,8 +657,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('updater:skip', () => {
     skipUpdate()
   })
-  ipcMain.handle('updater:forceUpdate', () => {
-    return forceUpdate()
+  ipcMain.handle('updater:forceUpdate', (e) => {
+    return forceUpdate(e.sender)
   })
   ipcMain.handle('updater:changelog', () => {
     return getChangelog()
