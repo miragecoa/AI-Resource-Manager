@@ -429,6 +429,7 @@ export default {
     ignoreMsg: 'After ignoring, "{title}" will no longer be auto-imported. You can still add it manually.',
     ignoreConfirm: 'Ignore',
     ignoreCancel: 'Cancel',
+    removeFromLibrary: 'Remove from library',
     unclassified: 'Unclassified',
     stats: {
       duration: 'Duration',

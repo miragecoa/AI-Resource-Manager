@@ -1,32 +1,6 @@
 <template>
   <aside class="sidebar" :class="{ collapsed: settingsStore.sidebarCollapsed, 'no-transition': isResizing }" :style="settingsStore.sidebarCollapsed ? {} : { width: sidebarWidth + 'px' }">
     <div class="sidebar-content">
-      <div class="sidebar-header">
-        <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
-        </svg>
-        <input
-          v-if="editing"
-          class="logo-input"
-          :value="settingsStore.appTitle"
-          @change="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
-          @blur="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
-          maxlength="20"
-        />
-        <span v-else class="logo-text">{{ settingsStore.appTitle }}</span>
-        <button
-          class="edit-btn"
-          :class="{ active: editing }"
-          :title="editing ? t('sidebar.editDone') : t('sidebar.editTitle')"
-          @click="editing = !editing"
-        >
-          <span v-html="editing ? doneIcon : editIcon" />
-        </button>
-      </div>
-
       <!-- 普通导航 -->
       <nav v-if="!editing" class="nav-section">
         <button
@@ -121,7 +95,9 @@ function onResizeStart(e: MouseEvent) {
   window.addEventListener('mouseup', onUp)
 }
 
-const editing = ref(false)
+const props = defineProps<{ editing: boolean }>()
+const emit = defineEmits<{ 'update:editing': [value: boolean] }>()
+const editing = computed(() => props.editing)
 
 const visibleNavItems = computed(() =>
   settingsStore.sidebarNav
@@ -137,7 +113,7 @@ function select(type: string) {
 
 function toggleCollapse() {
   // 收起时退出编辑模式
-  if (!settingsStore.sidebarCollapsed) editing.value = false
+  if (!settingsStore.sidebarCollapsed) emit('update:editing', false)
   settingsStore.setSidebarCollapsed(!settingsStore.sidebarCollapsed)
 }
 
@@ -169,9 +145,7 @@ function toggleVisible(idx: number) {
 }
 
 // ── Icons ────────────────────────────────────────────────────────
-const settingsIcon  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
-const editIcon      = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
-const doneIcon      = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
+
 const dragHandleIcon= `<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>`
 const eyeIcon       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`
 const eyeOffIcon    = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
@@ -250,44 +224,6 @@ const chevronRightSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
   height: 13px;
 }
 
-.sidebar-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 8px 10px 14px;
-  border-bottom: 1px solid var(--border);
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.logo-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--accent);
-  flex-shrink: 0;
-}
-
-.logo-text {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: -0.01em;
-}
-
-.logo-input {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--text);
-  background: var(--surface-3);
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-  padding: 1px 5px;
-  outline: none;
-  letter-spacing: -0.01em;
-}
 
 .nav-section {
   flex: 1;
@@ -403,36 +339,6 @@ const chevronRightSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
   height: 15px;
 }
 
-.edit-btn {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-3);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.1s, color 0.1s;
-}
-
-.edit-btn:hover {
-  background: var(--surface-2);
-  color: var(--text-2);
-}
-
-.edit-btn.active {
-  color: var(--accent);
-  background: rgba(99, 102, 241, 0.1);
-}
-
-.edit-btn :deep(svg) {
-  width: 15px;
-  height: 15px;
-}
 
 /* ── 编辑模式列表 ─────────────────────────────────────────────── */
 .edit-mode {

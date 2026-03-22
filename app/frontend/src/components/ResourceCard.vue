@@ -121,6 +121,9 @@
         <button @click="$emit('ignore', resource); showMenu = false" class="danger">
           <span v-html="ignoreIcon" />{{ t('resource.ignore') }}
         </button>
+        <button @click="$emit('remove', resource); showMenu = false" class="danger">
+          <span v-html="removeIcon" />{{ t('resource.removeFromLibrary') }}
+        </button>
       </div>
     </Teleport>
 

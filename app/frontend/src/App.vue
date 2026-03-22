@@ -11,6 +11,31 @@
   <div class="app" v-else-if="!isMasonryWindow && !isDropWindow">
     <!-- 自定义标题栏（替代系统原生标题栏） -->
     <div class="titlebar" :class="{ 'is-pinned': isPinned }">
+      <div class="titlebar-title">
+        <svg class="tb-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+        <input
+          v-if="sidebarEditing"
+          class="tb-logo-input"
+          :value="settingsStore.appTitle"
+          @change="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
+          @blur="(e) => settingsStore.setAppTitle((e.target as HTMLInputElement).value)"
+          maxlength="20"
+        />
+        <span v-else class="tb-logo-text">{{ settingsStore.appTitle }}</span>
+        <button
+          class="tb-edit-btn"
+          :class="{ active: sidebarEditing }"
+          :title="sidebarEditing ? t('sidebar.editDone') : t('sidebar.editTitle')"
+          @click="sidebarEditing = !sidebarEditing"
+        >
+          <span v-html="sidebarEditing ? doneIcon : editIcon" />
+        </button>
+      </div>
       <div class="titlebar-drag" />
       <div class="titlebar-btns">
         <button class="tb-btn tb-settings" @click="toggleSettings" :title="isOnSettings ? t('app.settingsClose') : t('app.settings')" :class="{ 'tb-active': isOnSettings }">
@@ -37,7 +62,7 @@
     </div>
 
     <div class="app-body">
-      <Sidebar />
+      <Sidebar v-model:editing="sidebarEditing" />
       <main class="main-content">
         <RouterView />
       </main>
@@ -68,6 +93,10 @@ const settingsStore = useSettingsStore()
 const showConsent = ref(false)
 const isMaximized = ref(false)
 const isPinned = ref(false)
+const sidebarEditing = ref(false)
+
+const editIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
+const doneIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
 
 const isOnSettings = computed(() => route.path === '/settings')
 function toggleSettings() {
@@ -192,6 +221,64 @@ body {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
+
+.titlebar-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 6px 0 12px;
+  height: 100%;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.tb-logo {
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.tb-logo-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.tb-logo-input {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-3);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  outline: none;
+  letter-spacing: -0.01em;
+  width: 110px;
+}
+
+.tb-edit-btn {
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+  flex-shrink: 0;
+}
+.tb-edit-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.tb-edit-btn.active { color: var(--accent); background: rgba(99,102,241,0.1); }
+.tb-edit-btn span { display: flex; line-height: 0; }
+.tb-edit-btn span svg { width: 13px; height: 13px; }
 
 .titlebar-drag {
   flex: 1;

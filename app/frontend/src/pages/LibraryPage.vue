@@ -1392,7 +1392,7 @@ const batchTagSuggestions = computed(() => {
   const addedIds = new Set(batchTags.value.map(bt => bt.id))
   const q = batchTagInput.value.trim().toLowerCase()
   const available = batchTagAllSuggestions.value.filter(bt => !addedIds.has(bt.id))
-  return q ? available.filter(bt => bt.name.toLowerCase().includes(q)) : available.slice(0, 12)
+  return q ? available.filter(bt => bt.name.toLowerCase().includes(q)) : available
 })
 const batchTargetType = ref<ResourceType | ''>('')
 const pathMode = ref<'drive' | 'prefix'>('drive')
@@ -1464,7 +1464,7 @@ async function doBatchType() {
 async function openBatchTag() {
   batchTags.value = []
   batchTagInput.value = ''
-  batchTagAllSuggestions.value = await window.api.tags.getForType(undefined, 'count')
+  batchTagAllSuggestions.value = await window.api.tags.getForType(undefined, 'lastUsed')
   showBatchTag.value = true
 }
 
@@ -4275,6 +4275,7 @@ async function deleteIgnored(filePath: string) {
 
 .batch-modal .tag-suggestions {
   display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  max-height: 160px; overflow-y: auto;
 }
 .batch-modal .sug-btn {
   padding: 3px 10px; border-radius: 6px; font-size: 12px;

@@ -429,6 +429,7 @@ export default {
     ignoreMsg: '忽略后，「{title}」将不再被自动入库。如需重新添加，可通过「手动添加」功能操作，不受影响。',
     ignoreConfirm: '确认忽略',
     ignoreCancel: '取消',
+    removeFromLibrary: '从库内删除',
     unclassified: '未分类',
     stats: {
       duration: '时长',

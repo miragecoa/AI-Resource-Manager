@@ -281,6 +281,7 @@ async function pickCover() {
 // ─── Debounced save ────────────────────────────────────────────────
 const saveTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 function debounceSave(field: string, value: any) {
+  hasEdited.value = true  // keep isDirty until user explicitly closes
   if (saveTimers[field]) clearTimeout(saveTimers[field])
   saveTimers[field] = setTimeout(() => saveField(field, value), 650)
 }
