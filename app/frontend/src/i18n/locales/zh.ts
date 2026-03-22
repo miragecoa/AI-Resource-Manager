@@ -431,6 +431,7 @@ export default {
     ignoreCancel: '取消',
     removeFromLibrary: '从库内删除',
     unclassified: '未分类',
+    unclassifiedHint: '右键可添加标签、修改分类',
     stats: {
       duration: '时长',
       count: '{n}次',
@@ -454,7 +455,7 @@ export default {
     rating: '评分',
     note: '备注',
     tags: '标签',
-    addTag: '+ 添加标签',
+    addTag: '输入标签，按 Enter 添加',
     save: '保存',
     cancel: '取消',
     cover: '封面',

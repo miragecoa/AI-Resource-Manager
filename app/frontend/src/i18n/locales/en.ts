@@ -431,6 +431,7 @@ export default {
     ignoreCancel: 'Cancel',
     removeFromLibrary: 'Remove from library',
     unclassified: 'Unclassified',
+    unclassifiedHint: 'Right-click to add tags or change category',
     stats: {
       duration: 'Duration',
       count: '×{n}',
@@ -454,7 +455,7 @@ export default {
     rating: 'Rating',
     note: 'Note',
     tags: 'Tags',
-    addTag: '+ Add tag',
+    addTag: 'Type tag, press Enter to add',
     save: 'Save',
     cancel: 'Cancel',
     cover: 'Cover',

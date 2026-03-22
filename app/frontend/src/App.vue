@@ -226,7 +226,7 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 0 6px 0 12px;
+  padding: 0 6px 0 26px;
   height: 100%;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
@@ -274,6 +274,7 @@ body {
   justify-content: center;
   transition: background 0.1s, color 0.1s;
   flex-shrink: 0;
+  margin-left: 16px;
 }
 .tb-edit-btn:hover { background: var(--surface-2); color: var(--text-2); }
 .tb-edit-btn.active { color: var(--accent); background: rgba(99,102,241,0.1); }

@@ -62,7 +62,7 @@
         <template v-if="resource.tags?.length">
           <span v-for="tag in resource.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
         </template>
-        <span v-else class="tag tag-unclassified">{{ t('resource.unclassified') }}</span>
+        <span v-else class="tag tag-unclassified" :title="t('resource.unclassifiedHint')">{{ t('resource.unclassified') }}</span>
       </div>
     </div>
 
