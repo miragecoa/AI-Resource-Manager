@@ -347,13 +347,6 @@ function createTray(): void {
   tray.on('click', () => mainWindow?.show())
 }
 
-const DRAWER_SIZES: Record<string, { w: number; h: number }> = {
-  xs:     { w: 40, h: 50 },
-  small:  { w: 56, h: 68 },
-  medium: { w: 68, h: 80 },
-  large:  { w: 96, h: 114 },
-  xl:     { w: 256, h: 304 },
-}
 // Legacy named-preset → numeric (0-100) migration map
 const DRAWER_SIZE_LEGACY: Record<string, number> = { xs: 5, small: 20, medium: 40, large: 60, xl: 85 }
 function drawerSizeFromValue(v: number): { w: number; h: number } {
@@ -926,35 +919,55 @@ app.whenReady().then(() => {
       height: _dragOffset.wh,
     })
   })
-  ipcMain.handle('drawer:dragEnd', () => {
-    if (!drawerWindow || !_dragOffset) { _dragOffset = null; return }
-    const { ww, wh } = _dragOffset
-    _dragOffset = null
-    let [x, y] = drawerWindow.getPosition()
 
-    // Clamp position so the peek strip (14px) stays within screen bounds
-    const PEEK_PX = 14
+  function snapDrawerToEdge() {
+    if (!drawerWindow || drawerWindow.isDestroyed()) return
+    const [ww, wh] = drawerWindow.getSize()
+    let [x, y] = drawerWindow.getPosition()
     const display = screen.getDisplayNearestPoint({ x, y })
-    const b = display.bounds
-    const edge = getSetting('drawerEdge') ?? 'none'
-    const pinToEdge = getSetting('drawerPinToEdge') === 'true'
-    if (pinToEdge && edge !== 'none') {
-      // Fixed to edge: snap to exact screen edge position
-      if (edge === 'right')       x = b.x + b.width  - ww
-      else if (edge === 'left')   x = b.x
-      else if (edge === 'top')    y = b.y
-      else if (edge === 'bottom') y = b.y + b.height - wh
+    const b = display.bounds // Use physical bounds for real edge snapping
+    
+    // Preference: If a collapse edge is set, snap to THAT edge specifically
+    const collapseEdge = getSetting('drawerEdge') ?? 'none'
+    if (collapseEdge === 'left') {
+      x = b.x
+    } else if (collapseEdge === 'right') {
+      x = b.x + b.width - ww
+    } else if (collapseEdge === 'top') {
+      y = b.y
+    } else if (collapseEdge === 'bottom') {
+      y = b.y + b.height - wh
     } else {
-      if (edge === 'right')       x = Math.min(x, b.x + b.width  - PEEK_PX)
-      else if (edge === 'left')   x = Math.max(x, b.x - ww + PEEK_PX)
-      else if (edge === 'top')    y = Math.max(y, b.y - wh + PEEK_PX)
-      else if (edge === 'bottom') y = Math.min(y, b.y + b.height - PEEK_PX)
+      // Fallback: Snap to nearest edge
+      const distLeft = x - b.x
+      const distRight = (b.x + b.width) - (x + ww)
+      const distTop = y - b.y
+      const distBottom = (b.y + b.height) - (y + wh)
+      const minDist = Math.min(distLeft, distRight, distTop, distBottom)
+      if (minDist === distLeft) x = b.x
+      else if (minDist === distRight) x = b.x + b.width - ww
+      else if (minDist === distTop) y = b.y
+      else if (minDist === distBottom) y = b.y + b.height - wh
     }
 
-    drawerWindow.setBounds({ x, y, width: ww, height: wh })
-    drawerWindow.setResizable(false)
+    drawerWindow.setPosition(x, y)
     setSetting('drawerX', String(x))
     setSetting('drawerY', String(y))
+  }
+
+  ipcMain.handle('drawer:dragEnd', () => {
+    if (!drawerWindow || !_dragOffset) { _dragOffset = null; return }
+    _dragOffset = null
+    
+    const snapEnabled = getSetting('drawerSnapToEdge') === 'true'
+    if (snapEnabled) {
+      snapDrawerToEdge()
+    } else {
+      const [x, y] = drawerWindow.getPosition()
+      setSetting('drawerX', String(x))
+      setSetting('drawerY', String(y))
+    }
+    drawerWindow.setResizable(false)
   })
   // Right-click → open HTML settings popup with sliders
   ipcMain.handle('drawer:showContextMenu', () => openDrawerSettings())
@@ -972,7 +985,7 @@ app.whenReady().then(() => {
       size:    getDrawerSizeValue(),
       hasCustomIcon: !!(customIconPath && existsSync(customIconPath)),
       edge:       getSetting('drawerEdge') ?? 'none',
-      pinToEdge:  getSetting('drawerPinToEdge') === 'true',
+      snapToEdge: getSetting('drawerSnapToEdge') === 'true',
       stripLen:   parseInt(getSetting('drawerStripLen') ?? '50'),
       stripWid:   parseInt(getSetting('drawerStripWid') ?? '14'),
       accent, accent2,
@@ -983,29 +996,16 @@ app.whenReady().then(() => {
     setSetting('drawerStripWid', String(wid))
     drawerWindow?.webContents.send('drawer:setStripSize', { len, wid })
   })
+  ipcMain.handle('drawerSettings:setSnapToEdge', (_e, enabled: boolean) => {
+    setSetting('drawerSnapToEdge', String(enabled))
+    if (enabled) snapDrawerToEdge()
+  })
   ipcMain.handle('drawerSettings:setEdge', (_e, dir: string) => {
     setSetting('drawerEdge', dir)
+    if (getSetting('drawerSnapToEdge') === 'true') snapDrawerToEdge()
     // No position snapping — window stays wherever the user placed it;
     // the renderer applies a CSS transform to hide in the chosen direction.
     drawerWindow?.webContents.send('drawer:setEdge', dir)
-  })
-  ipcMain.handle('drawerSettings:setPinToEdge', (_e, pin: boolean) => {
-    setSetting('drawerPinToEdge', pin ? 'true' : 'false')
-    if (!pin || !drawerWindow) return
-    const edge = getSetting('drawerEdge') ?? 'none'
-    if (edge === 'none') return
-    const [ww, wh] = drawerWindow.getSize()
-    const [cx, cy] = drawerWindow.getPosition()
-    const display = screen.getDisplayNearestPoint({ x: cx, y: cy })
-    const b = display.bounds
-    let x = cx, y = cy
-    if (edge === 'right')       x = b.x + b.width  - ww
-    else if (edge === 'left')   x = b.x
-    else if (edge === 'top')    y = b.y
-    else if (edge === 'bottom') y = b.y + b.height - wh
-    drawerWindow.setPosition(x, y)
-    setSetting('drawerX', String(x))
-    setSetting('drawerY', String(y))
   })
   ipcMain.handle('drawer:getCustomIcon', () => {
     return iconToDataUrl(getSetting('drawerCustomIcon') ?? '')
@@ -1052,6 +1052,7 @@ app.whenReady().then(() => {
     // resizable:false on Windows prevents programmatic shrinking; temporarily lift it
     drawerWindow.setResizable(true)
     drawerWindow.setSize(w, h)
+    if (getSetting('drawerSnapToEdge') === 'true') snapDrawerToEdge()
     drawerWindow.setResizable(false)
   })
   ipcMain.handle('drawerSettings:openMain', () => {
