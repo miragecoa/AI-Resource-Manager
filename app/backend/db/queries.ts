@@ -165,11 +165,11 @@ export function restoreResource(resource: Resource): Resource | null {
 }
 
 export function isIgnored(filePath: string): boolean {
-  return !!getDb().prepare('SELECT 1 FROM ignored_paths WHERE path = ?').get(filePath)
+  return !!getDb().prepare('SELECT 1 FROM ignored_paths WHERE path = ?').get(filePath.toLowerCase())
 }
 
 export function addIgnoredPath(filePath: string): void {
-  getDb().prepare('INSERT OR IGNORE INTO ignored_paths (path) VALUES (?)').run(filePath)
+  getDb().prepare('INSERT OR IGNORE INTO ignored_paths (path) VALUES (?)').run(filePath.toLowerCase())
 }
 
 export function getAllIgnoredPaths(): string[] {

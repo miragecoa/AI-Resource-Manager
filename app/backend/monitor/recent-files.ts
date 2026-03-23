@@ -777,10 +777,10 @@ export async function scanRecentFolder(): Promise<Resource[]> {
     const type = EXT_MAP[ext]
     if (!type) continue
     // exe 类型：新进程先检查图标，无图标的跳过
-    if (type === 'app' && !getResourceByPath(exePath) && !await hasAppIcon(exePath)) continue
+    if (type === 'app' && !getResourceByPath(lower) && !await hasAppIcon(exePath)) continue
     const title = basename(exePath, ext)
     try {
-      const resource = upsertResource({ type, title, file_path: exePath, rating: 0 })
+      const resource = upsertResource({ type, title, file_path: lower, rating: 0 })
       if (resource) {
         const upgraded = trySteamUpgrade(exePath)
         results.push(upgraded ?? resource)
