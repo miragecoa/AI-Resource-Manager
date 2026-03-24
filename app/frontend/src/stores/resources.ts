@@ -66,36 +66,57 @@ export const useResourceStore = defineStore('resources', () => {
       const q = searchQuery.value.toLowerCase()
       const matched: Resource[] = []
       for (const r of list) {
-        const t = r.title.toLowerCase()
         let score = -1
+        const t = r.title.toLowerCase()
+
+        // ── 1. 标题匹配评分 ──
         if (t === q) {
-          score = 5000
+          score = Math.max(score, 5000) // 完全匹配
         } else if (t.startsWith(q)) {
-          score = 4000
+          score = Math.max(score, 4000) // 前缀匹配
         } else {
           const idx = t.indexOf(q)
           if (idx >= 0) {
-            // 出现位置越靠前分越高（最多 999 分）
-            score = 3000 - Math.min(idx, 999)
+            score = Math.max(score, 3000 - Math.min(idx, 999)) // 包含匹配
           } else {
             const pm = pinyinMatch(r.title, q)
             if (pm !== null) {
-              // 判断是真拼音匹配（命中汉字）还是散列英文字母模糊匹配
               const isChinese = pm.some(i => /[\u4e00-\u9fff]/.test(r.title[i]))
               if (isChinese) {
-                // 真拼音匹配：区间 2000-1001，低于连续文本包含（3000-2001）
-                score = 2000 - Math.min(pm[0] ?? 0, 999)
+                score = Math.max(score, 2000 - Math.min(pm[0] ?? 0, 999)) // 拼音首字母/全拼匹配
               } else {
-                // 散列英文字母模糊匹配：低于拼音，高于纯标签
-                score = 500
+                score = Math.max(score, 500) // 散列字母模糊匹配
               }
             }
           }
-          if (score < 0 && r.tags?.some(t2 => t2.name.toLowerCase().includes(q) || pinyinMatch(t2.name, q) !== null)) {
-            score = 0
+        }
+
+        // ── 2. 标签匹配评分（显著提升优先级） ──
+        if (r.tags && r.tags.length > 0) {
+          for (const tag of r.tags) {
+            const tn = tag.name.toLowerCase()
+            if (tn === q) {
+              score = Math.max(score, 4500) // 标签完全匹配：高于标题前缀
+            } else if (tn.startsWith(q)) {
+              score = Math.max(score, 3500) // 标签前缀匹配：高于拼音，低于标题前缀
+            } else {
+              const tidx = tn.indexOf(q)
+              if (tidx >= 0) {
+                score = Math.max(score, 2500 - Math.min(tidx, 499)) // 标签包含匹配
+              } else {
+                const tpm = pinyinMatch(tag.name, q)
+                if (tpm !== null) {
+                  score = Math.max(score, 1500 - Math.min(tpm[0] ?? 0, 499)) // 标签拼音匹配
+                }
+              }
+            }
           }
         }
-        if (score >= 0) { matched.push(r); relevanceMap.set(r.id, score) }
+
+        if (score >= 0) {
+          matched.push(r)
+          relevanceMap.set(r.id, score)
+        }
       }
       list = matched
     }

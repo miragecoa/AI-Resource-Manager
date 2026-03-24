@@ -478,6 +478,7 @@ export default {
     ignore: 'Ignore',
     saveAndClose: 'Save & Close',
     close: 'Close',
+    tagEnterTip: 'Press Enter to create tag',
     favicon: {
       loading: 'Fetching…',
       failed: 'Failed, retry',
@@ -551,6 +552,7 @@ export default {
     tags: {
       noMatch: 'No matching tags',
       placeholder: 'Search or create tag, Enter to confirm...',
+      tagEnterTip: 'Press Enter to create tag',
     },
     scan: {
       start: 'Start scan',

@@ -97,13 +97,21 @@
                     {{ tag.name }}
                     <button class="tag-remove" @click="removeTag(tag.id)" v-html="xSvg" />
                   </span>
-                  <input
-                    v-model="newTagInput"
-                    class="tag-input"
-                    :placeholder="t('detail.addTag')"
-                    @keydown.enter.prevent="addTag"
-                    @keydown.188.prevent="addTag"
-                  />
+                  <div class="tag-input-wrap">
+                    <input
+                      v-model="newTagInput"
+                      class="tag-input"
+                      :placeholder="t('detail.addTag')"
+                      @keydown.enter.prevent="addTag"
+                      @keydown.188.prevent="addTag"
+                      @blur="addTag"
+                    />
+                    <Transition name="tip">
+                      <div v-if="newTagInput.trim()" class="tag-tip">
+                        {{ t('detail.tagEnterTip') }}
+                      </div>
+                    </Transition>
+                  </div>
                 </div>
                 <!-- 当前品类已有标签，点击快速添加 -->
                 <div v-if="filteredSuggestions.length" class="tag-suggestions">
@@ -297,9 +305,13 @@ const isDirty = computed(() =>
   hasEdited.value ||
   editTitle.value !== props.resource.title ||
   editNote.value  !== (props.resource.note ?? '') ||
-  editPath.value  !== props.resource.file_path
+  editPath.value  !== props.resource.file_path ||
+  newTagInput.value.trim() !== ''
 )
 async function flushAndClose() {
+  if (newTagInput.value.trim()) {
+    await addTag()
+  }
   for (const field of Object.keys(saveTimers)) {
     clearTimeout(saveTimers[field])
     delete saveTimers[field]
@@ -842,8 +854,7 @@ async function refetchIcon() {
 .tag-remove :deep(svg) { width: 9px; height: 9px; }
 
 .tag-input {
-  flex: 1;
-  min-width: 80px;
+  width: 100%;
   background: none;
   border: none;
   outline: none;
@@ -853,6 +864,47 @@ async function refetchIcon() {
   padding: 0;
 }
 .tag-input::placeholder { color: var(--text-3); }
+
+.tag-input-wrap {
+  flex: 1;
+  min-width: 100px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.tag-tip {
+  position: absolute;
+  top: -34px;
+  left: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.tag-tip::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 10px;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--accent);
+}
+
+.tip-enter-active, .tip-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.tip-enter-from, .tip-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.95);
+}
 
 /* 路径 */
 .path-col {

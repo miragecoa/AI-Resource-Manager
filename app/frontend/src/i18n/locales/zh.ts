@@ -478,6 +478,7 @@ export default {
     ignore: '忽略',
     saveAndClose: '保存并关闭',
     close: '关闭',
+    tagEnterTip: '按 Enter 创建标签',
     favicon: {
       loading: '获取中…',
       failed: '获取失败，点击重试',
@@ -551,6 +552,7 @@ export default {
     tags: {
       noMatch: '无匹配标签',
       placeholder: '搜索或新建标签，回车确认...',
+      tagEnterTip: '按 Enter 创建标签',
     },
     scan: {
       start: '开始扫描',

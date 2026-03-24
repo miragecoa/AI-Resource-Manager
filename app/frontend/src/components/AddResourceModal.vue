@@ -67,7 +67,13 @@
                       :placeholder="t('addModal.tags.placeholder')"
                       @input="newTagInput = ($event.target as HTMLInputElement).value"
                       @keydown.enter.prevent="createAndAddTag"
+                      @blur="createAndAddTag"
                     />
+                    <Transition name="tip">
+                      <div v-if="newTagInput.trim()" class="tag-tip">
+                        {{ t('addModal.tags.tagEnterTip') }}
+                      </div>
+                    </Transition>
                   </div>
                 </div>
               </div>
@@ -210,7 +216,13 @@
                       :placeholder="t('addModal.tags.placeholder')"
                       @input="newTagInput = ($event.target as HTMLInputElement).value"
                       @keydown.enter.prevent="createAndAddTag"
+                      @blur="createAndAddTag"
                     />
+                    <Transition name="tip">
+                      <div v-if="newTagInput.trim()" class="tag-tip">
+                        {{ t('addModal.tags.tagEnterTip') }}
+                      </div>
+                    </Transition>
                   </div>
                 </div>
               </div>
@@ -632,6 +644,7 @@ function applyFile(path: string) {
 }
 
 async function submitFile() {
+  if (newTagInput.value.trim()) await createAndAddTag()
   if (!canSubmit.value || submitting.value) return
   submitting.value = true
   errorMsg.value = ''
@@ -661,6 +674,7 @@ async function submitFile() {
 }
 
 async function submitWebpage() {
+  if (newTagInput.value.trim()) await createAndAddTag()
   if (!canSubmitWebpage.value || submitting.value) return
   submitting.value = true
   errorMsg.value = ''
@@ -715,6 +729,7 @@ function onFolderPathChange() {
 }
 
 async function submitFolder() {
+  if (newTagInput.value.trim()) await createAndAddTag()
   if (!canSubmitFolder.value || submitting.value) return
   submitting.value = true
   errorMsg.value = ''
@@ -1260,7 +1275,7 @@ const checkIcon     = `<svg viewBox="0 0 48 48" fill="none" stroke="#10b981" str
   font-variant-numeric: tabular-nums;
 }
 
-.new-tag-row { display: flex; }
+.new-tag-row { display: flex; position: relative; }
 
 .new-tag-input {
   flex: 1;
@@ -1276,6 +1291,39 @@ const checkIcon     = `<svg viewBox="0 0 48 48" fill="none" stroke="#10b981" str
 }
 .new-tag-input::placeholder { color: var(--text-3); }
 .new-tag-input:focus { border-color: var(--accent); }
+
+.tag-tip {
+  position: absolute;
+  top: -34px;
+  left: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.tag-tip::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 10px;
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid var(--accent);
+}
+
+.tip-enter-active, .tip-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+.tip-enter-from, .tip-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.95);
+}
 
 /* ── 底部操作栏 ──────────────────────────────────────── */
 .modal-footer {

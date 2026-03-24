@@ -1,15 +1,29 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, net, globalShortcut, screen, dialog, clipboard } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, globalShortcut, screen, dialog, clipboard } from 'electron'
 import { join, extname, basename } from 'path'
 import { createHash } from 'crypto'
 import { deflateSync } from 'zlib'
 import { existsSync, createReadStream, statSync, copyFileSync, unlinkSync, readFileSync, mkdirSync, writeFileSync } from 'fs'
-import { pathToFileURL } from './utils/fs-safe'
+// import { pathToFileURL } from './utils/fs-safe'
 import { execFile } from 'child_process'
 
 // Windows 终端默认使用 GBK 编码，切换到 UTF-8 (65001) 让中文日志正常显示
 if (process.platform === 'win32') {
   execFile('cmd.exe', ['/c', 'chcp', '65001'], { windowsHide: true }, () => { })
 }
+
+
+// ── 全局异常捕获 ─────────────────────────────────────────────
+// Electron 28+ 的 net.fetch 有一个已知 bug (undici): 当网络重置或连接失败时（状态码为 0），
+// 它内部会抛出 RangeError: init["status"] must be in the range of 200 to 599...
+// 这个错误有时会逃逸 Promise 的 catch 而导致主进程弹出报错对话框。这里全局捕获并屏蔽它。
+process.on('uncaughtException', (err: any) => {
+  if (err?.message?.includes('range of 200 to 599')) {
+    console.warn('[UncaughtException] 捕获并屏蔽了 Electron net.fetch 内部状态码越界 bug:', err.message)
+    return
+  }
+  // 其他严重错误可以打印到控制台，但在生产环境下我们尽量不直接让程序崩溃
+  console.error('[UncaughtException] 主进程捕获到未处理异常:', err)
+})
 
 // 必须在 app ready 之前声明自定义 scheme（用于本地文件预览）
 protocol.registerSchemesAsPrivileged([
@@ -722,13 +736,8 @@ app.whenReady().then(() => {
         }
       }
 
-      // 小文件（<20MB）：用 net.fetch 简单转发（图片、图标等）
-      if (fileSize < 20 * 1024 * 1024) {
-        const target = pathToFileURL(filePath)
-        return net.fetch(target, { headers: Object.fromEntries(request.headers) })
-      }
 
-      // 大文件：流式读取，告知浏览器支持 Range（后续 seek 会走 Range 分支）
+      // 各种大小的文件统统采用直连文件流响应（避开 net.fetch 的潜在 Bug）
       return new Response(streamToWeb(createReadStream(filePath)), {
         status: 200,
         headers: {
