@@ -106,9 +106,9 @@
                       @keydown.188.prevent="addTag"
                       @blur="addTag"
                     />
-                    <Transition name="tip">
-                      <div v-if="newTagInput.trim()" class="tag-tip">
-                        {{ t('detail.tagEnterTip') }}
+                    <Transition name="fade-in">
+                      <div v-if="newTagInput.trim()" class="tag-enter-badge">
+                        Enter创建
                       </div>
                     </Transition>
                   </div>
@@ -861,7 +861,7 @@ async function refetchIcon() {
   color: var(--text);
   font-size: 12px;
   font-family: inherit;
-  padding: 0;
+  padding: 0 65px 0 0; /* 给右侧 Badge 留出空间 */
 }
 .tag-input::placeholder { color: var(--text-3); }
 
@@ -873,37 +873,29 @@ async function refetchIcon() {
   align-items: center;
 }
 
-.tag-tip {
+.tag-enter-badge {
   position: absolute;
-  top: -34px;
-  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   background: var(--accent);
   color: #fff;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 5px;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
   white-space: nowrap;
   pointer-events: none;
-  z-index: 100;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-}
-.tag-tip::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 10px;
-  width: 0; height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 4px solid var(--accent);
+  z-index: 10;
+  opacity: 0.9;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 
-.tip-enter-active, .tip-leave-active {
-  transition: opacity 0.2s, transform 0.2s;
+.fade-in-enter-active, .fade-in-leave-active {
+  transition: opacity 0.15s, transform 0.15s;
 }
-.tip-enter-from, .tip-leave-to {
+.fade-in-enter-from, .fade-in-leave-to {
   opacity: 0;
-  transform: translateY(6px) scale(0.95);
+  transform: translateY(-50%) translateX(5px);
 }
 
 /* 路径 */

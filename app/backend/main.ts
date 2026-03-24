@@ -67,7 +67,7 @@ app.on('before-quit', () => {
   flushRunningSessions()
   // 显式释放所有全局快捷键，确保 Win+V 等在进程退出后还给系统
   // （Electron 退出时操作系统会自动释放，但显式调用更保险）
-  globalShortcut.unregisterAll()
+  if (app.isReady()) globalShortcut.unregisterAll()
 })
 
 /** 用 Node 内置 zlib 生成合法 PNG buffer（无外部依赖） */
