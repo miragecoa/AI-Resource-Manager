@@ -231,28 +231,22 @@ export async function applyAndRestart(): Promise<void> {
   const logPath = join(tempDir, 'update.log')
   const batPath = join(tempDir, 'update.cmd')
 
-  // Escape single-quotes in paths for use inside PowerShell string literals
-  const psPathEsc = psPath.replace(/'/g, "''")
-
-  // When not admin: launch powershell.exe elevated directly (not the .cmd itself).
-  // This avoids the unreliable "re-launch %~f0 via RunAs" pattern that silently fails
-  // on Windows 11 when the path contains non-ASCII characters or the conhost window
-  // has already been closed by the exiting non-admin instance.
-  // Wrap psPath in embedded double-quotes so Start-Process preserves the
-  // path as a single token even when it contains spaces.
-  const elevateArgs = `@('-NoProfile','-ExecutionPolicy','Bypass','-File','"${psPathEsc}"')`
-  const elevateCmd = `Start-Process -FilePath powershell.exe -ArgumentList ${elevateArgs} -Verb RunAs`
+  // Self-elevate the .cmd itself via RunAs. %~f0 is cmd's built-in for the
+  // current batch file's full path — PowerShell single-quotes keep it as one
+  // token even when the path contains spaces. The re-launched elevated cmd
+  // then uses %~dp0 (its own directory) to locate update.ps1, sidestepping
+  // all cross-shell path-quoting issues.
   writeFileSync(batPath, [
     '@echo off',
     `echo [%date% %time%] Updater started > "${logPath}"`,
     'net session >nul 2>&1',
     'if %ERRORLEVEL% equ 0 goto :run',
     `echo [%date% %time%] Not admin, requesting elevation >> "${logPath}"`,
-    `powershell -NoProfile -Command "${elevateCmd}"`,
+    `powershell -NoProfile -WindowStyle Hidden -Command "Start-Process '%~f0' -Verb RunAs"`,
     'exit /b 0',
     ':run',
     `echo [%date% %time%] Running as admin, starting extraction >> "${logPath}"`,
-    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${psPath}" >> "${logPath}" 2>&1`,
+    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0update.ps1" >> "${logPath}" 2>&1`,
     `echo [%date% %time%] PowerShell exited with code %ERRORLEVEL% >> "${logPath}"`,
     'if %ERRORLEVEL% neq 0 pause',
   ].join('\r\n') + '\r\n')
