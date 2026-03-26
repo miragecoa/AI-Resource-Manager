@@ -238,7 +238,9 @@ export async function applyAndRestart(): Promise<void> {
   // This avoids the unreliable "re-launch %~f0 via RunAs" pattern that silently fails
   // on Windows 11 when the path contains non-ASCII characters or the conhost window
   // has already been closed by the exiting non-admin instance.
-  const elevateArgs = `@('-NoProfile','-ExecutionPolicy','Bypass','-File','${psPathEsc}')`
+  // Wrap psPath in embedded double-quotes so Start-Process preserves the
+  // path as a single token even when it contains spaces.
+  const elevateArgs = `@('-NoProfile','-ExecutionPolicy','Bypass','-File','"${psPathEsc}"')`
   const elevateCmd = `Start-Process -FilePath powershell.exe -ArgumentList ${elevateArgs} -Verb RunAs`
   writeFileSync(batPath, [
     '@echo off',
