@@ -1,6 +1,6 @@
 {
   "name": "ai-resource-manager",
-  "version": "0.2.29",
+  "version": "0.2.30",
   "description": "AI小抽屉 - 本地资源自动入库与AI标签",
   "main": "out/main/main.js",
   "scripts": {
@@ -31,7 +31,7 @@
   "author": "miragecoa",
   "build": {
     "appId": "com.airesourcemanager.app",
-    "productName": "AI资源管家",
+    "productName": "AI-Cubby",
     "icon": "resources/icon.ico",
     "artifactName": "AI-Cubby-${version}-portable-${os}-${arch}.${ext}",
     "files": [
