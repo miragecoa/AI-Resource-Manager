@@ -9,6 +9,14 @@
           <button class="close-btn" @click="$emit('close')" v-html="closeSvg" />
         </div>
 
+        <!-- 未分类提示横幅 -->
+        <div v-if="props.showHint" class="classify-hint">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          {{ t('detail.classifyHint') }}
+        </div>
+
         <!-- 主体：左（封面）+ 右（表单） -->
         <div class="modal-body">
 
@@ -200,7 +208,7 @@ import { useSettingsStore } from '../stores/settings'
 
 const { t, locale } = useI18n()
 
-const props = defineProps<{ resource: Resource }>()
+const props = defineProps<{ resource: Resource; showHint?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const store = useResourceStore()
@@ -532,6 +540,21 @@ async function refetchIcon() {
 }
 .close-btn:hover { background: var(--surface-2); color: var(--text); }
 .close-btn :deep(svg) { width: 16px; height: 16px; }
+
+/* ── 未分类提示 ─────────────────────────────────── */
+.classify-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 20px 4px;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--accent) 85%, white);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+}
 
 /* ── 主体双栏 ───────────────────────────────────── */
 .modal-body {

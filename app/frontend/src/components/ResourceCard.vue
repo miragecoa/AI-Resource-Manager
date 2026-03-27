@@ -62,7 +62,7 @@
         <template v-if="resource.tags?.length">
           <span v-for="tag in resource.tags" :key="tag.id" class="tag">{{ tag.name }}</span>
         </template>
-        <span v-else class="tag tag-unclassified" :title="t('resource.unclassifiedHint')">{{ t('resource.unclassified') }}</span>
+        <span v-else class="tag tag-unclassified tag-unclassified-btn" :title="t('resource.unclassifiedHint')" @click.stop="$emit('select-hint', resource)">{{ t('resource.unclassified') }}</span>
       </div>
     </div>
 
@@ -194,6 +194,7 @@ const micro   = computed(() => props.cardZoom <= 0.55) // < ~82px:  hide info en
 const emit = defineEmits<{
   open:   [resource: Resource]
   select: [resource: Resource]
+  'select-hint': [resource: Resource]
   remove: [resource: Resource]
   ignore: [resource: Resource]
   'toggle-select': [resource: Resource]
@@ -599,6 +600,15 @@ function openInExplorer() {
   color: var(--text-3);
   border: 1px dashed color-mix(in srgb, var(--text-3) 40%, transparent);
   font-weight: 400;
+}
+.tag-unclassified-btn {
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.tag-unclassified-btn:hover {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .ctx-backdrop {

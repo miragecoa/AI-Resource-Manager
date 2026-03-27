@@ -434,7 +434,7 @@ export default {
     ignoreCancel: 'Cancel',
     removeFromLibrary: 'Remove from library',
     unclassified: 'Unclassified',
-    unclassifiedHint: 'Right-click to add tags or change category',
+    unclassifiedHint: 'Click to add name, notes and tags',
     stats: {
       duration: 'Duration',
       count: '×{n}',
@@ -479,6 +479,7 @@ export default {
     saveAndClose: 'Save & Close',
     close: 'Close',
     tagEnterTip: 'Press Enter to create tag',
+    classifyHint: 'Edit the name, notes, and tags below to help AI better understand this resource.',
     favicon: {
       loading: 'Fetching…',
       failed: 'Failed, retry',

@@ -33,7 +33,7 @@
     "appId": "com.airesourcemanager.app",
     "productName": "AI资源管家",
     "icon": "resources/icon.ico",
-    "artifactName": "AI-Resource-Manager-${version}-portable-${os}-${arch}.${ext}",
+    "artifactName": "AI-Cubby-${version}-portable-${os}-${arch}.${ext}",
     "files": [
       "out/**/*",
       "resources/icon.*",

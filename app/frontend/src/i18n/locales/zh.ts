@@ -434,7 +434,7 @@ export default {
     ignoreCancel: '取消',
     removeFromLibrary: '从库内删除',
     unclassified: '未分类',
-    unclassifiedHint: '右键可添加标签、修改分类',
+    unclassifiedHint: '点击可添加名称、备注和标签',
     stats: {
       duration: '时长',
       count: '{n}次',
@@ -479,6 +479,7 @@ export default {
     saveAndClose: '保存并关闭',
     close: '关闭',
     tagEnterTip: '按 Enter 创建标签',
+    classifyHint: '可以在下方修改名称、添加备注和标签，帮助 AI 更好地认识这个资源',
     favicon: {
       loading: '获取中…',
       failed: '获取失败，点击重试',

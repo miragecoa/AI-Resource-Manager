@@ -267,6 +267,7 @@
                 :heat-level="statsPanel === 'heat' ? heatLevel(item) : undefined"
                 @toggle-select="toggleSelect(item)"
                 @select="onCardSelect"
+                @select-hint="onCardSelectHint"
                 @open="openResource"
                 @remove="removeResource"
                 @ignore="ignoreResource"
@@ -604,7 +605,8 @@
     <ResourceDetailPanel
       v-if="selectedResource"
       :resource="selectedResource"
-      @close="selectedId = null"
+      :show-hint="detailShowHint"
+      @close="selectedId = null; detailShowHint = false"
     />
 
     <!-- 拖入提示 Toast -->
@@ -1307,8 +1309,16 @@ const selectedResource = computed(() =>
   selectedId.value ? (store.items.find(r => r.id === selectedId.value) ?? null) : null
 )
 
+const detailShowHint = ref(false)
+
 function onCardSelect(resource: Resource) {
+  detailShowHint.value = false
   selectedId.value = selectedId.value === resource.id ? null : resource.id
+}
+
+function onCardSelectHint(resource: Resource) {
+  detailShowHint.value = true
+  selectedId.value = resource.id
 }
 
 // 列表视图右键菜单
