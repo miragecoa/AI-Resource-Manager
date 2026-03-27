@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    :root {
+      --accent: #6366F1;
+      --accent-2: #818CF8;
+      --bg: #0C0C18;
+      --surface: #111122;
+      --surface-2: #191930;
+      --border: #28284A;
+      --text: #E2E2F2;
+      --text-2: #9090B8;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      font-family: -apple-system, 'Microsoft YaHei', 'PingFang SC', sans-serif;
+      color: var(--text);
+      overflow: hidden;
+      user-select: none; -webkit-user-select: none;
+    }
+
+    .titlebar {
+      -webkit-app-region: drag;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .titlebar-title {
+      font-size: 12.5px;
+      color: var(--text-2);
+      font-weight: 500;
+    }
+    .close-btn {
+      -webkit-app-region: no-drag;
+      background: transparent;
+      border: none;
+      width: 22px; height: 22px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      border-radius: 5px;
+      color: var(--text-2);
+      transition: background 0.15s, color 0.15s;
+    }
+    .close-btn:hover { background: rgba(239,68,68,0.18); color: #ef4444; }
+
+    .content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: calc(100% - 36px);
+    }
+
+    .drop-zone {
+      border: 2px dashed color-mix(in srgb, var(--accent) 35%, transparent);
+      border-radius: 12px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+      position: relative;
+      overflow: hidden;
+    }
+    .drop-zone:hover {
+      border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+      background: color-mix(in srgb, var(--accent) 5%, var(--surface-2));
+    }
+    .drop-zone.dragover {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .drop-icon {
+      width: 52px; height: 52px;
+      opacity: 0.5;
+    }
+    .drop-text {
+      font-size: 13px;
+      color: var(--text-2);
+    }
+    .drop-sub {
+      font-size: 11px;
+      color: color-mix(in srgb, var(--text-2) 55%, transparent);
+    }
+
+    .preview-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .preview-img {
+      width: 80px; height: 80px;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(99,102,241,0.18);
+    }
+    .preview-label {
+      font-size: 11.5px;
+      color: var(--text-2);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      flex: 1;
+      height: 34px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface-2);
+      color: var(--text-2);
+      font-size: 12.5px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn:hover {
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface-2));
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      color: var(--text);
+    }
+    .btn.primary {
+      background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      color: var(--accent-2);
+    }
+    .btn.primary:hover {
+      background: color-mix(in srgb, var(--accent) 28%, var(--surface));
+      border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+    }
+    .btn.danger { color: rgba(252,165,165,0.8); }
+    .btn.danger:hover {
+      background: rgba(239,68,68,0.12);
+      border-color: rgba(239,68,68,0.3);
+      color: rgba(252,165,165,1);
+    }
+  </style>
+</head>
+<body>
+  <div class="titlebar">
+    <span class="titlebar-title" id="ip-title">更换应用图标</span>
+    <button class="close-btn" id="closeBtn">
+      <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+        <path d="M1 1l7 7M8 1l-7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="content">
+    <div class="drop-zone" id="dropZone">
+      <div class="empty-state" id="emptyState">
+        <svg class="drop-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="7" y="7" width="38" height="38" rx="8" stroke="color-mix(in srgb, #6366F1 55%, transparent)" stroke-width="1.5"/>
+          <path d="M15 33l8-9 5 5 5-6 9 10" stroke="color-mix(in srgb, #6366F1 70%, transparent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="19" cy="21" r="3.5" stroke="color-mix(in srgb, #6366F1 55%, transparent)" stroke-width="1.5"/>
+        </svg>
+        <div class="drop-text" id="ip-drop">将图片拖放到此处</div>
+        <div class="drop-sub" id="ip-drop-sub">支持 PNG · JPG · ICO · WebP</div>
+      </div>
+      <div class="preview-state" id="previewState">
+        <img class="preview-img" id="previewImg" src="" alt="" />
+        <div class="preview-label" id="ip-preview-label">当前图标</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="browseBtn">浏览文件</button>
+      <button class="btn danger" id="clearBtn" style="display:none">恢复默认</button>
+    </div>
+  </div>
+
+  <script>
+    // ── i18n ─────────────────────────────────────────────
+    const _I18N = {
+      zh: {
+        title: '更换应用图标',
+        drop: '将图片拖放到此处',
+        dropSub: '支持 PNG · JPG · ICO · WebP',
+        browse: '浏览文件',
+        clear: '恢复默认',
+        preview: '当前图标',
+      },
+      en: {
+        title: 'Change App Icon',
+        drop: 'Drop an image here',
+        dropSub: 'PNG · JPG · ICO · WebP',
+        browse: 'Browse',
+        clear: 'Reset Default',
+        preview: 'Current icon',
+      },
+    }
+    const _sp = new URLSearchParams(window.location.search)
+    let _lang = _sp.get('lang') === 'en' ? 'en' : 'zh'
+
+    function applyLang() {
+      const T = _I18N[_lang] || _I18N.zh
+      document.getElementById('ip-title').textContent = T.title
+      document.getElementById('ip-drop').textContent = T.drop
+      document.getElementById('ip-drop-sub').textContent = T.dropSub
+      document.getElementById('browseBtn').textContent = T.browse
+      document.getElementById('clearBtn').textContent = T.clear
+      document.getElementById('ip-preview-label').textContent = T.preview
+    }
+    applyLang()
+
+    // Apply theme vars from URL
+    const _vars = {
+      '--accent':    _sp.get('accent'),
+      '--accent-2':  _sp.get('accent2'),
+      '--bg':        _sp.get('bg'),
+      '--surface':   _sp.get('surface'),
+      '--surface-2': _sp.get('surface2'),
+      '--border':    _sp.get('border'),
+      '--text':      _sp.get('text'),
+      '--text-2':    _sp.get('text2'),
+    }
+    for (const [k, v] of Object.entries(_vars)) {
+      if (v) document.documentElement.style.setProperty(k, v)
+    }
+
+    // ── State helpers ─────────────────────────────────────
+    const dropZone    = document.getElementById('dropZone')
+    const emptyState  = document.getElementById('emptyState')
+    const previewState = document.getElementById('previewState')
+    const previewImg  = document.getElementById('previewImg')
+    const clearBtn    = document.getElementById('clearBtn')
+
+    function showPreview(dataUrl) {
+      previewImg.src = dataUrl
+      emptyState.style.display = 'none'
+      previewState.style.display = 'flex'
+      clearBtn.style.display = 'block'
+    }
+    function showEmpty() {
+      previewImg.src = ''
+      emptyState.style.display = 'flex'
+      previewState.style.display = 'none'
+      clearBtn.style.display = 'none'
+    }
+
+    // Load current icon on open
+    window.iconPickerApi.getCurrentIcon().then(dataUrl => {
+      if (dataUrl) showPreview(dataUrl)
+    })
+
+    // Listen for language change
+    window.iconPickerApi.onLanguageChange(lang => {
+      _lang = lang === 'en' ? 'en' : 'zh'
+      applyLang()
+    })
+
+    // ── Drag & drop ───────────────────────────────────────
+    dropZone.addEventListener('dragover', e => {
+      e.preventDefault()
+      dropZone.classList.add('dragover')
+    })
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'))
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault()
+      dropZone.classList.remove('dragover')
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]
+      if (!file || !file.type.startsWith('image/')) return
+      const reader = new FileReader()
+      reader.onload = ev => {
+        const dataUrl = ev.target && ev.target.result
+        if (typeof dataUrl === 'string') {
+          showPreview(dataUrl)
+          window.iconPickerApi.saveFromDataUrl(dataUrl)
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+
+    // Click on drop zone = browse
+    dropZone.addEventListener('click', () => browseBtn.click())
+
+    // ── Buttons ───────────────────────────────────────────
+    const browseBtn = document.getElementById('browseBtn')
+    browseBtn.addEventListener('click', e => {
+      e.stopPropagation()
+      window.iconPickerApi.browse()
+    })
+
+    clearBtn.addEventListener('click', e => {
+      e.stopPropagation()
+      window.iconPickerApi.clearIcon()
+    })
+
+    document.getElementById('closeBtn').addEventListener('click', () => {
+      window.iconPickerApi.close()
+    })
+
+    // ── Main process feedback ─────────────────────────────
+    window.iconPickerApi.onIconSaved(dataUrl => {
+      if (dataUrl) showPreview(dataUrl)
+      else showEmpty()
+    })
+  </script>
+</body>
+</html>

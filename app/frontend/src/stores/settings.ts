@@ -324,6 +324,7 @@ export const useSettingsStore = defineStore('settings', () => {
   async function setAppTitle(title: string) {
     appTitle.value = title || 'AI小抽屉'
     await window.api.settings.set('appTitle', appTitle.value)
+    window.api.app.setTitle(appTitle.value)
   }
 
   async function setOfflineMode(enabled: boolean) {

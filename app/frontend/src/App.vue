@@ -12,12 +12,29 @@
     <!-- 自定义标题栏（替代系统原生标题栏） -->
     <div class="titlebar" :class="{ 'is-pinned': isPinned }">
       <div class="titlebar-title">
-        <svg class="tb-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="7" height="7" rx="1.5" />
-          <rect x="14" y="3" width="7" height="7" rx="1.5" />
-          <rect x="3" y="14" width="7" height="7" rx="1.5" />
-          <rect x="14" y="14" width="7" height="7" rx="1.5" />
-        </svg>
+        <!-- 图标：自定义图片 or 默认SVG -->
+        <button
+          class="tb-logo-btn"
+          :title="t('sidebar.changeIcon')"
+          @click="pickAppIcon"
+        >
+          <img v-if="customIconUrl" :src="customIconUrl" class="tb-logo-img" alt="icon" />
+          <svg v-else class="tb-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7" rx="1.5" />
+            <rect x="14" y="3" width="7" height="7" rx="1.5" />
+            <rect x="3" y="14" width="7" height="7" rx="1.5" />
+            <rect x="14" y="14" width="7" height="7" rx="1.5" />
+          </svg>
+        </button>
+        <!-- 清除自定义图标按钮（有自定义图标时才显示） -->
+        <button
+          v-if="customIconUrl && sidebarEditing"
+          class="tb-icon-clear"
+          :title="t('sidebar.clearIcon')"
+          @click.stop="clearAppIcon"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
         <input
           v-if="sidebarEditing"
           class="tb-logo-input"
@@ -94,6 +111,15 @@ const showConsent = ref(false)
 const isMaximized = ref(false)
 const isPinned = ref(false)
 const sidebarEditing = ref(false)
+const customIconUrl = ref<string | null>(null)
+
+function pickAppIcon() {
+  window.api.app.pickIcon()
+}
+async function clearAppIcon() {
+  await window.api.app.clearIcon()
+  customIconUrl.value = null
+}
 
 const editIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`
 const doneIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`
@@ -106,6 +132,7 @@ function toggleSettings() {
 let unsubscribe: (() => void) | null = null
 let unsubscribeRunning: (() => void) | null = null
 let unsubscribeMaximize: (() => void) | null = null
+let unsubscribeIconChanged: (() => void) | null = null
 
 const winMinimize = () => window.api.win.minimize()
 const winMaximize = () => window.api.win.maximize()
@@ -128,6 +155,12 @@ onMounted(async () => {
 
   // 独立子窗口只需要主题，不需要完整的应用初始化
   if (isMasonryWindow || isDropWindow) return
+
+  // 加载自定义图标 + 监听图标选择弹窗的回调
+  customIconUrl.value = await window.api.app.getCustomIcon()
+  unsubscribeIconChanged = window.api.app.onIconChanged((dataUrl) => {
+    customIconUrl.value = dataUrl
+  })
 
   // 窗口最大化 / 置顶状态同步
   isMaximized.value = await window.api.win.isMaximized()
@@ -156,6 +189,7 @@ onUnmounted(() => {
   unsubscribe?.()
   unsubscribeRunning?.()
   unsubscribeMaximize?.()
+  unsubscribeIconChanged?.()
 })
 </script>
 
@@ -232,12 +266,51 @@ body {
   -webkit-app-region: no-drag;
 }
 
+.tb-logo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.1s;
+}
+.tb-logo-btn:hover { background: var(--surface-2); }
+
 .tb-logo {
   width: 16px;
   height: 16px;
   color: var(--accent);
   flex-shrink: 0;
 }
+
+.tb-logo-img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.tb-icon-clear {
+  width: 16px;
+  height: 16px;
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 3px;
+  color: var(--text-3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.1s, color 0.1s;
+}
+.tb-icon-clear:hover { background: rgba(239,68,68,0.12); color: #ef4444; }
+.tb-icon-clear svg { width: 10px; height: 10px; }
 
 .tb-logo-text {
   font-size: 13px;

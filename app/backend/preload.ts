@@ -159,7 +159,15 @@ contextBridge.exposeInMainWorld('api', {
     getZoom: (): number => webFrame.getZoomFactor(),
     getDbPath: (): Promise<string> => ipcRenderer.invoke('app:getDbPath'),
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
-    openUrl: (url: string): Promise<void> => ipcRenderer.invoke('app:openUrl', url)
+    openUrl: (url: string): Promise<void> => ipcRenderer.invoke('app:openUrl', url),
+    setTitle: (title: string): Promise<void> => ipcRenderer.invoke('app:setTitle', title),
+    getCustomIcon: (): Promise<string | null> => ipcRenderer.invoke('app:getCustomIcon'),
+    pickIcon: (): Promise<void> => ipcRenderer.invoke('app:pickIcon'),
+    clearIcon: (): Promise<void> => ipcRenderer.invoke('app:clearIcon'),
+    onIconChanged: (callback: (dataUrl: string | null) => void) => {
+      ipcRenderer.on('app:iconChanged', (_e, dataUrl) => callback(dataUrl))
+      return () => ipcRenderer.removeAllListeners('app:iconChanged')
+    },
   },
 
   // 自动更新

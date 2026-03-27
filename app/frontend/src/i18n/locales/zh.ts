@@ -28,6 +28,8 @@ export default {
   sidebar: {
     editTitle: '自定义侧边栏',
     editDone: '完成编辑',
+    changeIcon: '点击更换图标',
+    clearIcon: '还原默认图标',
     editHint: '拖拽排序 · 点击眼睛显隐',
     show: '显示',
     hide: '隐藏',

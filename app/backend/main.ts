@@ -44,6 +44,7 @@ let clipboardWindow: BrowserWindow | null = null
 
 let drawerSettingsWindow: BrowserWindow | null = null
 let dropImportWindow: BrowserWindow | null = null
+let iconPickerWindow: BrowserWindow | null = null
 
 // ── 剪贴板监听状态 ─────────────────────────────────────────────
 let clipboardImgDir = ''
@@ -355,8 +356,15 @@ function buildTrayMenu(): Electron.Menu {
 }
 
 function createTray(): void {
-  tray = new Tray(createTrayIcon())
-  tray.setToolTip('AI小抽屉')
+  const customIconPath = getSetting('appCustomIcon') ?? ''
+  const trayIcon = (() => {
+    if (customIconPath && existsSync(customIconPath)) {
+      try { const img = nativeImage.createFromPath(customIconPath); if (!img.isEmpty()) return img } catch {}
+    }
+    return createTrayIcon()
+  })()
+  tray = new Tray(trayIcon)
+  tray.setToolTip(getSetting('appTitle') || 'AI小抽屉')
   tray.setContextMenu(buildTrayMenu())
   tray.on('click', () => mainWindow?.show())
 }
@@ -575,6 +583,62 @@ function openDropImportWindow(items: Array<{ type: string; title: string; file_p
   }
 }
 
+/** 保存图标文件 + 更新窗口/托盘图标 + 通知主窗口 */
+function applyCustomIcon(dest: string): string | null {
+  setSetting('appCustomIcon', dest)
+  try {
+    const img = nativeImage.createFromPath(dest)
+    if (!img.isEmpty()) {
+      mainWindow?.setIcon(img)
+      tray?.setImage(img)
+    }
+  } catch { /* unsupported format */ }
+  const dataUrl = iconToDataUrl(dest)
+  mainWindow?.webContents.send('app:iconChanged', dataUrl)
+  return dataUrl
+}
+
+function openIconPickerWindow(): void {
+  if (iconPickerWindow && !iconPickerWindow.isDestroyed()) {
+    iconPickerWindow.focus()
+    return
+  }
+  const { width: sw, height: sh } = screen.getPrimaryDisplay().workAreaSize
+  const W = 340, H = 280
+  const theme = (() => { try { return JSON.parse(getSetting('theme') ?? '{}') } catch { return {} } })()
+  const accent   = theme['accent']    ?? '#6366F1'
+  const accent2  = theme['accent-2']  ?? '#818CF8'
+  const bg       = theme['bg']        ?? '#0C0C18'
+  const surface  = theme['surface']   ?? '#111122'
+  const surface2 = theme['surface-2'] ?? '#191930'
+  const border   = theme['border']    ?? '#28284A'
+  const text     = theme['text']      ?? '#E2E2F2'
+  const text2    = theme['text-2']    ?? '#9090B8'
+  const lang     = getSetting('language') ?? 'zh'
+  const query = new URLSearchParams({ accent, accent2, bg, surface, surface2, border, text, text2, lang }).toString()
+
+  iconPickerWindow = new BrowserWindow({
+    width: W, height: H,
+    x: Math.round((sw - W) / 2), y: Math.round((sh - H) / 2),
+    show: false, frame: false,
+    title: '更换应用图标',
+    backgroundColor: bg,
+    resizable: false,
+    ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/iconPicker.js'),
+      contextIsolation: true, nodeIntegration: false,
+    }
+  })
+  iconPickerWindow.on('ready-to-show', () => { iconPickerWindow?.show(); iconPickerWindow?.focus() })
+  iconPickerWindow.on('closed', () => { iconPickerWindow = null })
+  if (process.env['ELECTRON_RENDERER_URL']) {
+    iconPickerWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/icon-picker.html?' + query)
+  } else {
+    iconPickerWindow.loadFile(join(__dirname, '../renderer/icon-picker.html'), { query: { accent, accent2, bg, surface, surface2, border, text, text2, lang } })
+  }
+}
+
 function createWindow(): void {
   // 恢复上次窗口位置和大小
   let savedBounds: { x?: number; y?: number; width: number; height: number } = { width: 1600, height: 1000 }
@@ -583,6 +647,12 @@ function createWindow(): void {
     if (raw) savedBounds = { ...savedBounds, ...JSON.parse(raw) }
   } catch { /* use defaults */ }
 
+  const savedAppTitle = getSetting('appTitle') || 'AI小抽屉'
+  const savedAppIconPath = getSetting('appCustomIcon') ?? ''
+  const savedAppIcon = savedAppIconPath && existsSync(savedAppIconPath)
+    ? (() => { try { const img = nativeImage.createFromPath(savedAppIconPath); return img.isEmpty() ? null : img } catch { return null } })()
+    : null
+
   mainWindow = new BrowserWindow({
     ...savedBounds,
     minWidth: 900,
@@ -590,9 +660,9 @@ function createWindow(): void {
     show: false,
     frame: false,
     skipTaskbar: true,   // 默认不在任务栏，显示时再 setSkipTaskbar(false)
-    title: 'AI小抽屉',
+    title: savedAppTitle,
     backgroundColor: '#0C0C18',
-    ...(loadFileIcon() ? { icon: loadFileIcon()! } : {}),
+    ...(savedAppIcon ? { icon: savedAppIcon } : loadFileIcon() ? { icon: loadFileIcon()! } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -600,7 +670,12 @@ function createWindow(): void {
     }
   })
 
+  // 阻止网页 <title> 标签覆盖用户保存的应用名称
+  mainWindow.on('page-title-updated', (e) => e.preventDefault())
+
   mainWindow.on('ready-to-show', () => {
+    // 页面加载完成后重新应用保存的标题（防止 HTML <title> 覆盖）
+    mainWindow?.setTitle(savedAppTitle)
     const showOnAutoStart = getSetting('showOnAutoStart') === 'true'
     if (!launchedHidden || showOnAutoStart) {
       mainWindow?.setSkipTaskbar(false)
@@ -791,6 +866,83 @@ app.whenReady().then(() => {
 
   createTray()
   createWindow()
+
+  // ── 应用标题 / 图标 IPC ───────────────────────────────
+  ipcMain.handle('app:setTitle', (_e, title: string) => {
+    const t = title || 'AI小抽屉'
+    mainWindow?.setTitle(t)
+    tray?.setToolTip(t)
+  })
+
+  ipcMain.handle('app:getCustomIcon', () => {
+    return iconToDataUrl(getSetting('appCustomIcon') ?? '')
+  })
+
+  ipcMain.handle('app:pickIcon', () => {
+    openIconPickerWindow()
+  })
+
+  ipcMain.handle('app:clearIcon', () => {
+    const p = getSetting('appCustomIcon') ?? ''
+    if (p) { try { unlinkSync(p) } catch {} }
+    setSetting('appCustomIcon', '')
+    const defaultIcon = loadFileIcon() ?? nativeImage.createFromBuffer(makeSolidPng(0x63, 0x66, 0xF1))
+    mainWindow?.setIcon(defaultIcon)
+    tray?.setImage(defaultIcon)
+    mainWindow?.webContents.send('app:iconChanged', null)
+  })
+
+  // ── 图标选择弹窗 IPC ─────────────────────────────────
+  ipcMain.handle('iconPicker:getCurrentIcon', () => {
+    return iconToDataUrl(getSetting('appCustomIcon') ?? '')
+  })
+
+  ipcMain.handle('iconPicker:browse', async () => {
+    const result = await dialog.showOpenDialog(iconPickerWindow ?? mainWindow!, {
+      title: '选择应用图标',
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'ico', 'webp'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || !result.filePaths.length) return
+    const src = result.filePaths[0]
+    const ext = extname(src).toLowerCase()
+    const dest = join(getProfileDir(loadManifest().active), `app-custom-icon${ext}`)
+    copyFileSync(src, dest)
+    const dataUrl = applyCustomIcon(dest)
+    iconPickerWindow?.webContents.send('iconPicker:saved', dataUrl)
+    iconPickerWindow?.close()
+  })
+
+  ipcMain.handle('iconPicker:saveFromDataUrl', (_e, dataUrl: string) => {
+    try {
+      const match = dataUrl.match(/^data:image\/([a-zA-Z+.-]+);base64,(.+)$/)
+      if (!match) return
+      let ext = match[1].toLowerCase()
+      if (ext === 'jpeg') ext = 'jpg'
+      if (ext === 'x-icon' || ext === 'vnd.microsoft.icon') ext = 'ico'
+      if (ext === 'svg+xml') ext = 'svg'
+      const buf = Buffer.from(match[2], 'base64')
+      const dest = join(getProfileDir(loadManifest().active), `app-custom-icon.${ext}`)
+      writeFileSync(dest, buf)
+      applyCustomIcon(dest)
+      iconPickerWindow?.close()
+    } catch { /* ignore bad data */ }
+  })
+
+  ipcMain.handle('iconPicker:clearIcon', () => {
+    const p = getSetting('appCustomIcon') ?? ''
+    if (p) { try { unlinkSync(p) } catch {} }
+    setSetting('appCustomIcon', '')
+    const defaultIcon = loadFileIcon() ?? nativeImage.createFromBuffer(makeSolidPng(0x63, 0x66, 0xF1))
+    mainWindow?.setIcon(defaultIcon)
+    tray?.setImage(defaultIcon)
+    mainWindow?.webContents.send('app:iconChanged', null)
+    iconPickerWindow?.close()
+  })
+
+  ipcMain.handle('iconPicker:close', () => {
+    iconPickerWindow?.close()
+  })
 
   // 悬浮小抽屉 IPC
   ipcMain.handle('drawer:openMain', () => {

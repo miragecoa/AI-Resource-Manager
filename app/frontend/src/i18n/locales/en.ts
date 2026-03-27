@@ -28,6 +28,8 @@ export default {
   sidebar: {
     editTitle: 'Customize sidebar',
     editDone: 'Done',
+    changeIcon: 'Click to change icon',
+    clearIcon: 'Restore default icon',
     editHint: 'Drag to reorder · Click eye to show/hide',
     show: 'Show',
     hide: 'Hide',
