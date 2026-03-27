@@ -479,7 +479,7 @@ export default {
     saveAndClose: 'Save & Close',
     close: 'Close',
     tagEnterTip: 'Press Enter to create tag',
-    classifyHint: 'Edit the name, notes, and tags below to help AI better understand this resource.',
+    classifyHint: 'Edit the name, notes, and tags below.',
     favicon: {
       loading: 'Fetching…',
       failed: 'Failed, retry',

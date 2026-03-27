@@ -133,7 +133,7 @@ That game from three months ago, that batch of photos from last week — open AI
 
 Go to the [Releases](../../releases) page for the latest version:
 
-- **Portable** (no installer): `AI-Resource-Manager-x.x.x-portable-win-x64.zip` — unzip and run
+- **Portable** (no installer): `AI-Cubby-x.x.x-portable-win-x64.zip` — unzip and run
 
 > Requires Windows 10 or later
 

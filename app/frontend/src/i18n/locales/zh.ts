@@ -479,7 +479,7 @@ export default {
     saveAndClose: '保存并关闭',
     close: '关闭',
     tagEnterTip: '按 Enter 创建标签',
-    classifyHint: '可以在下方修改名称、添加备注和标签，帮助 AI 更好地认识这个资源',
+    classifyHint: '可以在下方修改名称、添加备注和标签',
     favicon: {
       loading: '获取中…',
       failed: '获取失败，点击重试',
