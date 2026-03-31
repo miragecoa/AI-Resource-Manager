@@ -231,6 +231,8 @@ export const useSettingsStore = defineStore('settings', () => {
       await window.api.settings.set('language', 'zh')
     }
     i18n.global.locale.value = language.value
+    // If appTitle was never customized, use locale-appropriate default
+    if (!appTitleVal) appTitle.value = language.value === 'en' ? 'AI Cubby' : 'AI小抽屉'
 
     if (customCatVal) {
       try { customCategories.value = JSON.parse(customCatVal) } catch {}
@@ -322,7 +324,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   async function setAppTitle(title: string) {
-    appTitle.value = title || 'AI小抽屉'
+    appTitle.value = title || (language.value === 'en' ? 'AI Cubby' : 'AI小抽屉')
     await window.api.settings.set('appTitle', appTitle.value)
     window.api.app.setTitle(appTitle.value)
   }
@@ -359,6 +361,13 @@ export const useSettingsStore = defineStore('settings', () => {
     language.value = lang
     i18n.global.locale.value = lang
     await window.api.settings.set('language', lang)
+    // If still on default title, switch to the new locale's default
+    if (appTitle.value === 'AI小抽屉' || appTitle.value === 'AI Cubby') {
+      const newTitle = lang === 'en' ? 'AI Cubby' : 'AI小抽屉'
+      appTitle.value = newTitle
+      await window.api.settings.set('appTitle', newTitle)
+      window.api.app.setTitle(newTitle)
+    }
   }
 
   async function addCustomCategory(name: string) {

@@ -243,29 +243,30 @@ export function registerIpcHandlers(): void {
   // ── 预设常用工具 ──────────────────────────────────────
   ipcMain.handle('resources:getPresetApps', () => {
     const S32 = 'C:\\Windows\\System32'
+    const isEn = (getSetting('language') ?? 'zh') === 'en'
+    const T = isEn
+      ? { tool: 'Windows Tools', cli: 'Command Line', sys: 'System', util: 'Utilities' }
+      : { tool: 'Windows 工具', cli: '命令行', sys: '系统管理', util: '实用工具' }
     const presets: Array<{ title: string; path: string; tags: string[] }> = [
-      // 命令行
-      { title: '命令提示符', path: `${S32}\\cmd.exe`, tags: ['Windows 工具', '命令行'] },
-      { title: 'PowerShell', path: `${S32}\\WindowsPowerShell\\v1.0\\powershell.exe`, tags: ['Windows 工具', '命令行'] },
-      // 系统管理
-      { title: '任务管理器', path: `${S32}\\Taskmgr.exe`, tags: ['Windows 工具', '系统管理'] },
-      { title: '控制面板', path: `${S32}\\control.exe`, tags: ['Windows 工具', '系统管理'] },
-      { title: '注册表编辑器', path: 'C:\\Windows\\regedit.exe', tags: ['Windows 工具', '系统管理'] },
-      { title: '资源监视器', path: `${S32}\\resmon.exe`, tags: ['Windows 工具', '系统管理'] },
-      { title: '事件查看器', path: `${S32}\\eventvwr.exe`, tags: ['Windows 工具', '系统管理'] },
-      { title: '系统配置', path: `${S32}\\msconfig.exe`, tags: ['Windows 工具', '系统管理'] },
-      { title: '磁盘清理', path: `${S32}\\cleanmgr.exe`, tags: ['Windows 工具', '系统管理'] },
-      // 实用工具
-      { title: '记事本', path: `${S32}\\notepad.exe`, tags: ['Windows 工具', '实用工具'] },
-      { title: '计算器', path: `${S32}\\calc.exe`, tags: ['Windows 工具', '实用工具'] },
-      { title: '画图', path: `${S32}\\mspaint.exe`, tags: ['Windows 工具', '实用工具'] },
-      { title: '截图工具', path: `${S32}\\SnippingTool.exe`, tags: ['Windows 工具', '实用工具'] },
+      { title: isEn ? 'Command Prompt'    : '命令提示符',   path: `${S32}\\cmd.exe`,                                          tags: [T.tool, T.cli]  },
+      { title: 'PowerShell',                                 path: `${S32}\\WindowsPowerShell\\v1.0\\powershell.exe`,          tags: [T.tool, T.cli]  },
+      { title: isEn ? 'Task Manager'      : '任务管理器',   path: `${S32}\\Taskmgr.exe`,                                      tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Control Panel'     : '控制面板',     path: `${S32}\\control.exe`,                                      tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Registry Editor'   : '注册表编辑器', path: 'C:\\Windows\\regedit.exe',                                 tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Resource Monitor'  : '资源监视器',   path: `${S32}\\resmon.exe`,                                       tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Event Viewer'      : '事件查看器',   path: `${S32}\\eventvwr.exe`,                                     tags: [T.tool, T.sys]  },
+      { title: isEn ? 'System Config'     : '系统配置',     path: `${S32}\\msconfig.exe`,                                     tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Disk Cleanup'      : '磁盘清理',     path: `${S32}\\cleanmgr.exe`,                                     tags: [T.tool, T.sys]  },
+      { title: isEn ? 'Notepad'           : '记事本',       path: `${S32}\\notepad.exe`,                                      tags: [T.tool, T.util] },
+      { title: isEn ? 'Calculator'        : '计算器',       path: `${S32}\\calc.exe`,                                         tags: [T.tool, T.util] },
+      { title: isEn ? 'Paint'             : '画图',         path: `${S32}\\mspaint.exe`,                                      tags: [T.tool, T.util] },
+      { title: isEn ? 'Snipping Tool'     : '截图工具',     path: `${S32}\\SnippingTool.exe`,                                 tags: [T.tool, T.util] },
     ]
     // Windows Terminal（可能未安装）
     try {
       const wtPath = require('child_process').execSync('where wt.exe', { encoding: 'utf8' }).trim().split('\n')[0]
       if (wtPath && existsSync(wtPath)) {
-        presets.push({ title: 'Windows Terminal', path: wtPath, tags: ['Windows 工具', '命令行'] })
+        presets.push({ title: 'Windows Terminal', path: wtPath, tags: [T.tool, T.cli] })
       }
     } catch { /* not installed */ }
     return presets
