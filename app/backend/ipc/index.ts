@@ -178,6 +178,9 @@ export function resolveDroppedPaths(paths: string[]): Array<{ type: string; titl
   return results
 }
 
+let _onLanguageChange: (() => void) | null = null
+export function setOnLanguageChange(cb: () => void) { _onLanguageChange = cb }
+
 export function registerIpcHandlers(): void {
 
   // ── 资源 ──────────────────────────────────────────────
@@ -350,6 +353,7 @@ export function registerIpcHandlers(): void {
       webContents.getAllWebContents().forEach(wc => {
         if (!wc.isDestroyed()) wc.send('language:change', value)
       })
+      _onLanguageChange?.()
     }
     return true
   })

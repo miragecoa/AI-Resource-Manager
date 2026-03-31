@@ -32,7 +32,7 @@ protocol.registerSchemesAsPrivileged([
 import { initDatabase, clipboardAddItem, clipboardGetItem, clipboardTogglePin, clipboardCleanup, dataDir } from './db/index'
 import { getSetting, setSetting, addManualResource } from './db/queries'
 import { ensureProfiles, getProfileDir, loadManifest } from './db/profiles'
-import { registerIpcHandlers, resolveDroppedPaths } from './ipc/index'
+import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from './ipc/index'
 import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
@@ -336,11 +336,15 @@ function startClipboardPolling(): void {
 
 function buildTrayMenu(): Electron.Menu {
   const drawerVisible = getSetting('drawerVisible') !== 'false'
+  const isEn = (getSetting('language') ?? 'zh') === 'en'
+  const L = isEn
+    ? { show: 'Show Window', clipboard: 'Clipboard History', hideDrawer: 'Hide Floating Drawer', showDrawer: 'Show Floating Drawer', recall: 'Recall Drawer to Center', quit: 'Quit' }
+    : { show: '显示窗口', clipboard: '剪贴板历史', hideDrawer: '隐藏悬浮窗', showDrawer: '显示悬浮窗', recall: '召回悬浮窗到屏幕中央', quit: '退出' }
   return Menu.buildFromTemplate([
-    { label: '显示窗口', click: () => mainWindow?.show() },
-    { label: '剪贴板历史', click: () => showClipboardWindow() },
+    { label: L.show, click: () => mainWindow?.show() },
+    { label: L.clipboard, click: () => showClipboardWindow() },
     {
-      label: drawerVisible ? '隐藏悬浮窗' : '显示悬浮窗',
+      label: drawerVisible ? L.hideDrawer : L.showDrawer,
       click: () => {
         if (drawerVisible) {
           drawerWindow?.hide()
@@ -356,9 +360,9 @@ function buildTrayMenu(): Electron.Menu {
         tray?.setContextMenu(buildTrayMenu())
       }
     },
-    { label: '召回悬浮窗到屏幕中央', click: () => recallDrawer() },
+    { label: L.recall, click: () => recallDrawer() },
     { type: 'separator' },
-    { label: '退出', click: () => app.quit() }
+    { label: L.quit, click: () => app.quit() }
   ])
 }
 
@@ -853,6 +857,7 @@ app.whenReady().then(() => {
   clipboardImgDir = join(dataDir, 'clipboard')
   mkdirSync(clipboardImgDir, { recursive: true })
   registerIpcHandlers()
+  setOnLanguageChange(() => tray?.setContextMenu(buildTrayMenu()))
   ipcMain.handle('masonry:open', (_e, items: Array<{ path: string; title: string }>) => { createMasonryWindow(items) })
   ipcMain.handle('masonry:getPaths', () => masonryPaths)
   ipcMain.handle('masonry:minimize', () => { masonryWindow?.minimize() })

@@ -232,6 +232,8 @@ export default {
       heatHigh: '高',
       topResources: '最常使用',
       timelineEmpty: '最近 30 天无使用记录',
+      from: '从',
+      to: '至',
     },
     dropOverlay: '松开以导入文件',
     dropHintLabel: '提示',

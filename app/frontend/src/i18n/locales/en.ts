@@ -232,6 +232,8 @@ export default {
       heatHigh: 'High',
       topResources: 'Most used',
       timelineEmpty: 'No activity in the last 30 days',
+      from: 'From',
+      to: 'To',
     },
     dropOverlay: 'Drop to import',
     dropHintLabel: 'Tip',

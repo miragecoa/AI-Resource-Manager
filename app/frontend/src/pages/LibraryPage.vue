@@ -562,12 +562,12 @@
         <div v-if="statsPanel === 'timeline'" class="stats-content tl-scroll">
           <div class="tl-date-range">
             <div class="tl-date-field">
-              <label class="tl-date-label">从</label>
+              <label class="tl-date-label">{{ t('library.statsPanel.from') }}</label>
               <input type="date" class="tl-date-input" v-model="timelineStart" :max="timelineEnd" />
             </div>
             <span class="tl-date-sep">—</span>
             <div class="tl-date-field">
-              <label class="tl-date-label">到</label>
+              <label class="tl-date-label">{{ t('library.statsPanel.to') }}</label>
               <input type="date" class="tl-date-input" v-model="timelineEnd" :min="timelineStart" :max="isoToday()" />
             </div>
           </div>
@@ -1758,7 +1758,7 @@ const timelineData = computed(() => {
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([isoDate, resources]) => ({
       isoDate,
-      label: new Date(isoDate + 'T12:00:00').toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }),
+      label: new Date(isoDate + 'T12:00:00').toLocaleDateString(locale.value === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }),
       resources: resources.sort((a, b) => (b.last_run_at ?? 0) - (a.last_run_at ?? 0))
     }))
 })
