@@ -36,6 +36,7 @@ import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from '.
 import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
+import { initHeartbeat, stopHeartbeat } from './heartbeat'
 
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
@@ -66,6 +67,7 @@ const launchedHidden = process.argv.includes('--hidden')
 app.on('before-quit', () => {
   willQuit = true
   flushRunningSessions()
+  stopHeartbeat()
   // 退出前同步保存窗口位置/大小，防止防抖定时器来不及触发
   if (mainWindow && !mainWindow.isDestroyed()) {
     setSetting('windowMaximized', mainWindow.isMaximized() ? 'true' : 'false')
@@ -1344,6 +1346,9 @@ app.whenReady().then(() => {
 
   // 自动更新检查
   initAutoUpdater(mainWindow!)
+
+  // 匿名日活心跳（静默，不影响用户体验）
+  initHeartbeat()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

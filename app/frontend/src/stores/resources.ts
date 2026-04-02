@@ -88,6 +88,37 @@ export const useResourceStore = defineStore('resources', () => {
               } else {
                 score = Math.max(score, 500) // 散列字母模糊匹配
               }
+            } else {
+              // token 回退：CJK bigram + Latin 单词（≥3字母），按在查询中的出现顺序排列
+              // 命中越靠前的 token 分越高
+              // "我的discord" → ["我的", "discord"]，能命中 Discord.exe
+              const tokens: string[] = []
+              let i = 0
+              while (i < q.length) {
+                // CJK 连续段 → 生成 bigrams
+                const cjkMatch = q.slice(i).match(/^[\u4e00-\u9fff\u3400-\u4dbf]+/)
+                if (cjkMatch) {
+                  const run = cjkMatch[0]
+                  for (let j = 0; j <= run.length - 2; j++) tokens.push(run.slice(j, j + 2))
+                  i += run.length
+                  continue
+                }
+                // Latin 单词 ≥3 字母
+                const latinMatch = q.slice(i).match(/^[a-z]{3,}/i)
+                if (latinMatch) {
+                  tokens.push(latinMatch[0])
+                  i += latinMatch[0].length
+                  continue
+                }
+                i++
+              }
+              if (tokens.length > 0) {
+                const firstMatchIdx = tokens.findIndex(tk => t.includes(tk))
+                if (firstMatchIdx >= 0) {
+                  const posScore = 900 - Math.round((firstMatchIdx / tokens.length) * 100)
+                  score = Math.max(score, posScore)
+                }
+              }
             }
           }
         }

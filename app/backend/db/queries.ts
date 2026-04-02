@@ -354,10 +354,27 @@ export function removeTagFromResource(resourceId: string, tagId: number): void {
 
 // ── 搜索 ────────────────────────────────────────────────
 
+// 提取搜索 token：CJK 串做 bigram（2字滑动窗口）+ 拉丁单词（≥3字母）
+// "看视频" → ["看视", "视频"]，OR 匹配，能命中标题"视频"
+function extractTokens(query: string): string[] {
+  const tokens = new Set<string>()
+  const cjkRuns = query.match(/[\u4e00-\u9fff\u3400-\u4dbf]+/g) ?? []
+  for (const run of cjkRuns) {
+    for (let i = 0; i <= run.length - 2; i++) {
+      tokens.add(run.slice(i, i + 2))
+    }
+  }
+  const latin = query.match(/[a-zA-Z]{3,}/g) ?? []
+  for (const w of latin) tokens.add(w)
+  return [...tokens]
+}
+
 export function searchResources(query: string, type?: string): Resource[] {
   const db = getDb()
   const typeFilter = type ? `AND r.type = '${type}'` : ''
-  const rows = db.prepare(`
+
+  // 第一步：FTS5 全文搜索（精准）
+  let rows = db.prepare(`
     SELECT r.* FROM resources r
     JOIN resources_fts fts ON r.rowid = fts.rowid
     WHERE resources_fts MATCH ?
@@ -365,6 +382,29 @@ export function searchResources(query: string, type?: string): Resource[] {
     ORDER BY rank
     LIMIT 100
   `).all(query + '*') as Resource[]
+
+  console.log(`[search] query="${query}" fts_hits=${rows.length}`)
+
+  // 第二步：FTS 无结果时，用 token 子串回退（LIKE）
+  if (rows.length === 0) {
+    const tokens = extractTokens(query)
+    console.log(`[search] tokens=${JSON.stringify(tokens)}`)
+    if (tokens.length > 0) {
+      const conditions = tokens.map(() => `(r.title LIKE ? OR r.file_path LIKE ?)`).join(' OR ')
+      const params = tokens.flatMap(t => [`%${t}%`, `%${t}%`])
+      const typeClause = type ? `AND r.type = '${type}'` : ''
+      rows = db.prepare(`
+        SELECT r.* FROM resources r
+        WHERE (${conditions})
+        ${typeClause}
+        ORDER BY r.added_at DESC
+        LIMIT 100
+      `).all(...params) as Resource[]
+      console.log(`[search] like_hits=${rows.length} params=${JSON.stringify(params)}`)
+    } else {
+      console.log(`[search] no tokens extracted, skipping LIKE fallback`)
+    }
+  }
 
   return rows.map(attachTags)
 }
