@@ -193,8 +193,8 @@ export function clipboardGetItem(id: number): ClipboardItem | undefined {
 
 export function clipboardClearAll(): void {
   if (!db) return
-  const rows = db.prepare(`SELECT image_path FROM clipboard_items WHERE image_path IS NOT NULL`).all() as { image_path: string }[]
-  db.prepare(`DELETE FROM clipboard_items`).run()
+  const rows = db.prepare(`SELECT image_path FROM clipboard_items WHERE pinned = 0 AND image_path IS NOT NULL`).all() as { image_path: string }[]
+  db.prepare(`DELETE FROM clipboard_items WHERE pinned = 0`).run()
   for (const r of rows) {
     try { require('fs').unlinkSync(r.image_path) } catch { /* already gone */ }
   }

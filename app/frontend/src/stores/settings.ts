@@ -223,7 +223,7 @@ export const useSettingsStore = defineStore('settings', () => {
       language.value = langVal
     } else if (!consentVal) {
       // Brand-new user: auto-detect from system locale
-      language.value = navigator.language.toLowerCase().startsWith('en') ? 'en' : 'zh'
+      language.value = navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en'
       await window.api.settings.set('language', language.value)
     } else {
       // Existing user upgrading: default to Chinese

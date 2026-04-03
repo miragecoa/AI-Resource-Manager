@@ -20,6 +20,10 @@ const ENDPOINT = 'https://aicubby.app/api/heartbeat'
 const INTERVAL_MS = 60 * 60 * 1000  // 1 hour
 
 let _timer: ReturnType<typeof setInterval> | null = null
+let _pendingLaunches = 0
+
+/** Call each time the user opens or reveals a resource. */
+export function incLaunchCount(): void { _pendingLaunches++ }
 
 /** Returns the persisted install_id, creating one on first run. */
 function getInstallId(): string {
@@ -38,11 +42,13 @@ function getInstallId(): string {
 
 /** Fires one heartbeat. Never throws. */
 async function sendHeartbeat(installId: string, version: string): Promise<void> {
+  const lc = _pendingLaunches
+  _pendingLaunches = 0  // reset before await — if fetch fails we lose the count, acceptable
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: installId, v: version }),
+      body: JSON.stringify({ id: installId, v: version, lc }),
       signal: AbortSignal.timeout(8000),  // 8s timeout, don't hang
     })
   } catch { /* offline, timeout, or any error — silently ignored */ }

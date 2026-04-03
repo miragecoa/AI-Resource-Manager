@@ -18,6 +18,7 @@ import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, 
 import { dbPath, dataDir, clipboardGetItems, clipboardDeleteItem, clipboardClearAll, clipboardRecordUse } from '../db/index'
 import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate, getChangelog, getPendingUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
+import { incLaunchCount } from '../heartbeat'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
 // 扫描目录时可识别的文件扩展名 → 资源类型
@@ -360,6 +361,7 @@ export function registerIpcHandlers(): void {
 
   // ── 文件操作 ──────────────────────────────────────────
   ipcMain.handle('files:openPath', async (_e, filePath: string, meta?: string) => {
+    incLaunchCount()
     const m = meta ? (() => { try { return JSON.parse(meta) } catch { return null } })() : null
     if (m?.steam_appid) {
       // Steam 游戏：通过 steam:// 协议启动（确保走 Steam 客户端）
@@ -380,7 +382,10 @@ export function registerIpcHandlers(): void {
     }
     return null
   })
-  ipcMain.handle('files:openInExplorer', (_e, filePath: string) => shell.showItemInFolder(filePath))
+  ipcMain.handle('files:openInExplorer', (_e, filePath: string) => {
+    incLaunchCount()
+    shell.showItemInFolder(filePath)
+  })
 
   // 解析拖放的文件路径：识别类型、解析快捷方式、处理文件夹
   ipcMain.handle('files:resolveDropped', (_e, paths: string[]) => resolveDroppedPaths(paths))
