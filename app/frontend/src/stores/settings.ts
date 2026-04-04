@@ -158,6 +158,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const sidebarCollapsed = ref(false)
   const showFileExt = ref(true)
   const autoUpdate = ref(true)
+  const autoDirTag = ref(true)
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
   const appTitle = ref('AI小抽屉')
   const offlineMode = ref(false)
@@ -171,7 +172,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal, autoDirTagVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -193,6 +194,7 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('language'),
       window.api.settings.get('consent_given'),
       window.api.settings.get('customCategories'),
+      window.api.settings.get('autoDirTag'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -204,6 +206,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (collapsedVal) sidebarCollapsed.value = collapsedVal === 'true'
     if (fileExtVal !== null && fileExtVal !== undefined) showFileExt.value = fileExtVal !== 'false'
     autoUpdate.value = autoUpdateVal !== 'false'
+    autoDirTag.value = autoDirTagVal !== 'false'
     if (viewModeByTypeVal) { try { viewModeByType.value = JSON.parse(viewModeByTypeVal) } catch {} }
     if (cardZoomByTypeVal) { try { cardZoomByType.value = JSON.parse(cardZoomByTypeVal) } catch {} }
     if (listColVal) { try { listColumns.value = { ...listColumns.value, ...JSON.parse(listColVal) } } catch {} }
@@ -307,6 +310,11 @@ export const useSettingsStore = defineStore('settings', () => {
   async function setAutoUpdate(enabled: boolean) {
     autoUpdate.value = enabled
     await window.api.settings.set('autoUpdate', String(enabled))
+  }
+
+  async function setAutoDirTag(enabled: boolean) {
+    autoDirTag.value = enabled
+    await window.api.settings.set('autoDirTag', String(enabled))
   }
 
   async function setViewMode(type: string, mode: 'grid' | 'list' | 'heat' | 'masonry') {
@@ -428,5 +436,5 @@ export const useSettingsStore = defineStore('settings', () => {
     ])
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults }
+  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, autoDirTag, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setAutoDirTag, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults }
 })

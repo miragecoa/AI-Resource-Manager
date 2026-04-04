@@ -32,6 +32,7 @@ declare global {
       settings: {
         get: (key: string) => Promise<string | null>
         set: (key: string, value: string) => Promise<void>
+        reFetchDirTags: () => Promise<void>
       }
       files: {
         openPath: (filePath: string, meta?: string) => Promise<import('../stores/resources').Resource | null>
@@ -49,6 +50,7 @@ declare global {
       }
       onNewResource: (callback: (entry: object) => void) => () => void
       onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => () => void
+      onReload: (callback: () => void) => () => void
       onDrawerImport: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => () => void
       onDropWindowItems: (callback: (items: Array<{ type: string; title: string; file_path: string; meta?: string }>) => void) => () => void
       dropImport: {

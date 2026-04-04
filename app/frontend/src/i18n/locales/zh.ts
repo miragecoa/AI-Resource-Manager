@@ -73,6 +73,10 @@ export default {
       autoStartDesc: '登录 Windows 时自动在后台启动，持续收录文件',
       showOnStart: '开机后自动显示窗口',
       showOnStartDesc: '默认关闭，开机后静默驻留后台；开启后恢复弹出主窗口',
+      autoDirTag: '自动按目录打标签',
+      autoDirTagDesc: '收录文件时，根据所在文件夹名称自动打上对应标签，方便按项目分类浏览',
+      reFetchDirTags: '重新抓取',
+      reFetchingDirTags: '抓取中…',
     },
     hotkey: {
       title: '快捷键',

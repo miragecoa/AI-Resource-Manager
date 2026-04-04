@@ -9,7 +9,7 @@ import {
   getAllResources, getResourceById, updateResource, removeResource,
   addManualResource, getResourceByPath, recordProcessStart, restoreResource,
   getAllTags, getTagsForType, createTag, removeTag, touchTag, addTagToResource, removeTagFromResource,
-  searchResources, getSetting, setSetting,
+  searchResources, getSetting, setSetting, setShowDirTags, reFetchDirTags,
   addIgnoredPath, getAllIgnoredPaths, removeIgnoredPath, removeResourceByPath,
   batchRemoveResources, batchReplacePath,
   getBlockedDirs, addBlockedDir, removeBlockedDir
@@ -345,6 +345,12 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
   ipcMain.handle('settings:set', (_e, key: string, value: string) => {
     setSetting(key, value)
+    if (key === 'autoDirTag') {
+      setShowDirTags(value !== 'false')
+      webContents.getAllWebContents().forEach(wc => {
+        if (!wc.isDestroyed()) wc.send('resources:reload')
+      })
+    }
     if (key === 'theme') {
       webContents.getAllWebContents().forEach(wc => {
         if (!wc.isDestroyed()) wc.send('theme:change', value)
@@ -357,6 +363,12 @@ export function registerIpcHandlers(): void {
       _onLanguageChange?.()
     }
     return true
+  })
+  ipcMain.handle('settings:reFetchDirTags', () => {
+    reFetchDirTags()
+    webContents.getAllWebContents().forEach(wc => {
+      if (!wc.isDestroyed()) wc.send('resources:reload')
+    })
   })
 
   // ── 文件操作 ──────────────────────────────────────────

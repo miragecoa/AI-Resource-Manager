@@ -147,6 +147,9 @@ function startApp() {
   unsubscribeRunning = window.api.onRunningChange((event) => {
     store.setRunning(event.resourceId, event.running, event.startTime)
   })
+  window.api.onReload(() => {
+    store.loadAll()
+  })
 }
 
 onMounted(async () => {

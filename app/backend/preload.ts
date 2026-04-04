@@ -45,7 +45,8 @@ contextBridge.exposeInMainWorld('api', {
   // 设置
   settings: {
     get: (key: string) => ipcRenderer.invoke('settings:get', key),
-    set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value)
+    set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
+    reFetchDirTags: () => ipcRenderer.invoke('settings:reFetchDirTags')
   },
 
   // 文件操作
@@ -71,6 +72,12 @@ contextBridge.exposeInMainWorld('api', {
   onNewResource: (callback: (entry: object) => void) => {
     ipcRenderer.on('resource:new', (_event, entry) => callback(entry))
     return () => ipcRenderer.removeAllListeners('resource:new')
+  },
+
+  // 通知前端重新加载全量资源（如标签可见性设置变更时）
+  onReload: (callback: () => void) => {
+    ipcRenderer.on('resources:reload', () => callback())
+    return () => ipcRenderer.removeAllListeners('resources:reload')
   },
 
   // 监听进程运行状态变化

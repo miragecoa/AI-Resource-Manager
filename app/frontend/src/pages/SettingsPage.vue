@@ -65,6 +65,25 @@
             <span class="toggle-thumb" />
           </button>
         </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">{{ t('settings.monitor.autoDirTag') }}</div>
+            <div class="setting-desc">{{ t('settings.monitor.autoDirTagDesc') }}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="profile-btn" :disabled="reFetchingDirTags" @click="reFetchDirTags" style="white-space:nowrap">
+              {{ reFetchingDirTags ? t('settings.monitor.reFetchingDirTags') : t('settings.monitor.reFetchDirTags') }}
+            </button>
+            <button
+              class="toggle"
+              :class="{ on: settingsStore.autoDirTag }"
+              @click="settingsStore.setAutoDirTag(!settingsStore.autoDirTag)"
+            >
+              <span class="toggle-thumb" />
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- 快捷键 -->
@@ -580,6 +599,12 @@ async function clearClipboardHotkey() {
 
 async function resetClipboardHotkey() {
   await settingsStore.setHotkeyClipboard('Alt+V')
+}
+
+const reFetchingDirTags = ref(false)
+async function reFetchDirTags() {
+  reFetchingDirTags.value = true
+  try { await window.api.settings.reFetchDirTags() } finally { reFetchingDirTags.value = false }
 }
 
 const dbPath = ref('')

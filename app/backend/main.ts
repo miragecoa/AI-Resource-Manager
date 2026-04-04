@@ -30,7 +30,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }
 ])
 import { initDatabase, clipboardAddItem, clipboardGetItem, clipboardTogglePin, clipboardCleanup, dataDir } from './db/index'
-import { getSetting, setSetting, addManualResource } from './db/queries'
+import { getSetting, setSetting, addManualResource, runDirTagMigration, setShowDirTags } from './db/queries'
 import { ensureProfiles, getProfileDir, loadManifest } from './db/profiles'
 import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from './ipc/index'
 import { startMonitor, flushRunningSessions } from './monitor/recent-files'
@@ -850,6 +850,9 @@ app.whenReady().then(() => {
 
   ensureProfiles()
   initDatabase()
+  // Dir-tag feature: apply setting and run one-time retroactive migration
+  setShowDirTags(getSetting('autoDirTag') !== 'false')
+  runDirTagMigration()
   // 自动清理剪贴板历史（根据设置，启动时执行一次）
   const autoCleanDays = parseInt(getSetting('clipboardAutoCleanDays') || '0')
   if (autoCleanDays > 0) {

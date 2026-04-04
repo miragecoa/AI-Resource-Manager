@@ -75,9 +75,14 @@ export function upsertResource(
   if (info.changes === 0) return null
 
   // 新插入 or 标题被更新：通过 file_path 查出真实记录（冲突时原 id 未写入）
+  const rawRow = db.prepare('SELECT * FROM resources WHERE file_path = ?').get(data.file_path) as Resource | undefined
+  if (!rawRow) return getResourceById(id)
+
+  // Auto-tag BEFORE attachTags so returned resource already includes dir tags
+  autoTagByDir(rawRow.id, data.file_path, data.type as Resource['type'])
+
   // 必须调用 attachTags()，否则 DO UPDATE 路径返回裸行（无 tags），导致前端用无标签快照覆盖 store
-  const existing = db.prepare('SELECT * FROM resources WHERE file_path = ?').get(data.file_path) as Resource | undefined
-  return existing ? attachTags(existing) : getResourceById(id) ?? null
+  return attachTags(rawRow)
 }
 
 export function updateResource(id: string, data: Partial<Resource>): void {
@@ -130,6 +135,7 @@ export function addManualResource(data: {
     INSERT INTO resources (id, type, title, file_path, cover_path, rating, note, meta, added_at, updated_at)
     VALUES (@id, @type, @title, @file_path, NULL, 0, @note, @meta, @added_at, @updated_at)
   `).run({ id, type: data.type, title: data.title, file_path: data.file_path, note: data.note ?? null, meta: data.meta ?? null, added_at: now, updated_at: now })
+  autoTagByDir(id, data.file_path, data.type as Resource['type'])
   return { resource: getResourceById(id)!, existed: false }
 }
 
@@ -311,7 +317,8 @@ export function getTagsForType(type?: string, sort = 'count'): Array<{ id: numbe
     lastAssigned: 'MAX(rt.assigned_at) DESC, count DESC',
   }
   const orderBy = ORDER_MAP[sort] ?? ORDER_MAP.count
-  const typeFilter = type ? 'WHERE r.type = ?' : ''
+  const dirFilter = _showDirTags ? '' : `AND rt.source != 'dir'`
+  const typeFilter = type ? `WHERE r.type = ? ${dirFilter}` : (dirFilter ? `WHERE 1=1 ${dirFilter}` : '')
   const params = type ? [type] : []
   return db.prepare(`
     SELECT t.id, t.name, COUNT(rt.resource_id) AS count
@@ -350,6 +357,102 @@ export function removeTagFromResource(resourceId: string, tagId: number): void {
   getDb()
     .prepare('DELETE FROM resource_tags WHERE resource_id = ? AND tag_id = ?')
     .run(resourceId, tagId)
+}
+
+// Directory names too generic to be useful as tags (lowercase)
+const SKIP_DIR_NAMES = new Set([
+  'bin', 'x64', 'x86', 'x86_64', 'amd64', 'arm64', 'win32', 'win64',
+  'lib', 'libs', 'dll', 'dlls',
+  'application', 'app', 'apps',
+  'release', 'debug', 'build', 'dist', 'out', 'output', 'obj',
+  'windows', 'system32', 'syswow64', 'sysarm64', 'winsxs',
+  'users', 'desktop', 'documents', 'downloads', 'appdata', 'local', 'roaming', 'temp', 'tmp',
+  'common', 'shared', 'resources', 'assets', 'data', 'content', 'locale', 'locales',
+  'current', 'latest', 'version', 'versions',
+  'program files', 'program files (x86)',
+])
+
+/**
+ * Auto-tag a resource with ALL ancestor directory names (source='dir').
+ * e.g. C:\project\hw\xxx.exe → tags: "C盘"/"disk c", "project", "hw"
+ * Skips webpage resources (their file_path is a URL, not a filesystem path).
+ */
+export function autoTagByDir(resourceId: string, filePath: string, type?: Resource['type']): void {
+  if (!_showDirTags) return
+  // Webpages have URLs as file_path — skip entirely
+  if (type === 'webpage' || /^https?:\/\//i.test(filePath)) return
+
+  const lang = getSetting('language') ?? 'zh'
+  const isChinese = lang.startsWith('zh')
+
+  // Normalize separators and split; drop the filename (last segment)
+  const segments = filePath.replace(/\\/g, '/').split('/').slice(0, -1)
+
+  for (const seg of segments) {
+    if (!seg) continue
+
+    let tagName: string
+    // Drive letter (e.g. "C:") → "C盘" or "disk c"
+    if (/^[a-zA-Z]:$/.test(seg)) {
+      tagName = isChinese ? `${seg[0].toUpperCase()}盘` : `disk ${seg[0].toLowerCase()}`
+    } else {
+      tagName = seg.toLowerCase()
+    }
+
+    if (tagName.length < 2) continue
+    if (/^\d[\d.]*$/.test(tagName)) continue
+    if (SKIP_DIR_NAMES.has(tagName)) continue
+
+    const tag = createTag(tagName)
+    addTagToResource(resourceId, tag.id, 'dir')
+  }
+}
+
+/**
+ * One-time retroactive migration: apply dir tags to all existing resources that
+ * don't have one yet. Guarded by a settings flag so it only runs once per profile.
+ */
+export function runDirTagMigration(): void {
+  const db = getDb()
+  const done = (db.prepare(`SELECT value FROM settings WHERE key = 'dir_tag_v1'`).get() as any)?.value
+  if (done === '1') return
+  _applyDirTagsToAll(db)
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('dir_tag_v1', '1')`).run()
+}
+
+/** Re-fetch all dir tags: wipes existing source='dir' tags and rebuilds from scratch. */
+export function reFetchDirTags(): void {
+  const db = getDb()
+  db.prepare(`DELETE FROM resource_tags WHERE source = 'dir'`).run()
+  // Also remove tags that are now orphaned (no resources use them)
+  db.prepare(`DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM resource_tags)`).run()
+  _applyDirTagsToAll(db)
+  db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('dir_tag_v1', '1')`).run()
+}
+
+function _applyDirTagsToAll(db: ReturnType<typeof getDb>): void {
+  const rows = db.prepare(`
+    SELECT r.id, r.file_path, r.type FROM resources r
+    WHERE r.file_path IS NOT NULL AND r.file_path != ''
+      AND r.type != 'webpage'
+  `).all() as Array<{ id: string; file_path: string; type: Resource['type'] }>
+  // Temporarily force-enable so tags are always written to DB
+  // (visibility is controlled separately by _showDirTags at query time)
+  const prev = _showDirTags
+  _showDirTags = true
+  for (const r of rows) {
+    try { autoTagByDir(r.id, r.file_path, r.type) } catch { /* skip malformed paths */ }
+  }
+  _showDirTags = prev
+  console.log(`[dir-tag] tagged ${rows.length} resources`)
+}
+
+// ── Dir-tag visibility (controlled by setting) ──────────────────────────────
+
+let _showDirTags = true
+
+export function setShowDirTags(v: boolean): void {
+  _showDirTags = v
 }
 
 // ── 搜索 ────────────────────────────────────────────────
@@ -426,10 +529,11 @@ export function setSetting(key: string, value: string): void {
 
 function attachTags(resource: Resource): Resource {
   const db = getDb()
+  const sourceFilter = _showDirTags ? '' : `AND rt.source != 'dir'`
   const tags = db.prepare(`
     SELECT t.id, t.name, rt.source
     FROM tags t JOIN resource_tags rt ON t.id = rt.tag_id
-    WHERE rt.resource_id = ?
+    WHERE rt.resource_id = ? ${sourceFilter}
   `).all(resource.id) as Tag[]
 
   return { ...resource, tags }

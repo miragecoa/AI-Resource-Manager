@@ -73,6 +73,10 @@ export default {
       autoStartDesc: 'Automatically start in the background when logging in to Windows',
       showOnStart: 'Show window on startup',
       showOnStartDesc: 'Default off: stay silently in tray; enable to show the main window on startup',
+      autoDirTag: 'Auto-tag by folder',
+      autoDirTagDesc: 'When importing files, automatically tag them with their parent folder name for easy project-based browsing',
+      reFetchDirTags: 'Re-fetch',
+      reFetchingDirTags: 'Fetching…',
     },
     hotkey: {
       title: 'Shortcuts',
