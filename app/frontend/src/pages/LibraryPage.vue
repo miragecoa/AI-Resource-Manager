@@ -201,6 +201,32 @@
                 <span v-html="masonryViewSvg" />
                 {{ t('library.masonry') }}
               </button>
+              <!-- 显示设置下拉 -->
+              <div class="qf-wrap">
+                <button class="qf-trigger" :class="{ active: displayHasHidden }" @click.stop="showDisplayDropdown = !showDisplayDropdown">
+                  <span v-html="displayEyeSvg" />
+                  {{ t('library.displayBtn') }}
+                  <span class="type-filter-caret" v-html="chevronDownSvg" :class="{ open: showDisplayDropdown }" />
+                </button>
+                <div v-if="showDisplayDropdown" class="qf-dropdown" @click.stop>
+                  <label class="type-filter-item">
+                    <input type="checkbox" :checked="settingsStore.cardDisplay.duration" @change="onDisplayToggle('duration')" />
+                    <span class="tfi-label">{{ t('library.displayDuration') }}</span>
+                  </label>
+                  <label class="type-filter-item">
+                    <input type="checkbox" :checked="settingsStore.cardDisplay.count" @change="onDisplayToggle('count')" />
+                    <span class="tfi-label">{{ t('library.displayCount') }}</span>
+                  </label>
+                  <label class="type-filter-item">
+                    <input type="checkbox" :checked="settingsStore.cardDisplay.lastUsed" @change="onDisplayToggle('lastUsed')" />
+                    <span class="tfi-label">{{ t('library.displayLastUsed') }}</span>
+                  </label>
+                  <label class="type-filter-item">
+                    <input type="checkbox" :checked="settingsStore.cardDisplay.tags" @change="onDisplayToggle('tags')" />
+                    <span class="tfi-label">{{ t('library.displayTags') }}</span>
+                  </label>
+                </div>
+              </div>
               <!-- 高级筛选下拉 -->
               <div class="qf-wrap">
                 <button class="qf-trigger" :class="{ active: quickFilters.length > 0 }" @click.stop="showQfDropdown = !showQfDropdown">
@@ -267,6 +293,7 @@
                 :card-zoom="cardZoom"
                 :show-micro-label="store.activeType === 'folder' || store.activeType === 'document'"
                 :heat-level="statsPanel === 'heat' ? heatLevel(item) : undefined"
+                :display="settingsStore.cardDisplay"
                 @toggle-select="toggleSelect(item)"
                 @shift-select="onCardShiftSelect(item)"
                 @select="onCardSelect"
@@ -844,30 +871,254 @@
     <!-- 系统扫描弹窗 -->
     <Teleport to="body">
       <div v-if="showScanModal" class="modal-overlay" @mousedown.self="cancelScan">
-        <div class="scan-modal">
-          <!-- 初始状态 -->
-          <template v-if="!sysScanning && sysScanResult === null">
-            <span class="scan-modal-icon" v-html="scanSysSvg" />
-            <p class="scan-modal-desc">{{ t('library.scanModal.desc') }}</p>
-            <button class="scan-modal-btn" @click="doSystemScan">{{ t('library.scanModal.start') }}</button>
-          </template>
-          <!-- 扫描中 -->
-          <template v-else-if="sysScanning">
-            <div class="spinner lg" />
-            <p class="scan-modal-desc">{{ t('library.scanModal.scanning') }}</p>
-            <button class="scan-modal-btn secondary" @click="cancelScan">{{ t('library.scanModal.cancel') }}</button>
-          </template>
-          <!-- 完成 -->
-          <template v-else>
-            <span class="scan-modal-done" v-html="checkSvg" />
-            <p class="scan-modal-desc">
-              {{ sysScanResult! > 0 ? t('library.scanModal.foundNew', { n: sysScanResult }) : t('library.scanModal.noNew') }}
-            </p>
-            <div class="scan-modal-actions">
-              <button class="scan-modal-btn secondary" @click="doSystemScan">{{ t('library.scanModal.rescan') }}</button>
-              <button class="scan-modal-btn" @click="showScanModal = false">{{ t('library.scanModal.done') }}</button>
-            </div>
-          </template>
+        <div class="scan-modal scan-modal-wide">
+          <!-- Tab bar -->
+          <div class="scan-tabs">
+            <button class="scan-tab" :class="{ active: scanTab === 'history' }" @click="scanTab = 'history'">
+              {{ t('library.scanModal.tabHistory') }}
+            </button>
+            <button class="scan-tab" :class="{ active: scanTab === 'disk' }" @click="scanTab = 'disk'">
+              {{ t('library.scanModal.tabDisk') }}
+            </button>
+            <button class="scan-modal-x" @click="cancelScan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <!-- ── Tab 1: 使用历史 ── -->
+          <div v-if="scanTab === 'history'" class="scan-tab-body">
+            <template v-if="!sysScanning && sysScanResult === null">
+              <span class="scan-modal-icon" v-html="scanSysSvg" />
+              <p class="scan-modal-desc">{{ t('library.scanModal.desc') }}</p>
+              <p class="scan-modal-hint">{{ t('library.scanModal.historyHint') }}</p>
+              <button class="scan-modal-btn" @click="doSystemScan">{{ t('library.scanModal.start') }}</button>
+            </template>
+            <template v-else-if="sysScanning">
+              <div class="spinner lg" />
+              <p class="scan-modal-desc">{{ t('library.scanModal.scanning') }}</p>
+              <p class="scan-modal-hint">{{ t('library.scanModal.historyHint') }}</p>
+              <button class="scan-modal-btn secondary" @click="cancelScan">{{ t('library.scanModal.cancel') }}</button>
+            </template>
+            <template v-else>
+              <span class="scan-modal-done" v-html="checkSvg" />
+              <p class="scan-modal-desc">
+                {{ sysScanResult! > 0 ? t('library.scanModal.foundNew', { n: sysScanResult }) : t('library.scanModal.noNew') }}
+              </p>
+              <div class="scan-modal-actions">
+                <button class="scan-modal-btn secondary" @click="doSystemScan">{{ t('library.scanModal.rescan') }}</button>
+                <button class="scan-modal-btn" @click="showScanModal = false">{{ t('library.scanModal.done') }}</button>
+              </div>
+            </template>
+          </div>
+
+          <!-- ── Tab 2: 添加文件 ── -->
+          <div v-else class="scan-tab-body scan-disk-body" :class="{ 'has-results': diskScanResults !== null && !diskScanning }">
+            <!-- 初始配置界面 -->
+            <template v-if="!diskScanning && diskScanResults === null">
+              <p class="disk-privacy-hint">{{ t('library.scanModal.diskPrivacyHint') }}</p>
+
+              <!-- 位置选择 -->
+              <div class="disk-section">
+                <span class="disk-section-label">{{ t('library.scanModal.diskFoldersLabel') }}</span>
+                <div class="disk-folder-list">
+                  <!-- 预设文件夹 -->
+                  <label v-for="preset in diskFolderPresets" :key="preset.key" class="disk-folder-row" :class="{ checked: preset.checked }">
+                    <input type="checkbox" v-model="preset.checked" />
+                    <span class="disk-folder-name">{{ preset.label }}</span>
+                    <span class="disk-folder-path">{{ preset.path }}</span>
+                  </label>
+                  <!-- 自定义文件夹 -->
+                  <label v-for="(dir, i) in diskCustomFolders" :key="'custom-' + i" class="disk-folder-row checked">
+                    <input type="checkbox" checked disabled />
+                    <span class="disk-folder-name" style="opacity:0.6">{{ dir.split('\\').pop() || dir }}</span>
+                    <span class="disk-folder-path">{{ dir }}</span>
+                    <button class="disk-folder-remove" @click.prevent="diskCustomFolders.splice(i, 1)">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12"><path d="M12 4L4 12M4 4l8 8"/></svg>
+                    </button>
+                  </label>
+                  <!-- 扩展范围：全盘 / 指定盘 -->
+                  <div class="disk-folder-divider" />
+                  <label class="disk-folder-row" :class="{ checked: diskScopeAll }">
+                    <input type="checkbox" v-model="diskScopeAll" @change="diskScopeAll && (diskScopeDrive = false)" />
+                    <span class="disk-folder-name">{{ t('library.scanModal.diskScopeAll') }}</span>
+                    <span class="disk-folder-path">{{ availableDrives.join('  ') }}</span>
+                  </label>
+                  <label class="disk-folder-row" :class="{ checked: diskScopeDrive }">
+                    <input type="checkbox" v-model="diskScopeDrive" @change="diskScopeDrive && (diskScopeAll = false)" />
+                    <span class="disk-folder-name">{{ t('library.scanModal.diskScopeDrive') }}</span>
+                    <select v-if="diskScopeDrive" v-model="diskScopeDriveValue" class="disk-drive-select" @click.stop>
+                      <option v-for="d in availableDrives" :key="d" :value="d">{{ d }}</option>
+                    </select>
+                    <span v-else class="disk-folder-path">{{ diskScopeDriveValue }}</span>
+                  </label>
+                  <button class="disk-add-folder-btn" @click="pickDiskScanDir">{{ t('library.scanModal.diskAddFolder') }}</button>
+                </div>
+              </div>
+
+              <!-- 文件类型 -->
+              <div class="disk-section">
+                <span class="disk-section-label">{{ t('library.scanModal.diskTypesLabel') }}</span>
+                <div class="disk-type-group">
+                  <label v-for="tp in diskTypeOptions" :key="tp.value" class="disk-type-check">
+                    <input type="checkbox" :value="tp.value" v-model="diskScanTypes" />
+                    <span>{{ tp.label }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <button
+                class="scan-modal-btn disk-start-btn"
+                :disabled="diskScanTypes.length === 0 || diskScanRoots.length === 0"
+                @click="doDiskScan"
+              >{{ t('library.scanModal.diskStart') }}</button>
+            </template>
+
+            <!-- 扫描中 -->
+            <template v-else-if="diskScanning">
+              <div class="disk-scan-anim">
+                <div class="disk-scan-bar">
+                  <div class="disk-scan-bar-fill" />
+                </div>
+                <p class="disk-scan-count">{{ t('library.scanModal.diskScanning', { n: diskScanProgress }) }}</p>
+                <div class="disk-scan-files">
+                  <TransitionGroup name="file-flash" tag="div" class="disk-scan-file-list">
+                    <span v-for="f in diskScanRecentFiles" :key="f" class="disk-scan-file">{{ f }}</span>
+                  </TransitionGroup>
+                </div>
+                <div class="disk-privacy-badge">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path d="M8 1L2 4v4c0 3.3 2.5 5.7 6 7 3.5-1.3 6-3.7 6-7V4L8 1z"/></svg>
+                  {{ t('library.scanModal.diskPrivacyBadge') }}
+                </div>
+              </div>
+              <button class="scan-modal-btn secondary" @click="cancelDiskScan">{{ t('library.scanModal.cancel') }}</button>
+            </template>
+
+            <!-- 结果 -->
+            <template v-else>
+              <!-- 错误提示 -->
+              <div v-if="diskScanError" class="disk-error-box">
+                <strong>扫描出错：</strong> {{ diskScanError }}
+              </div>
+
+              <!-- 智能过滤进度条 -->
+              <div v-if="diskFiltering" class="disk-filter-banner">
+                <div class="disk-filter-banner-inner">
+                  <svg class="disk-filter-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+                  <span>正在智能过滤（不消耗 AI token）… {{ diskFilterDone }}&thinsp;/&thinsp;{{ diskFilterTotal }}</span>
+                </div>
+                <div class="disk-filter-bar"><div class="disk-filter-bar-fill" :style="{ width: diskFilterTotal ? (diskFilterDone / diskFilterTotal * 100) + '%' : '0%' }" /></div>
+              </div>
+
+              <!-- 统计 -->
+              <div class="disk-result-stats">
+                <span class="disk-stat-new">{{ t('library.scanModal.diskFoundNew', { n: diskNewResults.length }) }}</span>
+                <span v-if="diskKnownCount > 0" class="disk-stat-known">{{ t('library.scanModal.diskAlreadyKnown', { n: diskKnownCount }) }}</span>
+              </div>
+
+              <!-- 分类 chips -->
+              <div v-if="diskResultBreakdown.length" class="disk-result-breakdown">
+                <button
+                  v-for="entry in diskResultBreakdown"
+                  :key="entry.type"
+                  class="disk-result-chip"
+                  :class="{ active: entry.allSelected, partial: entry.someSelected }"
+                  @click="diskToggleType(entry.type)"
+                  :title="entry.allSelected ? '点击取消全选' : '点击全选此类别'"
+                >
+                  <svg v-if="entry.allSelected" viewBox="0 0 12 12" fill="none" width="11" height="11" style="flex-shrink:0"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg v-else-if="entry.someSelected" viewBox="0 0 12 12" fill="currentColor" width="11" height="11" style="flex-shrink:0"><rect x="2" y="5.5" width="8" height="1.5" rx=".75"/></svg>
+                  {{ entry.label }}&nbsp;{{ entry.count }}
+                </button>
+              </div>
+
+              <!-- 文件预览列表 -->
+              <div v-if="diskNewResults.length > 0" class="disk-preview-panel">
+                <div class="disk-preview-header">
+                  <label class="disk-preview-checkall">
+                    <input type="checkbox"
+                      :checked="diskSelectedCount === diskNewResults.length"
+                      :indeterminate="diskSelectedCount > 0 && diskSelectedCount < diskNewResults.length"
+                      @change="diskToggleAll(($event.target as HTMLInputElement).checked)"
+                    />
+                    {{ t('library.scanModal.diskSelectAll') }}
+                  </label>
+                  <span class="disk-preview-hint">
+                    <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" width="12" height="12"><circle cx="7" cy="7" r="5.5"/><path d="M7 6.5v3M7 4.5v.5" stroke-linecap="round"/></svg>
+                    右键有更多选项
+                  </span>
+                  <span class="disk-preview-count">{{ diskSelectedCount }} / {{ diskNewResults.length }}</span>
+                </div>
+                <div class="disk-preview-list" @click="diskCtxMenu = null">
+                  <label v-for="r in diskNewResults" :key="r.file_path" class="disk-preview-item"
+                    :class="{ selected: diskScanSelected.has(r.file_path) }"
+                    @contextmenu.prevent="showDiskCtxMenu($event, r)">
+                    <input type="checkbox"
+                      :checked="diskScanSelected.has(r.file_path)"
+                      @change="diskScanSelected.has(r.file_path) ? diskScanSelected.delete(r.file_path) : diskScanSelected.add(r.file_path); diskScanSelected = new Set(diskScanSelected)"
+                    />
+                    <span class="disk-preview-type-dot" :data-type="r.type" />
+                    <span class="disk-preview-name">{{ r.title }}</span>
+                    <span class="disk-preview-path">{{ r.file_path }}</span>
+                  </label>
+                </div>
+                <!-- 右键菜单 -->
+                <Teleport to="body">
+                  <div v-if="diskCtxMenu" class="disk-ctx-menu"
+                    :style="{ left: diskCtxMenu.x + 'px', top: diskCtxMenu.y + 'px' }"
+                    @mouseleave="diskCtxMenu = null">
+                    <button class="disk-ctx-item" @click="openInExplorerCtx(diskCtxMenu!.path)">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><path d="M2 4h12v9H2z"/><path d="M2 4l3-2h3l2 2"/></svg>
+                      在文件夹中显示
+                    </button>
+                    <button class="disk-ctx-item" @click="diskCtxSelectOnly(diskCtxMenu!.path)">
+                      <svg viewBox="0 0 16 16" fill="currentColor" width="13" height="13"><rect x="2" y="2" width="12" height="12" rx="2" opacity=".15"/><path d="M5 8l2.5 2.5L11 5.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+                      仅选择此项
+                    </button>
+                    <div class="disk-ctx-separator" />
+                    <button class="disk-ctx-item" @click="diskCtxCopyDir(diskCtxMenu!.path)">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13"><rect x="5" y="5" width="9" height="9" rx="1.5"/><path d="M2 11V2h9"/></svg>
+                      复制目录路径
+                    </button>
+                  </div>
+                </Teleport>
+              </div>
+
+              <!-- 按路径前缀移除 -->
+              <div v-if="diskNewResults.length > 0" class="disk-remove-prefix-row">
+                <button class="disk-remove-toggle" @click="diskShowRemove = !diskShowRemove">
+                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12"><path d="M12 4L4 12M4 4l8 8"/></svg>
+                  按路径移除
+                </button>
+                <template v-if="diskShowRemove">
+                  <input v-model="diskRemovePrefix" class="disk-remove-input" placeholder="C:\某某目录" @keydown.enter="diskRemoveByPrefix()" />
+                  <button class="scan-modal-btn secondary small" @click="diskRemoveByPrefix()">移除</button>
+                </template>
+              </div>
+
+              <div class="scan-modal-actions">
+                <button class="scan-modal-btn secondary" @click="resetDiskScan">{{ t('library.scanModal.diskRescan') }}</button>
+                <button v-if="diskNewResults.length > 0" class="scan-modal-btn" :disabled="diskSelectedCount === 0" @click="tryImportDiskScanResults">
+                  {{ t('library.scanModal.diskImport') }} ({{ diskSelectedCount }})
+                </button>
+                <button v-else class="scan-modal-btn" @click="showScanModal = false">{{ t('library.scanModal.done') }}</button>
+              </div>
+
+              <!-- 大批量导入警告 -->
+              <Teleport to="body">
+                <div v-if="diskImportWarning" class="modal-overlay" @mousedown.self="diskImportWarning = false">
+                  <div class="disk-warn-modal">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.8" width="32" height="32"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <p class="disk-warn-title">即将导入 {{ diskSelectedCount }} 个文件</p>
+                    <p class="disk-warn-desc">当前数量较多，其中可能存在大量游戏资产、缓存图片等无用项。<br>建议先通过右键菜单或"按路径移除"过滤后再导入。</p>
+                    <div class="scan-modal-actions">
+                      <button class="scan-modal-btn secondary" @click="diskImportWarning = false">再看看</button>
+                      <button class="scan-modal-btn" @click="diskImportWarning = false; importDiskScanResults()">确认导入</button>
+                    </div>
+                  </div>
+                </div>
+              </Teleport>
+            </template>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -940,6 +1191,238 @@ const showScanModal = ref(false)
 const sysScanning = ref(false)
 const sysScanResult = ref<number | null>(null)
 let scanGeneration = 0  // used to discard stale results on cancel
+
+// ── 扫盘 ─────────────────────────────────────────────────
+const scanTab = ref<'history' | 'disk'>('history')
+
+interface FolderPreset { key: string; label: string; path: string; checked: boolean }
+const diskFolderPresets = ref<FolderPreset[]>([])
+const diskCustomFolders = ref<string[]>([])
+const availableDrives = ref<string[]>([])
+const diskScopeAll = ref(false)
+const diskScopeDrive = ref(false)
+const diskScopeDriveValue = ref('C:\\')
+const diskScanTypes = ref<string[]>(['app', 'image', 'video', 'music'])
+const diskScanning = ref(false)
+const diskScanProgress = ref(0)
+const diskScanRecentFiles = ref<string[]>([])
+const diskScanResults = ref<Array<{ type: string; title: string; file_path: string }> | null>(null)
+const diskFiltering = ref(false)
+const diskFilterDone = ref(0)
+const diskFilterTotal = ref(0)
+let _unsubDiskScanProgress: (() => void) | null = null
+let _unsubFilterProgress: (() => void) | null = null
+let _unsubFilterRemove: (() => void) | null = null
+
+const diskScanRoots = computed(() => {
+  const roots: string[] = [
+    ...diskFolderPresets.value.filter(p => p.checked).map(p => p.path),
+    ...diskCustomFolders.value,
+  ]
+  if (diskScopeAll.value) roots.push(...availableDrives.value)
+  else if (diskScopeDrive.value) roots.push(diskScopeDriveValue.value)
+  return [...new Set(roots)]
+})
+
+const diskTypeOptions = computed(() => [
+  { value: 'app',      label: t('library.scanModal.diskTypeApp') },
+  { value: 'image',    label: t('library.scanModal.diskTypeImage') },
+  { value: 'video',    label: t('library.scanModal.diskTypeVideo') },
+  { value: 'music',    label: t('library.scanModal.diskTypeMusic') },
+  { value: 'document', label: t('library.scanModal.diskTypeDoc') },
+])
+
+// diskScanResults = ALL found (new + known), diskScanSelected = paths the user wants to import
+const diskScanSelected = ref<Set<string>>(new Set())
+const diskScanError = ref<string | null>(null)
+const diskCtxMenu = ref<{ x: number; y: number; path: string } | null>(null)
+
+function showDiskCtxMenu(e: MouseEvent, r: { file_path: string }) {
+  diskCtxMenu.value = { x: e.clientX, y: e.clientY, path: r.file_path }
+}
+function openInExplorerCtx(path: string) {
+  window.api.files.openInExplorer(path)
+  diskCtxMenu.value = null
+}
+function diskCtxSelectOnly(path: string) {
+  diskScanSelected.value = new Set([path])
+  diskCtxMenu.value = null
+}
+function diskCtxCopyDir(filePath: string) {
+  const parts = filePath.split('\\')
+  parts.pop()
+  navigator.clipboard.writeText(parts.join('\\'))
+  diskCtxMenu.value = null
+}
+function diskCtxRemoveUnder(filePath: string) {
+  // Use parent directory of the clicked file as the removal prefix
+  const parts = filePath.split('\\')
+  parts.pop()
+  diskRemoveByPrefix(parts.join('\\'))
+  diskCtxMenu.value = null
+}
+
+// ── 按路径前缀移除 ────────────────────────────────────────
+const diskRemovePrefix = ref('')
+const diskShowRemove = ref(false)
+function diskRemoveByPrefix(prefix?: string) {
+  const p = (prefix ?? diskRemovePrefix.value).trim().replace(/\\+$/, '').toLowerCase()
+  if (!p || !diskScanResults.value) return
+  diskScanResults.value = diskScanResults.value.filter(r => !r.file_path.toLowerCase().startsWith(p))
+  diskScanSelected.value = new Set([...diskScanSelected.value].filter(fp => !fp.toLowerCase().startsWith(p)))
+  diskRemovePrefix.value = ''
+}
+
+const diskImportWarning = ref(false)
+function tryImportDiskScanResults() {
+  if (diskSelectedCount.value > 1000) { diskImportWarning.value = true; return }
+  importDiskScanResults()
+}
+
+const diskNewResults = computed(() => {
+  if (!diskScanResults.value) return []
+  const knownPaths = new Set(store.items.map(r => r.file_path.toLowerCase()))
+  return diskScanResults.value.filter(r => !knownPaths.has(r.file_path.toLowerCase()))
+})
+const diskKnownCount = computed(() => {
+  if (!diskScanResults.value) return 0
+  return diskScanResults.value.length - diskNewResults.value.length
+})
+
+const diskResultBreakdown = computed(() => {
+  const results = diskNewResults.value
+  const counts: Record<string, number> = {}
+  for (const r of results) counts[r.type] = (counts[r.type] || 0) + 1
+  return diskTypeOptions.value
+    .filter(tp => counts[tp.value])
+    .map(tp => {
+      const paths = results.filter(r => r.type === tp.value).map(r => r.file_path)
+      const selectedCount = paths.filter(p => diskScanSelected.value.has(p)).length
+      const allSelected = selectedCount === paths.length
+      const someSelected = selectedCount > 0 && !allSelected
+      return { type: tp.value, label: tp.label, count: counts[tp.value], allSelected, someSelected }
+    })
+})
+
+const diskSelectedCount = computed(() =>
+  diskNewResults.value.filter(r => diskScanSelected.value.has(r.file_path)).length
+)
+
+function diskToggleAll(checked: boolean) {
+  if (checked) diskScanSelected.value = new Set(diskNewResults.value.map(r => r.file_path))
+  else diskScanSelected.value = new Set()
+}
+function diskToggleType(type: string) {
+  const paths = diskNewResults.value.filter(r => r.type === type).map(r => r.file_path)
+  const allSelected = paths.every(p => diskScanSelected.value.has(p))
+  const newSet = new Set(diskScanSelected.value)
+  if (allSelected) paths.forEach(p => newSet.delete(p))
+  else paths.forEach(p => newSet.add(p))
+  diskScanSelected.value = newSet
+}
+
+async function doDiskScan() {
+  if (diskScanning.value) return
+  const roots = diskScanRoots.value
+  if (!roots.length) return
+  diskScanning.value = true
+  diskScanProgress.value = 0
+  diskScanRecentFiles.value = []
+  diskScanResults.value = null
+  diskScanError.value = null
+
+  _unsubDiskScanProgress = window.api.files.onDiskScanProgress((count, latest) => {
+    diskScanProgress.value = count
+    if (latest) {
+      const name = latest.split('\\').pop() || latest
+      diskScanRecentFiles.value = [name, ...diskScanRecentFiles.value].slice(0, 6)
+    }
+  })
+
+  try {
+    // Spread to plain arrays — Vue reactive Proxies can't be serialized by Electron IPC
+    const raw = await window.api.files.diskScan([...roots], [...diskScanTypes.value])
+    diskScanResults.value = raw
+    // pre-select only new (non-library) files
+    const knownPaths = new Set(store.items.map(r => r.file_path.toLowerCase()))
+    diskScanSelected.value = new Set(
+      raw.filter(r => !knownPaths.has(r.file_path.toLowerCase())).map(r => r.file_path)
+    )
+    // kick off background GUI-exe filtering (deferred from scan for speed)
+    const appPaths = raw.filter(r => r.type === 'app').map(r => r.file_path)
+    if (appPaths.length) {
+      diskFiltering.value = true
+      diskFilterDone.value = 0
+      diskFilterTotal.value = appPaths.length
+      _unsubFilterProgress = window.api.files.onFilterGuiExesProgress((done, total) => {
+        diskFilterDone.value = done
+        diskFilterTotal.value = total
+      })
+      _unsubFilterRemove = window.api.files.onFilterGuiExesRemove((path) => {
+        // Remove rejected CLI exe from results + selection in real-time
+        if (diskScanResults.value) {
+          const lower = path.toLowerCase()
+          diskScanResults.value = diskScanResults.value.filter(r => r.file_path.toLowerCase() !== lower)
+          if (diskScanSelected.value.has(path)) {
+            const s = new Set(diskScanSelected.value)
+            s.delete(path)
+            diskScanSelected.value = s
+          }
+        }
+      })
+      window.api.files.filterGuiExes([...appPaths]).finally(() => {
+        diskFiltering.value = false
+        _unsubFilterProgress?.()
+        _unsubFilterRemove?.()
+        _unsubFilterProgress = null
+        _unsubFilterRemove = null
+      })
+    }
+  } catch (e: any) {
+    console.error('diskScan error', e)
+    diskScanError.value = e?.message ?? String(e)
+    diskScanResults.value = []
+  } finally {
+    diskScanning.value = false
+    _unsubDiskScanProgress?.()
+    _unsubDiskScanProgress = null
+  }
+}
+
+function cancelDiskScan() {
+  window.api.files.diskScanCancel()
+  diskScanning.value = false
+  _unsubDiskScanProgress?.()
+  _unsubDiskScanProgress = null
+}
+
+function resetDiskScan() {
+  cancelDiskScan()
+  diskFiltering.value = false
+  _unsubFilterProgress?.()
+  _unsubFilterRemove?.()
+  _unsubFilterProgress = null
+  _unsubFilterRemove = null
+  diskScanProgress.value = 0
+  diskScanRecentFiles.value = []
+  diskScanResults.value = null
+  diskScanError.value = null
+  diskScanSelected.value = new Set()
+}
+
+async function importDiskScanResults() {
+  const toImport = diskNewResults.value.filter(r => diskScanSelected.value.has(r.file_path))
+  if (!toImport.length) return
+  const items = toImport.map(r => ({ type: r.type, title: r.title, file_path: r.file_path }))
+  const { added } = await window.api.resources.batchAdd(items)
+  for (const r of added) store.addOrUpdate(r as any)
+  showScanModal.value = false
+}
+
+async function pickDiskScanDir() {
+  const dir = await window.api.files.pickFolder()
+  if (dir && !diskCustomFolders.value.includes(dir)) diskCustomFolders.value.push(dir)
+}
 
 // ── 底部导入按钮（滚动到底部才显示） ──────────────────────
 const gridScrollRef = ref<HTMLElement | null>(null)
@@ -1109,7 +1592,17 @@ function toggleTypeFilter(e: MouseEvent) {
   showTypeFilter.value = true
 }
 
-function onDocCloseTypeFilter() { showTypeFilter.value = false; showQfDropdown.value = false }
+function onDocCloseTypeFilter() { showTypeFilter.value = false; showQfDropdown.value = false; showDisplayDropdown.value = false }
+
+const showDisplayDropdown = ref(false)
+const displayHasHidden = computed(() => {
+  const d = settingsStore.cardDisplay
+  return !d.duration || !d.count || !d.lastUsed || !d.tags
+})
+function onDisplayToggle(key: 'duration' | 'count' | 'lastUsed' | 'tags') {
+  settingsStore.setCardDisplay({ [key]: !settingsStore.cardDisplay[key] })
+}
+const displayEyeSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
 
 const arrowUpSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>'
 const arrowDownSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>'
@@ -2269,10 +2762,30 @@ const checkSvg        = `<svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" s
 const updateSvg       = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`
 const aiLargeSvg      = `<svg viewBox="0 0 48 48" width="48" height="48" fill="none" stroke="var(--accent)" stroke-width="1.5"><path d="M24 4l4.8 14.4H44l-12 9.6 4.8 14.4L24 32.8l-12.8 9.6 4.8-14.4-12-9.6h15.2z"/><circle cx="24" cy="20" r="3" fill="var(--accent)" opacity="0.3"/></svg>`
 
-function openScanModal() {
+async function openScanModal() {
   sysScanResult.value = null
   sysScanning.value = false
+  scanTab.value = 'history'
+  diskScanResults.value = null
+  diskScanning.value = false
+  diskScanProgress.value = 0
+  diskScanRecentFiles.value = []
   showScanModal.value = true
+  if (!diskFolderPresets.value.length) {
+    const [kf, drives] = await Promise.all([
+      window.api.files.getKnownFolders(),
+      window.api.files.listDrives(),
+    ])
+    diskFolderPresets.value = [
+      { key: 'desktop',   label: t('library.scanModal.diskFolderDesktop'),   path: kf.desktop,   checked: true },
+      { key: 'downloads', label: t('library.scanModal.diskFolderDownloads'), path: kf.downloads, checked: false },
+      { key: 'documents', label: t('library.scanModal.diskFolderDocuments'), path: kf.documents, checked: false },
+      { key: 'videos',    label: t('library.scanModal.diskFolderVideos'),    path: kf.videos,    checked: false },
+      { key: 'pictures',  label: t('library.scanModal.diskFolderPictures'),  path: kf.pictures,  checked: false },
+    ]
+    availableDrives.value = drives
+    if (drives.length) diskScopeDriveValue.value = drives[0]
+  }
 }
 
 function openMasonryWindow() {
@@ -2300,6 +2813,7 @@ async function doSystemScan() {
 function cancelScan() {
   scanGeneration++      // invalidate in-flight result
   sysScanning.value = false
+  if (diskScanning.value) cancelDiskScan()
   showScanModal.value = false
 }
 
@@ -2628,6 +3142,408 @@ async function deleteIgnored(filePath: string) {
   margin-top: 6px;
 }
 .scan-modal .spinner.lg { width: 40px; height: 40px; }
+
+/* 扫盘宽弹窗 & tabs */
+.scan-modal-wide { min-width: 480px; max-width: 560px; padding: 0; gap: 0; align-items: stretch; }
+.scan-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 0 8px;
+  gap: 2px;
+  position: relative;
+}
+.scan-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 12px 14px 10px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.scan-tab:hover { color: var(--text); }
+.scan-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 500; }
+.scan-modal-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.scan-modal-x:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+.scan-tab-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 40px;
+}
+.scan-disk-body { align-items: stretch; gap: 14px; }
+.scan-disk-body.has-results { max-height: 80vh; overflow-y: auto; }
+.scan-modal-hint {
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* 扫盘配置区 */
+.disk-privacy-hint {
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+  background: rgba(99,102,241,0.06);
+  border: 1px solid rgba(99,102,241,0.15);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 2px;
+}
+.disk-section { display: flex; flex-direction: column; gap: 8px; }
+.disk-section-label { font-size: 11px; color: var(--text-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.disk-folder-list { display: flex; flex-direction: column; gap: 4px; }
+.disk-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.disk-folder-row input[type=checkbox] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.disk-folder-row.checked { border-color: rgba(99,102,241,0.3); background: rgba(99,102,241,0.07); }
+.disk-folder-name { font-size: 13px; color: var(--text); font-weight: 500; flex-shrink: 0; }
+.disk-folder-path { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.disk-folder-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.disk-folder-remove:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+.disk-add-folder-btn {
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.disk-add-folder-btn:hover { border-color: var(--accent); background: rgba(99,102,241,0.06); }
+.disk-folder-divider { height: 1px; background: var(--border); margin: 4px 0; opacity: 0.5; }
+.disk-drive-select {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 2px 8px;
+  cursor: pointer;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.disk-type-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.disk-type-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.disk-type-check:has(input:checked) { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,0.1); }
+.disk-type-check input[type=checkbox] { display: none; }
+.disk-start-btn { width: 100%; margin-top: 4px; }
+
+/* 扫描动画 */
+.disk-scan-anim { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.disk-scan-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.disk-scan-bar-fill {
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  border-radius: 2px;
+  animation: scan-bar-slide 1.4s ease-in-out infinite;
+}
+@keyframes scan-bar-slide {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}
+.disk-scan-count { font-size: 14px; color: var(--text-2); }
+.disk-scan-files {
+  width: 100%;
+  height: 96px;
+  overflow: hidden;
+  position: relative;
+  border-radius: 6px;
+  background: rgba(0,0,0,0.2);
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+.disk-scan-file-list { display: flex; flex-direction: column; gap: 3px; }
+.disk-scan-file {
+  font-size: 11px;
+  color: var(--text-3);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-flash-enter-active { transition: opacity 0.3s, transform 0.3s; }
+.file-flash-enter-from  { opacity: 0; transform: translateY(-8px); }
+.file-flash-leave-active { transition: opacity 0.2s; position: absolute; }
+.file-flash-leave-to    { opacity: 0; }
+.disk-privacy-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #4ade80;
+  background: rgba(74,222,128,0.08);
+  border: 1px solid rgba(74,222,128,0.2);
+  border-radius: 16px;
+  padding: 4px 12px;
+}
+
+/* 结果 */
+.disk-error-box {
+  width: 100%;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #fca5a5;
+  word-break: break-all;
+}
+.disk-filter-banner { background: rgba(99,102,241,.08); border: 1px solid rgba(99,102,241,.2); border-radius: 8px; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.disk-filter-banner-inner { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a5b4fc; }
+.disk-filter-spin { animation: disk-spin 1.2s linear infinite; flex-shrink: 0; }
+@keyframes disk-spin { to { transform: rotate(360deg); } }
+.disk-filter-bar { height: 2px; border-radius: 1px; background: rgba(99,102,241,.15); overflow: hidden; }
+.disk-filter-bar-fill { height: 100%; background: #6366f1; border-radius: 1px; transition: width .2s; }
+.disk-result-stats { display: flex; gap: 12px; align-items: center; }
+.disk-stat-new { font-size: 14px; color: var(--text); font-weight: 500; }
+.disk-stat-known { font-size: 12px; color: var(--text-3); }
+.disk-result-breakdown { display: flex; flex-wrap: wrap; gap: 6px; }
+.disk-result-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+  user-select: none;
+}
+.disk-result-chip:hover {
+  color: var(--text);
+  border-color: rgba(99,102,241,.5);
+  background: rgba(99,102,241,.08);
+}
+.disk-result-chip.partial {
+  color: #a5b4fc;
+  border-color: rgba(99,102,241,.4);
+  background: rgba(99,102,241,.1);
+}
+.disk-result-chip.active {
+  color: #fff;
+  background: #6366f1;
+  border-color: #6366f1;
+}
+.disk-result-chip.active:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+/* 文件预览列表 */
+.disk-preview-panel {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.disk-preview-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border);
+}
+.disk-preview-checkall {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.disk-preview-checkall input { accent-color: var(--accent); cursor: pointer; }
+.disk-preview-hint { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-3); margin-left: auto; }
+.disk-preview-count { font-size: 12px; color: var(--text-3); }
+.disk-preview-list {
+  overflow-y: auto;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+}
+.disk-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.1s;
+}
+.disk-preview-item:last-child { border-bottom: none; }
+.disk-preview-item:hover { background: rgba(255,255,255,0.04); }
+.disk-preview-item.selected { background: rgba(99,102,241,0.06); }
+.disk-preview-item input[type=checkbox] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.disk-preview-type-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-3);
+}
+.disk-preview-type-dot[data-type=app]      { background: #818cf8; }
+.disk-preview-type-dot[data-type=image]    { background: #34d399; }
+.disk-preview-type-dot[data-type=video]    { background: #f472b6; }
+.disk-preview-type-dot[data-type=music]    { background: #fb923c; }
+.disk-preview-type-dot[data-type=document] { background: #60a5fa; }
+.disk-preview-name { font-size: 12px; color: var(--text); flex-shrink: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-preview-path { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+
+/* 按路径移除 */
+.disk-remove-prefix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.disk-remove-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+.disk-remove-toggle:hover { color: #ef4444; border-color: rgba(239,68,68,0.4); }
+.disk-remove-input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+.disk-remove-input:focus { outline: none; border-color: var(--accent); }
+
+/* 大批量警告弹窗 */
+.disk-warn-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 380px;
+  text-align: center;
+}
+.disk-warn-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.disk-warn-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; }
+
+/* 右键菜单 */
+.disk-ctx-menu {
+  position: fixed;
+  z-index: 99999;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  min-width: 160px;
+}
+.disk-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s, color 0.1s;
+}
+.disk-ctx-item:hover { background: rgba(255,255,255,0.07); color: var(--text); }
+.disk-ctx-item.danger:hover { color: #ef4444; background: rgba(239,68,68,0.08); }
+.disk-ctx-separator { height: 1px; background: var(--border); margin: 3px 6px; }
+.scan-modal-btn.small { padding: 5px 12px; font-size: 12px; }
+.scan-modal-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* 更新弹窗 */
 /* 右下角后台下载悬浮条 */

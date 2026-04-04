@@ -47,6 +47,14 @@ declare global {
         pickFolder: () => Promise<string | null>
         pickMultipleFiles: () => Promise<string[] | null>
         scanDirectory: (dirPath: string) => Promise<Array<{ path: string; name: string; type: string }>>
+        listDrives: () => Promise<string[]>
+        getKnownFolders: () => Promise<{ desktop: string; downloads: string; documents: string; videos: string; pictures: string }>
+        diskScan: (roots: string[], types: string[]) => Promise<Array<{ type: string; title: string; file_path: string }>>
+        diskScanCancel: () => Promise<void>
+        onDiskScanProgress: (callback: (count: number, latest: string) => void) => () => void
+        filterGuiExes: (paths: string[]) => Promise<string[]>
+        onFilterGuiExesProgress: (callback: (done: number, total: number) => void) => () => void
+        onFilterGuiExesRemove: (callback: (path: string) => void) => () => void
       }
       onNewResource: (callback: (entry: object) => void) => () => void
       onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => () => void
@@ -134,6 +142,7 @@ declare global {
       }
       theme: {
         getSmartData: () => Promise<{ accentColor: string }>
+        onAccentChanged: (callback: (data: { accentColor: string }) => void) => () => void
       }
     }
   }

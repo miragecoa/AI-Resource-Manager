@@ -5,6 +5,14 @@ import { i18n } from '../i18n'
 import type { Locale } from '../i18n'
 
 export type ThemeId = 'dark' | 'light' | 'midnight' | 'aurora' | 'sand' | 'mint' | 'smart'
+
+export interface CardDisplayFlags {
+  duration: boolean   // 使用时长
+  count: boolean      // 使用次数
+  lastUsed: boolean   // 最近使用 / 本次计时
+  tags: boolean       // 标签
+}
+const DEFAULT_CARD_DISPLAY: CardDisplayFlags = { duration: true, count: true, lastUsed: true, tags: true }
 export type PaletteId = 'smart' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'indigo' | 'purple'
 export type BrightnessMode = 'dark' | 'neutral' | 'light'
 
@@ -323,6 +331,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const glassOpacity = ref(0.6)  // 0 = fully transparent, 1 = fully opaque
   const listColumns = ref<Record<string, number>>({ name: 300, type: 70, date: 130, count: 70, tags: 200 })
   const appTitle = ref('AI小抽屉')
+  const cardDisplay = ref<CardDisplayFlags>({ ...DEFAULT_CARD_DISPLAY })
   const offlineMode = ref(false)
   const showOnAutoStart = ref(false)
   const hotkeyWake = ref('Alt+Space')
@@ -334,7 +343,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal, autoDirTagVal, themeIdVal, paletteIdVal, brightnessModeVal, brightnessLevelVal, glassEnabledVal, glassOpacityVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal, autoDirTagVal, themeIdVal, paletteIdVal, brightnessModeVal, brightnessLevelVal, glassEnabledVal, glassOpacityVal, cardDisplayVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
@@ -363,6 +372,7 @@ export const useSettingsStore = defineStore('settings', () => {
       window.api.settings.get('brightnessLevel'),
       window.api.settings.get('glassEnabled'),
       window.api.settings.get('glassOpacity'),
+      window.api.settings.get('cardDisplay'),
     ])
     monitorEnabled.value = monitorVal !== 'false'
     autostartEnabled.value = autostartVal
@@ -379,6 +389,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (cardZoomByTypeVal) { try { cardZoomByType.value = JSON.parse(cardZoomByTypeVal) } catch {} }
     if (listColVal) { try { listColumns.value = { ...listColumns.value, ...JSON.parse(listColVal) } } catch {} }
     if (appTitleVal) appTitle.value = appTitleVal
+    if (cardDisplayVal) { try { cardDisplay.value = { ...DEFAULT_CARD_DISPLAY, ...JSON.parse(cardDisplayVal) } } catch {} }
     if (offlineModeVal === 'true') offlineMode.value = true
     if (showOnAutoStartVal === 'true') showOnAutoStart.value = true
     if (hotkeyWakeVal !== null) hotkeyWake.value = hotkeyWakeVal
@@ -519,6 +530,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('showFileExt', String(enabled))
   }
 
+  async function setCardDisplay(flags: Partial<CardDisplayFlags>) {
+    cardDisplay.value = { ...cardDisplay.value, ...flags }
+    await window.api.settings.set('cardDisplay', JSON.stringify(cardDisplay.value))
+  }
+
   async function setAutoUpdate(enabled: boolean) {
     autoUpdate.value = enabled
     await window.api.settings.set('autoUpdate', String(enabled))
@@ -583,6 +599,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // ── Smart theme ───────────────────────────────────────────────────────────
 
   let _smartPollTimer: ReturnType<typeof setInterval> | null = null
+  let _unsubAccentChanged: (() => void) | null = null
 
   /** Fall back to brand indigo when smart theme can't resolve a suitable color. */
   function _applyIndigoFallback() {
@@ -624,13 +641,19 @@ export const useSettingsStore = defineStore('settings', () => {
   function _startSmartTheme() {
     document.documentElement.classList.add('smart-theme')
     _applySmartColors()
+    // Event-driven: react immediately when Windows/WE changes the accent color
+    if (!_unsubAccentChanged) {
+      _unsubAccentChanged = window.api.theme.onAccentChanged(() => _applySmartColors())
+    }
+    // Fallback poll at 60s in case the event is missed
     if (!_smartPollTimer) {
-      _smartPollTimer = setInterval(_applySmartColors, 30_000)
+      _smartPollTimer = setInterval(_applySmartColors, 60_000)
     }
   }
 
   function _stopSmartTheme() {
     if (_smartPollTimer) { clearInterval(_smartPollTimer); _smartPollTimer = null }
+    if (_unsubAccentChanged) { _unsubAccentChanged(); _unsubAccentChanged = null }
     document.documentElement.classList.remove('smart-theme')
   }
 
@@ -849,5 +872,5 @@ export const useSettingsStore = defineStore('settings', () => {
     ])
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, autoDirTag, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, activeThemeId, isSmartTheme, paletteId, brightnessMode, brightnessLevel, glassEnabled, glassOpacity, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setAutoDirTag, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setSmartTheme, setPaletteMode, setBrightnessLevel, setGlassEnabled, setGlassOpacity, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults }
+  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, autoDirTag, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, activeThemeId, isSmartTheme, paletteId, brightnessMode, brightnessLevel, glassEnabled, glassOpacity, cardDisplay, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setAutoDirTag, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setSmartTheme, setPaletteMode, setBrightnessLevel, setGlassEnabled, setGlassOpacity, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults, setCardDisplay }
 })

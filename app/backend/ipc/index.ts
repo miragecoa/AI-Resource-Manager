@@ -18,6 +18,7 @@ import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, 
 import { dbPath, dataDir, clipboardGetItems, clipboardDeleteItem, clipboardClearAll, clipboardRecordUse } from '../db/index'
 import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate, getChangelog, getPendingUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
+import { listDrives, diskScan, isGuiExe, type DiskScanSignal } from '../disk-scan'
 import { incLaunchCount, incSearchCount, incTagUseCount } from '../heartbeat'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
@@ -543,6 +544,57 @@ export function registerIpcHandlers(): void {
     }
     await walk(dirPath)
     return results
+  })
+
+  // 磁盘扫描
+  ipcMain.handle('files:listDrives', () => listDrives())
+  ipcMain.handle('files:getKnownFolders', () => ({
+    desktop:   app.getPath('desktop'),
+    downloads: app.getPath('downloads'),
+    documents: app.getPath('documents'),
+    videos:    app.getPath('videos'),
+    pictures:  app.getPath('pictures'),
+  }))
+
+  let _diskScanSignal: DiskScanSignal = { cancelled: false }
+  ipcMain.handle('files:diskScan', async (event, roots: string[], types: string[]) => {
+    console.log('[diskScan] start — roots:', roots, 'types:', types)
+    _diskScanSignal = { cancelled: false }
+    let progressCount = 0
+    const items = await diskScan(roots, types, _diskScanSignal, (count, latest) => {
+      progressCount = count
+      console.log('[diskScan] progress count=%d latest=%s (type=%s)', count, latest, typeof latest)
+      try {
+        if (!event.sender.isDestroyed()) event.sender.send('files:diskScanProgress', count, String(latest ?? ''))
+      } catch (sendErr) {
+        console.error('[diskScan] sender.send error:', sendErr)
+      }
+    })
+    console.log('[diskScan] done — found %d items, last progress %d', items.length, progressCount)
+    const plain = items.map(({ type, title, file_path }) => ({ type: String(type), title: String(title), file_path: String(file_path) }))
+    console.log('[diskScan] returning %d plain items', plain.length)
+    return plain
+  })
+  ipcMain.handle('files:diskScanCancel', () => { _diskScanSignal.cancelled = true })
+
+  // Post-scan GUI-subsystem filter — checks PE header of EXEs, filters out CLI tools
+  ipcMain.handle('files:filterGuiExes', async (event, paths: string[]) => {
+    const guiPaths: string[] = []
+    for (let i = 0; i < paths.length; i++) {
+      const gui = await isGuiExe(paths[i])
+      if (gui) {
+        guiPaths.push(paths[i])
+      } else {
+        // Emit rejected path immediately so the UI can remove it in real-time
+        try {
+          if (!event.sender.isDestroyed()) event.sender.send('files:filterGuiExesRemove', paths[i])
+        } catch {}
+      }
+      try {
+        if (!event.sender.isDestroyed()) event.sender.send('files:filterGuiExesProgress', i + 1, paths.length)
+      } catch {}
+    }
+    return guiPaths
   })
 
   // 保存封面到本地磁盘，并更新数据库中的 cover_path

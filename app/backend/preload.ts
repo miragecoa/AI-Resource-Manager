@@ -65,7 +65,29 @@ contextBridge.exposeInMainWorld('api', {
     pickFolder: (): Promise<string | null> => ipcRenderer.invoke('files:pickFolder'),
     pickMultipleFiles: (): Promise<string[] | null> => ipcRenderer.invoke('files:pickMultipleFiles'),
     scanDirectory: (dirPath: string): Promise<Array<{ path: string; name: string; type: string }>> =>
-      ipcRenderer.invoke('files:scanDirectory', dirPath)
+      ipcRenderer.invoke('files:scanDirectory', dirPath),
+    listDrives: (): Promise<string[]> => ipcRenderer.invoke('files:listDrives'),
+    getKnownFolders: (): Promise<{ desktop: string; downloads: string; documents: string }> =>
+      ipcRenderer.invoke('files:getKnownFolders'),
+    diskScan: (roots: string[], types: string[]): Promise<Array<{ type: string; title: string; file_path: string }>> =>
+      ipcRenderer.invoke('files:diskScan', roots, types),
+    diskScanCancel: (): Promise<void> => ipcRenderer.invoke('files:diskScanCancel'),
+    onDiskScanProgress: (callback: (count: number, latest: string) => void) => {
+      const handler = (_e: any, count: number, latest: string) => callback(count, latest)
+      ipcRenderer.on('files:diskScanProgress', handler)
+      return () => ipcRenderer.removeListener('files:diskScanProgress', handler)
+    },
+    filterGuiExes: (paths: string[]): Promise<string[]> => ipcRenderer.invoke('files:filterGuiExes', paths),
+    onFilterGuiExesProgress: (callback: (done: number, total: number) => void) => {
+      const handler = (_e: any, done: number, total: number) => callback(done, total)
+      ipcRenderer.on('files:filterGuiExesProgress', handler)
+      return () => ipcRenderer.removeListener('files:filterGuiExesProgress', handler)
+    },
+    onFilterGuiExesRemove: (callback: (path: string) => void) => {
+      const handler = (_e: any, path: string) => callback(path)
+      ipcRenderer.on('files:filterGuiExesRemove', handler)
+      return () => ipcRenderer.removeListener('files:filterGuiExesRemove', handler)
+    },
   },
 
   // 监听主进程推送的新资源
@@ -240,6 +262,11 @@ contextBridge.exposeInMainWorld('api', {
   theme: {
     getSmartData: (): Promise<{ accentColor: string }> =>
       ipcRenderer.invoke('theme:smart:getData'),
+    onAccentChanged: (callback: (data: { accentColor: string }) => void) => {
+      const handler = (_e: any, data: { accentColor: string }) => callback(data)
+      ipcRenderer.on('theme:accent-changed', handler)
+      return () => ipcRenderer.removeListener('theme:accent-changed', handler)
+    },
   },
 
   // 配置文件（多数据库）

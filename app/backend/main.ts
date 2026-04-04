@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, globalShortcut, screen, dialog, clipboard, systemPreferences } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, globalShortcut, screen, dialog, clipboard, systemPreferences, webContents } from 'electron'
 import { join, extname, basename } from 'path'
 import { createHash } from 'crypto'
 import { deflateSync } from 'zlib'
@@ -884,6 +884,13 @@ app.whenReady().then(() => {
   setOnLanguageChange(() => tray?.setContextMenu(buildTrayMenu()))
   // ── Smart theme ───────────────────────────────────────
   ipcMain.handle('theme:smart:getData', () => getSmartThemeData())
+  // Push accent color change immediately when Windows/WE updates it
+  systemPreferences.on('accent-color-changed' as any, () => {
+    const data = getSmartThemeData()
+    for (const wc of webContents.getAllWebContents()) {
+      if (!wc.isDestroyed()) wc.send('theme:accent-changed', data)
+    }
+  })
   ipcMain.handle('masonry:open', (_e, items: Array<{ path: string; title: string }>) => { createMasonryWindow(items) })
   ipcMain.handle('masonry:getPaths', () => masonryPaths)
   ipcMain.handle('masonry:minimize', () => { masonryWindow?.minimize() })

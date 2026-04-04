@@ -49,16 +49,16 @@
       <div class="title" :title="displayTitle" :class="{ 'title-single': narrow }">{{ displayTitle }}</div>
       <!-- 统计信息行 -->
       <div v-if="!narrow" class="stats-row">
-        <span class="stat-item" :title="`${t('resource.stats.accumulated')}: ${fmtDuration(resource.total_run_time)}, ${t('resource.stats.count', { n: resource.open_count })}`">
+        <span v-if="props.display?.duration !== false" class="stat-item" :title="`${t('resource.stats.accumulated')}: ${fmtDuration(resource.total_run_time)}, ${t('resource.stats.count', { n: resource.open_count })}`">
           <span v-html="clockIcon" />
           <span v-if="!compact" class="stat-label-text">{{ t('resource.stats.accumulated') }}</span>
           {{ resource.total_run_time > 0 ? fmtDuration(resource.total_run_time) : (resource.open_count > 0 ? '—' : unplayedLabel) }}
         </span>
-        <span v-if="resource.open_count > 0" class="stat-count">{{ t('resource.stats.count', { n: resource.open_count }) }}</span>
-        <span v-if="isRunning" class="stat-session"><span v-if="!compact" class="stat-label-text">{{ t('resource.stats.session') }}</span>{{ fmtDuration(currentSessionSecs) }}</span>
-        <span v-else-if="resource.last_run_at" class="stat-last">{{ fmtRelDate(resource.last_run_at) }}</span>
+        <span v-if="resource.open_count > 0 && props.display?.count !== false" class="stat-count">{{ t('resource.stats.count', { n: resource.open_count }) }}</span>
+        <span v-if="isRunning && props.display?.lastUsed !== false" class="stat-session"><span v-if="!compact" class="stat-label-text">{{ t('resource.stats.session') }}</span>{{ fmtDuration(currentSessionSecs) }}</span>
+        <span v-else-if="resource.last_run_at && props.display?.lastUsed !== false" class="stat-last">{{ fmtRelDate(resource.last_run_at) }}</span>
       </div>
-      <div v-if="!narrow" class="tags">
+      <div v-if="!narrow && props.display?.tags !== false" class="tags">
         <template v-if="resource.tags?.length">
           <span v-for="tag in resource.tags" :key="tag.id" class="tag tag-clickable" @click.stop="$emit('select-hint', resource)">{{ tag.name }}</span>
         </template>
@@ -185,6 +185,7 @@ const props = withDefaults(defineProps<{
   cardZoom?: number
   heatLevel?: number
   showMicroLabel?: boolean
+  display?: { duration?: boolean; count?: boolean; lastUsed?: boolean; tags?: boolean }
 }>(), { selectable: false, selected: false, cardZoom: 0.75, showMicroLabel: false })
 
 // Responsive breakpoints based on zoom factor (150px * cardZoom = minCardWidth)
