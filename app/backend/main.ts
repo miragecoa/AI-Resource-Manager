@@ -36,7 +36,7 @@ import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from '.
 import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
-import { initHeartbeat, stopHeartbeat } from './heartbeat'
+import { initHeartbeat, flushAndStop, incShortcutMain, incShortcutClip } from './heartbeat'
 
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
@@ -64,10 +64,11 @@ let willQuit = false
 const launchedHidden = process.argv.includes('--hidden')
 
 // 点击 X 时隐藏到托盘，而非退出
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (willQuit) return  // 已经在退出流程中（由下方 app.quit() 触发的第二次调用）
+  event.preventDefault()
   willQuit = true
   flushRunningSessions()
-  stopHeartbeat()
   // 退出前同步保存窗口位置/大小，防止防抖定时器来不及触发
   if (mainWindow && !mainWindow.isDestroyed()) {
     setSetting('windowMaximized', mainWindow.isMaximized() ? 'true' : 'false')
@@ -76,8 +77,9 @@ app.on('before-quit', () => {
     }
   }
   // 显式释放所有全局快捷键，确保 Win+V 等在进程退出后还给系统
-  // （Electron 退出时操作系统会自动释放，但显式调用更保险）
   if (app.isReady()) globalShortcut.unregisterAll()
+  // 发送最后一次 heartbeat，完成后真正退出
+  flushAndStop().finally(() => app.quit())
 })
 
 /** 用 Node 内置 zlib 生成合法 PNG buffer（无外部依赖） */
@@ -195,6 +197,7 @@ function recallDrawer(): void {
 }
 
 function toggleClipboardWindow(): void {
+  incShortcutClip()
   if (!clipboardWindow || clipboardWindow.isDestroyed()) {
     createClipboardWindow()
     return
@@ -1387,6 +1390,7 @@ function registerWakeShortcut(accelerator: string): void {
   try {
     const ok = globalShortcut.register(accelerator, () => {
       if (!mainWindow) return
+      incShortcutMain()
       if (mainWindow.isVisible() && mainWindow.isFocused()) {
         mainWindow.setSkipTaskbar(true)
         mainWindow.hide()
@@ -1396,6 +1400,7 @@ function registerWakeShortcut(accelerator: string): void {
         mainWindow.show()
         mainWindow.focus()
         drawerWindow?.hide()
+        mainWindow.webContents.send('window:wake')  // 通知渲染层聚焦搜索框
       }
     })
     if (ok) _wakeAccelerator = accelerator

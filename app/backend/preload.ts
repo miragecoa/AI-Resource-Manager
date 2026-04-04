@@ -80,6 +80,12 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeAllListeners('resources:reload')
   },
 
+  // 快捷键唤起窗口 → 聚焦搜索框
+  onWake: (callback: () => void) => {
+    ipcRenderer.on('window:wake', () => callback())
+    return () => ipcRenderer.removeAllListeners('window:wake')
+  },
+
   // 监听进程运行状态变化
   onRunningChange: (callback: (event: { resourceId: string; running: boolean; startTime?: number }) => void) => {
     ipcRenderer.on('resource:running', (_event, data) => callback(data))

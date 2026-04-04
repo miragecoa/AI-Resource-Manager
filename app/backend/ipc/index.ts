@@ -18,7 +18,7 @@ import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, 
 import { dbPath, dataDir, clipboardGetItems, clipboardDeleteItem, clipboardClearAll, clipboardRecordUse } from '../db/index'
 import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate, getChangelog, getPendingUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
-import { incLaunchCount } from '../heartbeat'
+import { incLaunchCount, incSearchCount, incTagUseCount } from '../heartbeat'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
 // 扫描目录时可识别的文件扩展名 → 资源类型
@@ -309,6 +309,7 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle('tags:addToResource', (_e, resourceId: string, tagId: number, source = 'manual') => {
     addTagToResource(resourceId, tagId, source)
+    incTagUseCount()
     return true
   })
 
@@ -339,7 +340,10 @@ export function registerIpcHandlers(): void {
   })
 
   // ── 搜索 ──────────────────────────────────────────────
-  ipcMain.handle('search:query', (_e, q: string, type?: string) => searchResources(q, type))
+  ipcMain.handle('search:query', (_e, q: string, type?: string) => {
+    if (q.trim()) incSearchCount()
+    return searchResources(q, type)
+  })
 
   // ── 设置 ──────────────────────────────────────────────
   ipcMain.handle('settings:get', (_e, key: string) => getSetting(key))
@@ -633,8 +637,38 @@ export function registerIpcHandlers(): void {
   })
 
   // ── 窗口控制（自定义标题栏） ──────────────────────────
+
+  /** 锁定状态下将窗口置于 z-order 最底层（Win32 SetWindowPos HWND_BOTTOM） */
+  function sendToBottom(win: BrowserWindow): void {
+    win.blur()  // 立即释放焦点，让其他窗口获得激活
+    if (process.platform !== 'win32') return
+    try {
+      const hwnd = win.getNativeWindowHandle()
+      // 在 64-bit Windows 上 HWND 是 8 字节；取低 32 位对普通窗口足够
+      const hwndVal = hwnd.length >= 8
+        ? hwnd.readBigUInt64LE(0).toString()
+        : hwnd.readUInt32LE(0).toString()
+      // HWND_BOTTOM=1, SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE = 0x13
+      const script = `Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public class WH { [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr i,int x,int y,int cx,int cy,uint f); }
+'@ -Language CSharp; [WH]::SetWindowPos([IntPtr]${hwndVal},[IntPtr]1,0,0,0,0,0x13)`
+      const encoded = Buffer.from(script, 'utf16le').toString('base64')
+      execFile('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded],
+        { windowsHide: true },
+      )
+    } catch { /* 非关键路径，静默忽略 */ }
+  }
+
   ipcMain.handle('window:minimize', (e) => {
-    BrowserWindow.fromWebContents(e.sender)?.minimize()
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return
+    if (pinnedWindows.has(win)) {
+      sendToBottom(win)  // 锁定：置底而非最小化
+    } else {
+      win.minimize()
+    }
   })
   ipcMain.handle('window:maximize', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
@@ -649,30 +683,29 @@ export function registerIpcHandlers(): void {
     return BrowserWindow.fromWebContents(e.sender)?.isMaximized() ?? false
   })
   // 图钉锁定：防意外最小化，但不强制置顶（其他窗口可正常浮上来）
-  const pinnedWindows = new WeakMap<BrowserWindow, () => void>()
+  const pinnedWindows = new WeakMap<BrowserWindow, true>()
   ipcMain.handle('window:toggleAlwaysOnTop', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     if (!win) return false
     if (pinnedWindows.has(win)) {
       // 解锁
-      win.removeListener('minimize', pinnedWindows.get(win)!)
       pinnedWindows.delete(win)
       win.setResizable(true)
-      win.setMinimizable(true)
       return false
     } else {
-      // 锁定：监听 minimize 事件，立即 restore
-      const handler = () => win.restore()
-      win.on('minimize', handler)
-      pinnedWindows.set(win, handler)
+      // 锁定：最小化按钮改为置底（在 window:minimize 中处理）
+      pinnedWindows.set(win, true)
       win.setResizable(false)
-      win.setMinimizable(false)
       return true
     }
   })
   ipcMain.handle('window:isAlwaysOnTop', (e) => {
     const win = BrowserWindow.fromWebContents(e.sender)
     return win ? pinnedWindows.has(win) : false
+  })
+  // 解锁时恢复到最顶层（从置底状态唤回）
+  ipcMain.handle('window:moveTop', (e) => {
+    BrowserWindow.fromWebContents(e.sender)?.moveTop()
   })
 
   // ── 应用控制 ──────────────────────────────────────────

@@ -16,6 +16,7 @@
         <div class="search-wrap combined" v-if="!showIgnored">
           <span class="search-icon" v-html="searchSvg" />
           <input
+            ref="searchInputRef"
             v-model="store.searchQuery"
             class="search combine-left"
             :placeholder="t('library.searchPlaceholder')"
@@ -931,6 +932,7 @@ import { match as pinyinMatch } from 'pinyin-pro'
 const { t, locale } = useI18n()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
+const searchInputRef = ref<HTMLInputElement | null>(null)
 const showAddModal = ref(false)
 const showAiComingSoon = ref(false)
 const showAiSearchComingSoon = ref(false)
@@ -2032,12 +2034,20 @@ onMounted(async () => {
   }, 5_000)
 })
 
+const unsubWake = window.api.onWake(() => {
+  nextTick(() => {
+    searchInputRef.value?.focus()
+    searchInputRef.value?.select()
+  })
+})
+
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
   document.removeEventListener('dragover', onDocDragOver)
   document.removeEventListener('click', onDocCloseTypeFilter)
   sentinelObserver?.disconnect()
   unsubDrawerImport?.()
+  unsubWake?.()
 })
 
 // Per-type view mode and card zoom (derived from active category)

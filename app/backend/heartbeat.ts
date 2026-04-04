@@ -21,9 +21,19 @@ const INTERVAL_MS = 60 * 60 * 1000  // 1 hour
 
 let _timer: ReturnType<typeof setInterval> | null = null
 let _pendingLaunches = 0
+let _pendingSearches = 0
+let _pendingTagUses  = 0
+let _pendingShortcutMain = 0
+let _pendingShortcutClip = 0
+let _sid = ''
+let _sessionStart = 0
 
 /** Call each time the user opens or reveals a resource. */
-export function incLaunchCount(): void { _pendingLaunches++ }
+export function incLaunchCount(): void   { _pendingLaunches++ }
+export function incSearchCount(): void   { _pendingSearches++ }
+export function incTagUseCount(): void   { _pendingTagUses++ }
+export function incShortcutMain(): void  { _pendingShortcutMain++ }
+export function incShortcutClip(): void  { _pendingShortcutClip++ }
 
 /** Returns the persisted install_id, creating one on first run. */
 function getInstallId(): string {
@@ -42,14 +52,18 @@ function getInstallId(): string {
 
 /** Fires one heartbeat. Never throws. */
 async function sendHeartbeat(installId: string, version: string): Promise<void> {
-  const lc = _pendingLaunches
-  _pendingLaunches = 0  // reset before await — if fetch fails we lose the count, acceptable
+  const lc = _pendingLaunches;  _pendingLaunches = 0
+  const sc = _pendingSearches;  _pendingSearches = 0
+  const tc = _pendingTagUses;   _pendingTagUses  = 0
+  const sm = _pendingShortcutMain; _pendingShortcutMain = 0
+  const scl = _pendingShortcutClip; _pendingShortcutClip = 0
+  const se = Math.floor((Date.now() - _sessionStart) / 1000)
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: installId, v: version, lc }),
-      signal: AbortSignal.timeout(8000),  // 8s timeout, don't hang
+      body: JSON.stringify({ id: installId, v: version, lc, sc, tc, sm, scl, sid: _sid, se }),
+      signal: AbortSignal.timeout(8000),
     })
   } catch { /* offline, timeout, or any error — silently ignored */ }
 }
@@ -57,6 +71,8 @@ async function sendHeartbeat(installId: string, version: string): Promise<void> 
 /** Call once after app.whenReady(). Starts heartbeat loop. */
 export function initHeartbeat(): void {
   try {
+    _sid = randomUUID()
+    _sessionStart = Date.now()
     const installId = getInstallId()
     const version = app.getVersion()
 
@@ -73,10 +89,15 @@ export function initHeartbeat(): void {
   } catch { /* if anything goes wrong, heartbeat simply doesn't start */ }
 }
 
-/** Call on app quit to clean up the interval (optional, unref handles it). */
-export function stopHeartbeat(): void {
+/** Call on app quit — clears the interval and fires one final heartbeat. */
+export async function flushAndStop(): Promise<void> {
   if (_timer) {
     clearInterval(_timer)
     _timer = null
   }
+  try {
+    const installId = getInstallId()
+    const version = app.getVersion()
+    await sendHeartbeat(installId, version)
+  } catch { /* silently ignored */ }
 }
