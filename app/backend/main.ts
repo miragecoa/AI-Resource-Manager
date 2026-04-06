@@ -1406,12 +1406,12 @@ function registerWakeShortcut(accelerator: string): void {
   try {
     const ok = globalShortcut.register(accelerator, () => {
       if (!mainWindow) return
-      incShortcutMain()
       if (mainWindow.isVisible() && mainWindow.isFocused()) {
         mainWindow.setSkipTaskbar(true)
         mainWindow.hide()
         if (getSetting('drawerVisible') !== 'false') drawerWindow?.show()
       } else {
+        incShortcutMain()
         incWakeCount()
         mainWindow.setSkipTaskbar(false)
         mainWindow.show()
