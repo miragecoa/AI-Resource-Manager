@@ -243,6 +243,7 @@ export default {
     displayTags: 'Tags',
     displayFileSize: 'File size',
     displayPinRunning: 'Pin running apps',
+    pageSize: 'Per page',
     displayCardBg: 'Card background',
     sortLastUsed: 'Last used',
     sortRecentlyAdded: 'Recently added',

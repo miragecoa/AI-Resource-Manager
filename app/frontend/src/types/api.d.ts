@@ -39,7 +39,7 @@ declare global {
         openPath: (filePath: string, meta?: string) => Promise<import('../stores/resources').Resource | null>
         openAsAdmin: (filePath: string) => Promise<import('../stores/resources').Resource | null>
         openInExplorer: (filePath: string) => Promise<void>
-        readImage: (filePath: string) => Promise<string | null>
+        readImage: (filePath: string, size?: number) => Promise<string | null>
         readFullImage: (filePath: string) => Promise<string | null>
         getAppIcon: (filePath: string) => Promise<string | null>
         saveCover: (resourceId: string, dataUrl: string) => Promise<string | null>

@@ -19,6 +19,46 @@
         </div>
       </section>
 
+      <!-- 软件更新 -->
+      <section class="section">
+        <h2 class="section-title">{{ t('settings.update.title') }}</h2>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">{{ t('settings.update.autoCheck') }}</div>
+            <div class="setting-desc">{{ t('settings.update.autoCheckDesc') }}</div>
+          </div>
+          <button class="toggle" :class="{ on: settingsStore.autoUpdate }" @click="settingsStore.setAutoUpdate(!settingsStore.autoUpdate)">
+            <span class="toggle-thumb" />
+          </button>
+        </div>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">{{ t('settings.update.currentVersion', { version: appVersion }) }}</div>
+            <div class="setting-desc" v-if="updateCheckStatus === 'checking'">{{ t('settings.update.checking') }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'up-to-date'" style="color: #4ade80;">{{ t('settings.update.upToDate') }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'available'">
+              {{ t(updateCheckInfo?.isNewVersion ? 'settings.update.available' : 'settings.update.availableUpdate', { version: updateCheckInfo?.remoteVersion }) }}
+              {{ t('settings.update.downloadSize', { size: ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }) }}
+            </div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.downloading', { percent: updateDownloadPercent }) }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">{{ t('settings.update.ready') }}</div>
+            <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">{{ t('settings.update.error') }}</div>
+          </div>
+          <div class="setting-actions">
+            <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">{{ t('settings.update.btnDownload') }}</button>
+            <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">{{ t('settings.update.btnApply') }}</button>
+            <button v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">{{ t('settings.update.btnCheck') }}</button>
+            <button class="profile-btn" @click="openGitHubRelease">{{ t('settings.update.btnGithub') }}</button>
+            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.btnForce') }}</button>
+          </div>
+        </div>
+        <div class="update-tips-box">
+          <div class="update-tips-title">{{ t('settings.update.tipsTitle') }}</div>
+          <div class="update-tips-line">{{ t('settings.update.tipsLine1') }}</div>
+          <div class="update-tips-line">{{ t('settings.update.tipsLine2') }}</div>
+        </div>
+      </section>
+
       <!-- 监控设置 -->
       <section class="section">
         <h2 class="section-title">{{ t('settings.monitor.title') }}</h2>
@@ -467,45 +507,6 @@
         </div>
       </section>
 
-      <!-- 软件更新 -->
-      <section class="section">
-        <h2 class="section-title">{{ t('settings.update.title') }}</h2>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">{{ t('settings.update.autoCheck') }}</div>
-            <div class="setting-desc">{{ t('settings.update.autoCheckDesc') }}</div>
-          </div>
-          <button class="toggle" :class="{ on: settingsStore.autoUpdate }" @click="settingsStore.setAutoUpdate(!settingsStore.autoUpdate)">
-            <span class="toggle-thumb" />
-          </button>
-        </div>
-        <div class="setting-row">
-          <div class="setting-info">
-            <div class="setting-label">{{ t('settings.update.currentVersion', { version: appVersion }) }}</div>
-            <div class="setting-desc" v-if="updateCheckStatus === 'checking'">{{ t('settings.update.checking') }}</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'up-to-date'" style="color: #4ade80;">{{ t('settings.update.upToDate') }}</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'available'">
-              {{ t(updateCheckInfo?.isNewVersion ? 'settings.update.available' : 'settings.update.availableUpdate', { version: updateCheckInfo?.remoteVersion }) }}
-              {{ t('settings.update.downloadSize', { size: ((updateCheckInfo?.assetSize || 0) / 1024 / 1024).toFixed(1) }) }}
-            </div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.downloading', { percent: updateDownloadPercent }) }}</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'ready'" style="color: #4ade80;">{{ t('settings.update.ready') }}</div>
-            <div class="setting-desc" v-else-if="updateCheckStatus === 'error'" style="color: #ef4444;">{{ t('settings.update.error') }}</div>
-          </div>
-          <div class="setting-actions">
-            <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">{{ t('settings.update.btnDownload') }}</button>
-            <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">{{ t('settings.update.btnApply') }}</button>
-            <button v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">{{ t('settings.update.btnCheck') }}</button>
-            <button class="profile-btn" @click="openGitHubRelease">{{ t('settings.update.btnGithub') }}</button>
-            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.btnForce') }}</button>
-          </div>
-        </div>
-        <div class="update-tips-box">
-          <div class="update-tips-title">{{ t('settings.update.tipsTitle') }}</div>
-          <div class="update-tips-line">{{ t('settings.update.tipsLine1') }}</div>
-          <div class="update-tips-line">{{ t('settings.update.tipsLine2') }}</div>
-        </div>
-      </section>
 
       <!-- 关于 -->
       <section class="section">

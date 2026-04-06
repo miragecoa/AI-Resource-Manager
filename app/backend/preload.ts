@@ -5,6 +5,12 @@ contextBridge.exposeInMainWorld('__debugLog', (...args: unknown[]) => {
   ipcRenderer.send('debug:log', ...args)
 })
 
+// 清理渲染进程内部缓存（图片解码缓存等）+ 主进程缩略图缓存
+contextBridge.exposeInMainWorld('__clearRendererCache', () => {
+  webFrame.clearCache()
+  ipcRenderer.invoke('cache:clear')
+})
+
 // 暴露给渲染进程的 API（类型安全）
 contextBridge.exposeInMainWorld('api', {
   // 资源 CRUD
@@ -62,7 +68,7 @@ contextBridge.exposeInMainWorld('api', {
     openInExplorer: (filePath: string) => ipcRenderer.invoke('files:openInExplorer', filePath),
     resolveDropped: (paths: string[]): Promise<Array<{ type: string; title: string; file_path: string; meta?: string }>> =>
       ipcRenderer.invoke('files:resolveDropped', paths),
-    readImage: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:readImage', filePath),
+    readImage: (filePath: string, size?: number): Promise<string | null> => ipcRenderer.invoke('files:readImage', filePath, size),
     readFullImage: (filePath: string): Promise<string | null> => ipcRenderer.invoke('files:readFullImage', filePath),
     getAppIcon: (filePath: string, force?: boolean): Promise<string | null> => ipcRenderer.invoke('files:getAppIcon', filePath, force),
     saveCover: (resourceId: string, dataUrl: string, userPicked?: boolean): Promise<string | null> => ipcRenderer.invoke('files:saveCover', resourceId, dataUrl, userPicked),

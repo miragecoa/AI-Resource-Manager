@@ -57,6 +57,7 @@ class LRUMap<V> {
   }
   keys() { return this.map.keys() }
   delete(key: string) { return this.map.delete(key) }
+  clear() { this.map.clear() }
   get size() { return this.map.size }
 }
 
@@ -209,6 +210,16 @@ export function registerIpcHandlers(): void {
 
   // ── Debug: 渲染进程日志转发到 terminal ──────────────────
   ipcMain.on('debug:log', (_e, ...args: unknown[]) => { console.log('[renderer]', ...args) })
+
+  // 清理主进程缩略图缓存（翻页/切换视图时由渲染进程调用）
+  ipcMain.handle('cache:clear', () => {
+    const before = thumbCache.size + appIconCache.size
+    thumbCache.clear()
+    appIconCache.clear()
+    console.log(`[cache:clear] cleared ${before} entries`)
+    // 强制 V8 GC（主进程有 --expose-gc 标志时可用）
+    if (typeof global.gc === 'function') global.gc()
+  })
 
   // ── 资源 ──────────────────────────────────────────────
   ipcMain.handle('resources:getAll', (_e, type?: string) => getAllResources(type))
@@ -457,16 +468,18 @@ export function registerIpcHandlers(): void {
   })
 
   // 生成缩略图（用系统缓存，对中文路径完全兼容，返回 PNG data URL）
-  ipcMain.handle('files:readImage', async (_e, filePath: string) => {
-    if (thumbCache.has(filePath)) return thumbCache.get(filePath) ?? null
+  ipcMain.handle('files:readImage', async (_e, filePath: string, size?: number) => {
+    const dim = size ?? 400
+    const cacheKey = dim < 400 ? `${filePath}@${dim}` : filePath
+    if (thumbCache.has(cacheKey)) return thumbCache.get(cacheKey) ?? null
     try {
-      const thumb = await nativeImage.createThumbnailFromPath(filePath, { width: 400, height: 400 })
+      const thumb = await nativeImage.createThumbnailFromPath(filePath, { width: dim, height: dim })
       const result = thumb.isEmpty() ? null : thumb.toDataURL()
-      thumbCache.set(filePath, result)
+      thumbCache.set(cacheKey, result)
       return result
     } catch (e: any) {
       console.error('[Thumb] failed:', filePath, e?.message)
-      thumbCache.set(filePath, null)
+      thumbCache.set(cacheKey, null)
       return null
     }
   })

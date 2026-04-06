@@ -45,7 +45,8 @@
 <script setup lang="ts">
 import { ref, computed, watchEffect, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { loadImage, cancelQueued, isIndexVisible, getVisVersion } from '../utils/image-cache'
+import { loadImage, loadImageSmall, loadIcon, cancelQueued, hasSavedCover, markCoverSaved, isIndexVisible, getVisVersion } from '../utils/image-cache'
+import { useResourceStore } from '../stores/resources'
 import type { Resource } from '../stores/resources'
 
 const { t } = useI18n()
@@ -94,30 +95,76 @@ const isNearViewport = computed(() => { void _visCheck.value; return isIndexVisi
 const _visTimer = setInterval(() => { _visCheck.value = getVisVersion() }, 300)
 onUnmounted(() => clearInterval(_visTimer))
 
-// ── 独立缩略图管理（同 ResourceCard 策略）────────────────
+// ── 独立缩略图管理（同 ResourceCard 完整逻辑 + saveCover）────────────────
+const store = useResourceStore()
 const thumbSrc = ref<string | null>(null)
 
 // 离屏释放 + 取消队列
 watch(isNearViewport, (near) => {
   if (!near) {
     thumbSrc.value = null
-    const p = props.resource.cover_path || props.resource.file_path
+    const r = props.resource
+    const p = r.cover_path || r.file_path
     if (p) cancelQueued(p)
+    cancelQueued('icon:' + r.file_path)
   }
 })
 
-// 进入视口时加载
+// 进入视口时加载（同 ResourceCard.watchEffect）
 watchEffect(async () => {
   const r = props.resource
   if (!isNearViewport.value) return
 
-  const thumbPath = r.cover_path
-    || ((r.type === 'image' || r.type === 'video') ? r.file_path : null)
-  if (!thumbPath) { thumbSrc.value = null; return }
-
-  const src = await loadImage(thumbPath)
-  // 加载完后再次检查是否还在视口
-  if (isNearViewport.value) thumbSrc.value = src
+  // 已有 cover_path → 直接加载
+  if (r.cover_path) {
+    thumbSrc.value = await loadImage(r.cover_path)
+    return
+  }
+  if (r.type === 'image') {
+    thumbSrc.value = await loadImageSmall(r.file_path)
+    return
+  }
+  if (r.type === 'app' || r.type === 'game') {
+    const icon = await loadIcon(r.file_path)
+    thumbSrc.value = icon
+    if (icon && !hasSavedCover(r.id)) {
+      markCoverSaved(r.id)
+      window.api.files.saveCover(r.id, icon).then((path: string | null) => {
+        if (path) store.addOrUpdate({ ...r, cover_path: path })
+      }).catch(() => {})
+    }
+    return
+  }
+  if (r.type === 'video') {
+    const thumb = await loadImageSmall(r.file_path)
+    thumbSrc.value = thumb
+    if (thumb && !hasSavedCover(r.id)) {
+      markCoverSaved(r.id)
+      window.api.files.saveCover(r.id, thumb).then((path: string | null) => {
+        if (path) store.addOrUpdate({ ...r, cover_path: path })
+      }).catch(() => {})
+    }
+    return
+  }
+  if (r.type === 'document' || r.type.startsWith('cat_')) {
+    const ext = r.file_path.split('.').pop()?.toLowerCase() ?? ''
+    const skipThumb = ['txt', 'csv', 'log', 'md', 'json', 'xml', 'ini', 'cfg', 'bat', 'sh', 'yaml', 'yml', 'toml', 'sql'].includes(ext)
+    let thumb = skipThumb ? null : await loadImageSmall(r.file_path)
+    if (!thumb) thumb = await loadIcon(r.file_path)
+    thumbSrc.value = thumb
+    if (thumb && !hasSavedCover(r.id)) {
+      markCoverSaved(r.id)
+      window.api.files.saveCover(r.id, thumb).then((path: string | null) => {
+        if (path) store.addOrUpdate({ ...r, cover_path: path })
+      }).catch(() => {})
+    }
+    return
+  }
+  if (r.type === 'webpage') {
+    thumbSrc.value = null
+    return
+  }
+  thumbSrc.value = null
 })
 
 // ── 格式化（轻量计算，每行独立）────────────────

@@ -711,6 +711,15 @@ function createWindow(): void {
     }
   })
 
+  // Ctrl+Shift+I 打开 DevTools（仅开发模式）
+  if (!app.isPackaged) {
+    mainWindow.webContents.on('before-input-event', (_e, input) => {
+      if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        mainWindow?.webContents.toggleDevTools()
+      }
+    })
+  }
+
   // 阻止网页 <title> 标签覆盖用户保存的应用名称
   mainWindow.on('page-title-updated', (e) => e.preventDefault())
 

@@ -201,6 +201,28 @@
           <!-- 排序栏 -->
           <div v-if="!store.loading && store.filtered.length > 0" class="sort-bar">
             <span class="sort-bar-count">{{ t('library.count', { n: listSortedFiltered.length }) }}</span>
+
+            <!-- 分页 -->
+            <div v-if="totalPages > 1" class="pagination-controls">
+              <button class="page-btn" :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8 2L4 6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <span class="page-indicator">
+                <input
+                  class="page-input"
+                  type="text"
+                  inputmode="numeric"
+                  :value="currentPage"
+                  @keydown.enter="($event.target as HTMLInputElement).blur()"
+                  @blur="onPageInputBlur($event)"
+                  @focus="($event.target as HTMLInputElement).select()"
+                /> / {{ totalPages }}
+              </span>
+              <button class="page-btn" :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+
             <div class="sort-bar-spacer" />
             <div class="sort-bar-right">
               <!-- 瀑布流按钮（仅图片分类） -->
@@ -276,6 +298,15 @@
                       <span class="tfi-label">{{ t('library.displayPinRunning') }}</span>
                     </label>
                   </template>
+                  <div class="display-separator" />
+                  <div class="page-size-row">
+                    <span class="tfi-label">{{ t('library.pageSize') }}</span>
+                    <select class="page-size-select" :value="settingsStore.pageSize" @change="onPageSizeChange">
+                      <option :value="100">100</option>
+                      <option :value="200">200</option>
+                      <option :value="500">500</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <!-- 高级筛选下拉 -->
@@ -332,13 +363,12 @@
             <div v-else class="empty-hint">{{ t('library.emptyDefaultHint') }}</div>
           </div>
 
-          <div v-else ref="gridScrollRef" class="grid-scroll" @mousedown="onGridMousedown" @scroll="onContentScroll">
+          <div v-else ref="gridScrollRef" class="grid-scroll" @mousedown="onGridMousedown" @scroll="onContentScroll" @wheel="onContentWheel">
             <!-- 网格视图 / 热力模式（共用同一网格，热力模式给卡片叠加颜色） -->
             <div v-if="viewMode !== 'list'" class="grid" :style="{ '--card-min-width': cardMinWidth + 'px' }">
                 <ResourceCard
                   v-for="(item, idx) in visibleItems"
                   :key="item.id"
-                  :data-rid="item.id"
                   :resource="item"
                   :item-index="idx"
                   :selectable="batchMode"
@@ -355,7 +385,6 @@
                   @remove="removeResource"
                   @ignore="ignoreResource"
                 />
-                <div v-if="renderLimit < listSortedFiltered.length" ref="sentinelRef" class="grid-sentinel" />
             </div>
             <!-- 列表视图 -->
             <div v-else-if="viewMode === 'list'" class="list-view" :style="{ '--list-zoom': cardZoom }">
@@ -436,7 +465,6 @@
                 @play-click="store.runningMap.has(item.id) ? (listMenuKillTarget = item) : openResource(item)"
                 @tag-click="onCardSelectHint(item)"
               />
-              <div v-if="renderLimit < listSortedFiltered.length" ref="sentinelRef" class="grid-sentinel" />
             </div>
             <!-- 列表视图右键菜单 -->
             <Teleport to="body">
@@ -1510,7 +1538,7 @@ async function importDiskScanResults() {
       diskImportProgress.value = Math.min(i + CHUNK, items.length)
     }
     // 重置渲染窗口
-    renderLimit.value = BATCH_SIZE
+    currentPage.value = 1
     showScanModal.value = false
   } finally {
     diskImporting.value = false
@@ -1633,11 +1661,8 @@ async function addPresetApps() {
   }
 }
 
-// ── 渐进渲染 ───────────────────
-const BATCH_SIZE = 60
-const renderLimit = ref(BATCH_SIZE)
-const sentinelRef = ref<HTMLElement | null>(null)
-let sentinelObserver: IntersectionObserver | null = null
+// ── 分页（状态定义在 listSortedFiltered 之后）───────────────────
+const currentPage = ref(1)
 
 // ── 列表视图：本地列点击排序 ───────────────────
 const listSortCol = ref<'name'|'type'|'date'|'count'|'size'|null>(null)
@@ -1696,6 +1721,27 @@ function onVisibilityChange() { setPaused(document.hidden) }
 // 滚动时更新可见 index 范围（用于卡片图片释放/加载）
 // 用滚动百分比推算中心 index，不依赖行高估算
 let _scrollRaf = 0
+let _atBottom = false
+let _overscroll = 0
+let _overscrollTimer: ReturnType<typeof setTimeout> | null = null
+
+function onContentWheel(e: WheelEvent) {
+  if (!_atBottom || e.deltaY <= 0 || currentPage.value >= totalPages.value) {
+    _overscroll = 0
+    return
+  }
+  // 已在底部且继续向下滚 → 累积 overscroll
+  _overscroll += e.deltaY
+  const threshold = (gridScrollRef.value?.clientHeight ?? 600) * 0.5
+  if (_overscroll >= threshold) {
+    _overscroll = 0
+    goToPage(currentPage.value + 1)
+  }
+  // 停止滚动 800ms 后重置累积量
+  if (_overscrollTimer) clearTimeout(_overscrollTimer)
+  _overscrollTimer = setTimeout(() => { _overscroll = 0 }, 800)
+}
+
 function onContentScroll() {
   if (_scrollRaf) return
   _scrollRaf = requestAnimationFrame(() => {
@@ -1713,6 +1759,9 @@ function onContentScroll() {
       Math.max(0, centerIdx - BUFFER),
       Math.min(total, centerIdx + BUFFER)
     )
+
+    // 检测是否在底部（用于 overscroll 翻页）
+    _atBottom = scrollable > 0 && el.scrollTop >= scrollable - 2
   })
 }
 
@@ -1748,6 +1797,11 @@ function onColSort(col: 'name'|'type'|'date'|'count'|'size') {
     listSortDesc.value = false
   }
 }
+
+// 快速筛选（前置声明，listSortedFiltered 依赖它）
+const QUICK_FILTER_KEYS = ['neverOpened', 'untagged', 'hasTag'] as const
+type QuickFilterKey = typeof QUICK_FILTER_KEYS[number]
+const quickFilters = ref<QuickFilterKey[]>([])
 
 const listSortedFiltered = computed(() => {
   // 快速筛选（全视图通用）
@@ -1809,11 +1863,15 @@ const listSortedFiltered = computed(() => {
   })
 })
 
-const visibleItems = computed(() => listSortedFiltered.value.slice(0, renderLimit.value))
+const visibleItems = computed(() => {
+  const size = settingsStore.pageSize
+  const start = (currentPage.value - 1) * size
+  return listSortedFiltered.value.slice(start, start + size)
+})
 
-// 过滤条件变化时重置
+// 过滤条件变化时重置到第一页
 watch(() => [store.activeType, store.searchQuery, store.activeTags], () => {
-  renderLimit.value = BATCH_SIZE
+  currentPage.value = 1
 })
 
 
@@ -1830,23 +1888,6 @@ watch(() => store.searchQuery, (q) => {
   }
 })
 
-function setupSentinelObserver() {
-  sentinelObserver?.disconnect()
-  sentinelObserver = new IntersectionObserver((entries) => {
-    if (entries[0]?.isIntersecting && renderLimit.value < listSortedFiltered.value.length) {
-      renderLimit.value = Math.min(renderLimit.value + BATCH_SIZE, listSortedFiltered.value.length)
-    }
-  }, { rootMargin: '200px' })
-}
-
-// sentinelRef 会随着条件渲染出现/消失，用 watch 追踪
-watch(sentinelRef, (el) => {
-  sentinelObserver?.disconnect()
-  if (el) {
-    if (!sentinelObserver) setupSentinelObserver()
-    sentinelObserver!.observe(el)
-  }
-})
 // 拖放导入
 const dropOver = ref(false)
 const showDropModal = ref(false)
@@ -2547,14 +2588,11 @@ function onDocDragOver(e: Event) {
 }
 
 // ── 快速筛选（sort bar）───────────────────────
-const QUICK_FILTER_KEYS = ['neverOpened', 'untagged', 'hasTag'] as const
-type QuickFilterKey = typeof QUICK_FILTER_KEYS[number]
 const quickFilterDefs = computed(() => [
   { key: 'neverOpened' as QuickFilterKey, label: t('library.quickFilter.neverOpened') },
   { key: 'untagged'    as QuickFilterKey, label: t('library.quickFilter.untagged') },
   { key: 'hasTag'      as QuickFilterKey, label: t('library.quickFilter.hasTag') },
 ])
-const quickFilters = ref<QuickFilterKey[]>([])
 const showQfDropdown = ref(false)
 function toggleQuickFilter(key: QuickFilterKey) {
   const idx = quickFilters.value.indexOf(key)
@@ -2583,6 +2621,8 @@ let _autoFaviconDone = false
 
 onMounted(async () => {
   settingsStore.load()
+  // 首次加载：组件按 0→N mount 入队，reverse 后 pop() 从 0 开始（从上往下加载）
+  nextTick(() => reverseQueue())
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('dragover', onDocDragOver)
   document.addEventListener('click', onDocCloseTypeFilter)
@@ -2695,7 +2735,6 @@ onUnmounted(() => {
   document.removeEventListener('click', onDocCloseTypeFilter)
   document.removeEventListener('mouseup', diskDragStop)
   document.removeEventListener('visibilitychange', onVisibilityChange)
-  sentinelObserver?.disconnect()
   unsubDrawerImport?.()
   unsubWake?.()
   unsubTrayWake?.()
@@ -2704,6 +2743,41 @@ onUnmounted(() => {
 
 // Per-type view mode and card zoom (derived from active category)
 const viewMode = computed(() => settingsStore.getViewMode(store.activeType))
+
+// ── 分页（必须在 viewMode / listSortedFiltered 之后）───────────────────
+const totalPages = computed(() => Math.max(1, Math.ceil(listSortedFiltered.value.length / settingsStore.pageSize)))
+
+function goToPage(page: number) {
+  const clamped = Math.max(1, Math.min(page, totalPages.value))
+  if (clamped === currentPage.value) return
+  currentPage.value = clamped
+  clearImageCache()
+  // 清理 Chromium 内部缓存（图片解码位图等）
+  ;(window as any).__clearRendererCache?.()
+  if (gridScrollRef.value) gridScrollRef.value.scrollTop = 0
+  // 整页可见，让所有组件加载图片
+  setVisibleRange(0, settingsStore.pageSize)
+}
+
+function onPageSizeChange(e: Event) {
+  const val = parseInt((e.target as HTMLSelectElement).value)
+  settingsStore.setPageSize(val)
+  currentPage.value = 1
+  clearImageCache()
+  if (gridScrollRef.value) gridScrollRef.value.scrollTop = 0
+  setVisibleRange(0, val)
+}
+
+function onPageInputBlur(e: Event) {
+  const val = parseInt((e.target as HTMLInputElement).value)
+  if (!isNaN(val) && val >= 1 && val <= totalPages.value) {
+    goToPage(val)
+  }
+  // 还原显示值（如果输入了无效值）
+  ;(e.target as HTMLInputElement).value = String(currentPage.value)
+}
+
+watch(totalPages, (tp) => { if (currentPage.value > tp) currentPage.value = tp })
 const cardZoom = computed(() => settingsStore.getCardZoom(store.activeType))
 
 const cardMinWidth = computed(() => Math.round(150 * cardZoom.value))
@@ -2815,14 +2889,17 @@ function onColResizeEnd() {
 }
 
 // ListRow 组件自行管理缩略图（同 ResourceCard），此处只需 preload/clearImageCache
-import { getCached, loadImage, preload, clearImageCache, cancelQueued, setPaused, setVisibleRange } from '../utils/image-cache'
+import { getCached, loadImage, preload, clearImageCache, cancelQueued, reverseQueue, setPaused, setVisibleRange } from '../utils/image-cache'
 
 // 切换视图时：回到顶部、重置渲染窗口、清理上一模式资源
 watch(() => viewMode.value, (mode) => {
   if (gridScrollRef.value) gridScrollRef.value.scrollTop = 0
-  renderLimit.value = BATCH_SIZE
+  currentPage.value = 1
 
-  // 切换时清理上一模式的图片缓存 + 取消队列
+  // 切换时清理上一模式的图片缓存 + Chromium 内部缓存
+  ;(window as any).__clearRendererCache?.()
+  // 新组件按 0→N 入队，reverse 后 pop() 从上往下加载
+  nextTick(() => reverseQueue())
   clearImageCache()
 
   if (mode !== 'list') {
@@ -4403,6 +4480,15 @@ async function deleteIgnored(filePath: string) {
   color: var(--text-3);
   flex-shrink: 0;
 }
+.pagination-controls { display: flex; align-items: center; gap: 2px; margin-left: 12px; }
+.page-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08); background: transparent; color: var(--text-2); cursor: pointer; padding: 0; transition: background 0.15s; }
+.page-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.page-btn:disabled { opacity: 0.25; cursor: default; }
+.page-indicator { font-size: 11px; color: var(--text-2); padding: 0 6px; user-select: none; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 3px; }
+.page-input { width: 28px; text-align: center; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; color: var(--text); font-size: 11px; padding: 1px 2px; font-variant-numeric: tabular-nums; outline: none; }
+.page-input:focus { border-color: var(--accent); }
+.page-size-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; }
+.page-size-select { background: var(--surface); color: var(--text); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 2px 4px; font-size: 11px; cursor: pointer; }
 .sort-bar-spacer { flex: 1; }
 .sort-bar-right {
   display: flex;

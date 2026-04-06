@@ -243,6 +243,7 @@ export default {
     displayTags: '标签',
     displayFileSize: '文件大小',
     displayPinRunning: '置顶运行中',
+    pageSize: '每页数量',
     displayCardBg: '卡片背景',
     sortLastUsed: '最近使用',
     sortRecentlyAdded: '最近添加',

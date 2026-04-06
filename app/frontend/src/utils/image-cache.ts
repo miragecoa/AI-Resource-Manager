@@ -71,6 +71,9 @@ export function cancelQueued(keyPrefix: string): void {
   }
 }
 
+/** Reverse the pending queue order (used once after initial mount so pop() processes top-first). */
+export function reverseQueue(): void { _queue.reverse() }
+
 /** Cancel all pending queue items. Running items are not affected. */
 export function drainQueue(): void {
   while (_queue.length > 0) {
@@ -81,7 +84,7 @@ export function drainQueue(): void {
 function flush() {
   if (_paused) return
   while (_running < MAX_CONCURRENT && _queue.length > 0) {
-    const item = _queue.shift()!
+    const item = _queue.pop()!
     // Skip if already cached by the time it's dequeued
     if (_imgCache.has(item.key)) {
       item.resolve(_imgCache.get(item.key) ?? null)
@@ -120,6 +123,13 @@ export function isCached(path: string): boolean {
 export function loadImage(path: string): Promise<string | null> {
   if (_imgCache.has(path)) return Promise.resolve(_imgCache.get(path) ?? null)
   return enqueue(path, () => window.api.files.readImage(path))
+}
+
+/** Load a small thumbnail (64px) for list view — ~10x less IPC data than full 400px. */
+export function loadImageSmall(path: string): Promise<string | null> {
+  const key = `${path}@64`
+  if (_imgCache.has(key)) return Promise.resolve(_imgCache.get(key) ?? null)
+  return enqueue(key, () => window.api.files.readImage(path, 64))
 }
 
 /** Load an app icon via IPC, with concurrency limiting and LRU caching. */

@@ -328,6 +328,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const viewModeByType = ref<Record<string, string>>({})
   const cardZoomByType = ref<Record<string, number>>({})
   const sidebarNav = ref<SidebarNavConfig[]>(DEFAULT_SIDEBAR_NAV.map(x => ({ ...x })))
+  const pageSize = ref(200)
   const resourceSort = ref<ResourceSortField>('lastUsed')
   const tagSort = ref<TagSortField>('lastUsed')
   const sidebarCollapsed = ref(false)
@@ -356,11 +357,12 @@ export const useSettingsStore = defineStore('settings', () => {
 
   async function load() {
     if (loaded.value) return
-    const [monitorVal, autostartVal, zoomVal, navVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal, autoDirTagVal, themeIdVal, paletteIdVal, brightnessModeVal, brightnessLevelVal, glassEnabledVal, glassOpacityVal, cardDisplayVal, listDisplayVal] = await Promise.all([
+    const [monitorVal, autostartVal, zoomVal, navVal, pageSizeVal, resSortVal, tagSortVal, collapsedVal, fileExtVal, autoUpdateVal, viewModeByTypeVal, cardZoomByTypeVal, listColVal, appTitleVal, offlineModeVal, themeVal, showOnAutoStartVal, hotkeyWakeVal, hotkeyClipboardVal, langVal, consentVal, customCatVal, autoDirTagVal, themeIdVal, paletteIdVal, brightnessModeVal, brightnessLevelVal, glassEnabledVal, glassOpacityVal, cardDisplayVal, listDisplayVal] = await Promise.all([
       window.api.settings.get('monitorEnabled'),
       window.api.loginItem.get(),
       window.api.settings.get('zoom'),
       window.api.settings.get('sidebarNav'),
+      window.api.settings.get('pageSize'),
       window.api.settings.get('resourceSort'),
       window.api.settings.get('tagSort'),
       window.api.settings.get('sidebarCollapsed'),
@@ -393,6 +395,7 @@ export const useSettingsStore = defineStore('settings', () => {
     zoom.value = zoomVal ? parseFloat(zoomVal) : 1.5
     window.api.app.setZoom(zoom.value)
 
+    if (pageSizeVal) pageSize.value = parseInt(pageSizeVal as string) || 200
     if (resSortVal) resourceSort.value = resSortVal as ResourceSortField
     if (tagSortVal) tagSort.value = tagSortVal as TagSortField
     if (collapsedVal) sidebarCollapsed.value = collapsedVal === 'true'
@@ -518,6 +521,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function getCardZoom(type: string): number {
     return cardZoomByType.value[type] ?? cardZoomByType.value['all'] ?? 0.75
+  }
+
+  async function setPageSize(size: number) {
+    pageSize.value = size
+    await window.api.settings.set('pageSize', String(size))
   }
 
   async function setResourceSort(sort: ResourceSortField) {
@@ -892,5 +900,5 @@ export const useSettingsStore = defineStore('settings', () => {
     ])
   }
 
-  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, autoDirTag, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, activeThemeId, isSmartTheme, paletteId, brightnessMode, brightnessLevel, glassEnabled, glassOpacity, cardDisplay, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setAutoDirTag, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setSmartTheme, setPaletteMode, setBrightnessLevel, setGlassEnabled, setGlassOpacity, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults, setCardDisplay, listDisplay, setListDisplay }
+  return { monitorEnabled, autostartEnabled, zoom, viewModeByType, cardZoomByType, sidebarNav, pageSize, setPageSize, resourceSort, tagSort, sidebarCollapsed, showFileExt, autoUpdate, autoDirTag, listColumns, appTitle, offlineMode, showOnAutoStart, hotkeyWake, hotkeyClipboard, themeVars, language, customCategories, activeThemeId, isSmartTheme, paletteId, brightnessMode, brightnessLevel, glassEnabled, glassOpacity, cardDisplay, load, setMonitor, setAutostart, setZoom, getCardZoom, setCardZoom, setResourceSort, setTagSort, setSidebarNav, setSidebarCollapsed, setShowFileExt, setAutoUpdate, setAutoDirTag, getViewMode, setViewMode, setListColumns, setAppTitle, setOfflineMode, setShowOnAutoStart, setHotkeyWake, setHotkeyClipboard, setTheme, setSmartTheme, setPaletteMode, setBrightnessLevel, setGlassEnabled, setGlassOpacity, setLanguage, addCustomCategory, renameCustomCategory, removeCustomCategory, resetToDefaults, setCardDisplay, listDisplay, setListDisplay }
 })
