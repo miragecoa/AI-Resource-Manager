@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <video src="https://aicubby.app/media/hero-en.mp4" width="800" autoplay loop muted></video>
+  <img src="docs/hero-en.gif" width="800" alt="AI Cubby Demo">
 </p>
 
 ---

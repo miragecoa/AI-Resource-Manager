@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <video src="https://aicubby.app/media/hero.mp4" width="800" autoplay loop muted></video>
+  <img src="docs/hero-zh.gif" width="800" alt="AI小抽屉演示">
 </p>
 
 ---
