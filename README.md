@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <img src="https://aicubby.app/media/en/1.gif" width="800" alt="Drag and drop import">
+  <video src="https://aicubby.app/media/hero-en.mp4" width="800" autoplay loop muted></video>
 </p>
 
 ---

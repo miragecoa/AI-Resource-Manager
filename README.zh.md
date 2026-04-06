@@ -26,7 +26,7 @@
 ---
 
 <p align="center">
-  <img src="https://aicubby.app/media/zh/1.gif" width="800" alt="拖放导入">
+  <video src="https://aicubby.app/media/hero.mp4" width="800" autoplay loop muted></video>
 </p>
 
 ---
