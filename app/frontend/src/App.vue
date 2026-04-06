@@ -53,6 +53,7 @@
           <span v-html="sidebarEditing ? doneIcon : editIcon" />
         </button>
       </div>
+      <TipsMarquee v-if="tips.length > 0" :tips="tips" />
       <div class="titlebar-drag" />
       <div class="titlebar-btns">
         <button class="tb-btn tb-settings" @click="toggleSettings" :title="isOnSettings ? t('app.settingsClose') : t('app.settings')" :class="{ 'tb-active': isOnSettings }">
@@ -96,6 +97,8 @@ import { useSettingsStore } from './stores/settings'
 import Sidebar from './components/Sidebar.vue'
 import ConsentDialog from './components/ConsentDialog.vue'
 import MasonryWindow from './components/MasonryWindow.vue'
+import TipsMarquee from './components/TipsMarquee.vue'
+import { useTips } from './composables/useTips'
 import DropImportWindow from './components/DropImportWindow.vue'
 
 const windowParam = new URLSearchParams(window.location.search).get('window')
@@ -107,6 +110,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
+const { tips } = useTips()
 const showConsent = ref(false)
 const isMaximized = ref(false)
 const isPinned = ref(false)

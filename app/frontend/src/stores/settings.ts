@@ -331,7 +331,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const pageSize = ref(200)
   const resourceSort = ref<ResourceSortField>('lastUsed')
   const tagSort = ref<TagSortField>('lastUsed')
-  const sidebarCollapsed = ref(false)
+  const sidebarCollapsed = ref(true)
   const showFileExt = ref(true)
   const autoUpdate = ref(true)
   const autoDirTag = ref(true)
