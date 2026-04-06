@@ -211,6 +211,15 @@ export function registerIpcHandlers(): void {
   // ── Debug: 渲染进程日志转发到 terminal ──────────────────
   ipcMain.on('debug:log', (_e, ...args: unknown[]) => { console.log('[renderer]', ...args) })
 
+  // 主进程代理 HTTP GET（避免渲染进程 CORS/CSP 限制）
+  ipcMain.handle('net:fetchJson', async (_e, url: string) => {
+    try {
+      const res = await net.fetch(url, { signal: AbortSignal.timeout(8000) } as any)
+      if (!res.ok) return null
+      return await res.json()
+    } catch { return null }
+  })
+
   // 清理主进程缩略图缓存（翻页/切换视图时由渲染进程调用）
   ipcMain.handle('cache:clear', () => {
     const before = thumbCache.size + appIconCache.size

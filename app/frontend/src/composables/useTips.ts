@@ -40,10 +40,9 @@ export function useTips() {
 
   async function fetchTips() {
     try {
-      const res = await fetch(ENDPOINT, { signal: AbortSignal.timeout(5000) })
-      if (!res.ok) return
-      const json = await res.json()
-      if (json.ok && Array.isArray(json.data)) {
+      // 通过主进程 IPC 请求（避免打包版 CORS/CSP 限制）
+      const json = await window.api.net.fetchJson(ENDPOINT)
+      if (json?.ok && Array.isArray(json.data)) {
         tips.value = json.data
         saveToCache(json.data)
       }

@@ -97,6 +97,9 @@ declare global {
         getVersion: () => Promise<string>
         openUrl: (url: string) => Promise<void>
       }
+      net: {
+        fetchJson: (url: string) => Promise<any>
+      }
       updater: {
         check: () => Promise<{
           hasUpdate: boolean

@@ -223,6 +223,10 @@ contextBridge.exposeInMainWorld('api', {
     },
   },
 
+  // 主进程代理 HTTP（避免渲染进程 CORS/CSP 限制）
+  net: {
+    fetchJson: (url: string): Promise<any> => ipcRenderer.invoke('net:fetchJson', url),
+  },
   // 自动更新
   updater: {
     check:       (): Promise<any> => ipcRenderer.invoke('updater:check'),
