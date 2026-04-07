@@ -35,24 +35,30 @@
 
 ### Scenario 1: The desktop landfill
 
-Your desktop is buried under screenshots, installers, and random files. Finding anything takes forever, and the mess itself is exhausting. You tell yourself you'll organize it — spend an afternoon building folders — and three days later it's chaos again. So you give up, and next time you still have to dig.
+Your desktop is buried under screenshots, installers, and random files you saved "just for now." Finding anything takes forever, and the mess itself is draining. You tell yourself you'll organize it — spend an afternoon sorting into folders — and three days later it's chaos again. So you give up, and next time you still have to dig.
 
 **With AI Cubby:**
-1. Create one folder on your desktop, drag everything into it — desktop instantly clean
-2. Drag that folder into AI Cubby to import it in one click
+1. Create one folder on your desktop, drag everything into it — desktop instantly clean, *deeply* satisfying
+2. Drag that folder into AI Cubby — one click, everything's indexed
 3. Next time you need something, just search — it appears instantly
 
-No categories needed. No folder hierarchy. Desktop stays clean, nothing is lost.
+No categories. No folder hierarchies. Desktop stays clean, nothing is lost.
 
 ### Scenario 2: Tool amnesia
 
 You found a great tool that fixed your corrupted MP4. Used it once, problem solved. Six months later the same issue comes up — what was that tool called? Where did you install it? No idea.
 
-Sound familiar? AI Cubby silently logs every program and file you open during normal computer use. Next time you need it, one search is all it takes.
+That's me with [WizTree](https://diskanalyzer.com/) — the perfect disk analyzer I use when my C: drive fills up. Can never remember the name. Every single time I have to search for it all over again.
 
-### The compound effect
+AI Cubby silently logs every program and file you open during normal computer use. Next time you need it, one search is all it takes.
 
-Usage tracking compounds over time. Every time you open something, the record deepens. A file you struggled to find today becomes a one-second search tomorrow. Over weeks and months, you build a genuine "digital memory" of your computer use.
+### The compound effect: it grows on you
+
+At first I thought manual tagging was a non-starter — nobody bothers. But after talking to real users, the picture was more nuanced: **people won't tag random files, but they absolutely will tag the handful of tools and files they care about most.**
+
+So before AI fully takes over, AI Cubby's core identity is a **usage history recorder** — the kind of tool that gets more useful the longer you use it.
+
+You finally track down that one specific cleanup utility, and this time you slap a tag on it. The app also silently records that you opened it. Next time you need it — one second. Every find is a deposit. Over time, your "digital memory" comes alive.
 
 ---
 
