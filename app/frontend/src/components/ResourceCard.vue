@@ -369,23 +369,11 @@ function openMenu(e: MouseEvent) {
 
 const thumbSrc = ref<string | null>(null)
 
-// 离屏时释放图片数据 + 取消待加载队列
-watch(isNearViewport, (near) => {
-  if (!near) {
-    thumbSrc.value = null
-    // 取消该资源的待加载项
-    const r = props.resource
-    const p = r.cover_path || r.file_path
-    if (p) cancelQueued(p)
-    cancelQueued('icon:' + r.file_path)
-  }
-})
-
+// 分页模式：当前页全部加载，不做页内卸载
 // 通过 IPC / Canvas 加载预览图
 watchEffect(async () => {
   const r = props.resource
   void iconRetries.value  // 加入响应式依赖，重试时触发重跑
-  if (!isNearViewport.value) return  // 离屏不加载
 
   if (r.cover_path) {
     thumbSrc.value = await getCachedImage(r.cover_path)

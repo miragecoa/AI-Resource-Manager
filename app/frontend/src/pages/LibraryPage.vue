@@ -1748,18 +1748,7 @@ function onContentScroll() {
     _scrollRaf = 0
     const el = gridScrollRef.value
     if (!el) return
-
-    const total = visibleItems.value.length
-    if (total === 0) return
     const scrollable = el.scrollHeight - el.clientHeight
-    const pct = scrollable > 0 ? el.scrollTop / scrollable : 0
-    const centerIdx = Math.floor(pct * total)
-    const BUFFER = 200  // 中心前后各 200 项保留图片
-    setVisibleRange(
-      Math.max(0, centerIdx - BUFFER),
-      Math.min(total, centerIdx + BUFFER)
-    )
-
     // 检测是否在底部（用于 overscroll 翻页）
     _atBottom = scrollable > 0 && el.scrollTop >= scrollable - 2
   })
@@ -2622,7 +2611,6 @@ let _autoFaviconDone = false
 onMounted(async () => {
   settingsStore.load()
   // 首次加载：组件按 0→N mount 入队，reverse 后 pop() 从 0 开始（从上往下加载）
-  nextTick(() => reverseQueue())
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('dragover', onDocDragOver)
   document.addEventListener('click', onDocCloseTypeFilter)
@@ -2756,7 +2744,6 @@ function goToPage(page: number) {
   ;(window as any).__clearRendererCache?.()
   if (gridScrollRef.value) gridScrollRef.value.scrollTop = 0
   // 整页可见，让所有组件加载图片
-  setVisibleRange(0, settingsStore.pageSize)
 }
 
 function onPageSizeChange(e: Event) {
@@ -2765,7 +2752,6 @@ function onPageSizeChange(e: Event) {
   currentPage.value = 1
   clearImageCache()
   if (gridScrollRef.value) gridScrollRef.value.scrollTop = 0
-  setVisibleRange(0, val)
 }
 
 function onPageInputBlur(e: Event) {
@@ -2889,7 +2875,7 @@ function onColResizeEnd() {
 }
 
 // ListRow 组件自行管理缩略图（同 ResourceCard），此处只需 preload/clearImageCache
-import { getCached, loadImage, preload, clearImageCache, cancelQueued, reverseQueue, setPaused, setVisibleRange } from '../utils/image-cache'
+import { getCached, loadImage, preload, clearImageCache, cancelQueued, setPaused } from '../utils/image-cache'
 
 // 切换视图时：回到顶部、重置渲染窗口、清理上一模式资源
 watch(() => viewMode.value, (mode) => {
@@ -2899,7 +2885,6 @@ watch(() => viewMode.value, (mode) => {
   // 切换时清理上一模式的图片缓存 + Chromium 内部缓存
   ;(window as any).__clearRendererCache?.()
   // 新组件按 0→N 入队，reverse 后 pop() 从上往下加载
-  nextTick(() => reverseQueue())
   clearImageCache()
 
   if (mode !== 'list') {

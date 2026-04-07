@@ -43,9 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watchEffect, watch, onUnmounted } from 'vue'
+import { ref, computed, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { loadImage, loadImageSmall, loadIcon, cancelQueued, hasSavedCover, markCoverSaved, isIndexVisible, getVisVersion } from '../utils/image-cache'
+import { loadImage, loadImageSmall, loadIcon, hasSavedCover, markCoverSaved } from '../utils/image-cache'
 import { useResourceStore } from '../stores/resources'
 import type { Resource } from '../stores/resources'
 
@@ -89,31 +89,12 @@ defineEmits<{
   'tag-click': []
 }>()
 
-// ── 可见性追踪（同 ResourceCard 逻辑）────────────────
-const _visCheck = ref(0)
-const isNearViewport = computed(() => { void _visCheck.value; return isIndexVisible(props.itemIndex) })
-const _visTimer = setInterval(() => { _visCheck.value = getVisVersion() }, 300)
-onUnmounted(() => clearInterval(_visTimer))
-
-// ── 独立缩略图管理（同 ResourceCard 完整逻辑 + saveCover）────────────────
+// ── 独立缩略图管理（分页模式：当前页全加载，不做页内卸载）────────────────
 const store = useResourceStore()
 const thumbSrc = ref<string | null>(null)
 
-// 离屏释放 + 取消队列
-watch(isNearViewport, (near) => {
-  if (!near) {
-    thumbSrc.value = null
-    const r = props.resource
-    const p = r.cover_path || r.file_path
-    if (p) cancelQueued(p)
-    cancelQueued('icon:' + r.file_path)
-  }
-})
-
-// 进入视口时加载（同 ResourceCard.watchEffect）
 watchEffect(async () => {
   const r = props.resource
-  if (!isNearViewport.value) return
 
   // 已有 cover_path → 直接加载
   if (r.cover_path) {
