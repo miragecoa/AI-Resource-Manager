@@ -317,26 +317,33 @@ function notifyClipboardUpdated(): void {
 
 function startClipboardPolling(): void {
   if (_clipboardPollTimer) return
+  let _clipProcessing = false
   _clipboardPollTimer = setInterval(() => {
-    try {
-      const formats = clipboard.availableFormats()
-      const hasImage = formats.some(f => f.startsWith('image/') || f === 'image')
+    if (_clipProcessing) return  // 上一次还没处理完，跳过
+    // 整个检测推到 setImmediate，不阻塞当前事件循环
+    setImmediate(async () => {
+      try {
+        const formats = clipboard.availableFormats()
+        const hasImage = formats.some(f => f.startsWith('image/') || f === 'image')
 
-      // Text
-      if (!hasImage) {
-        const text = clipboard.readText()
-        if (text && text !== _lastClipText) {
-          _lastClipText = text
-          clipboardAddItem('text', text, null, Buffer.byteLength(text, 'utf8'))
-          notifyClipboardUpdated()
+        // Text
+        if (!hasImage) {
+          const text = clipboard.readText()
+          if (text && text !== _lastClipText) {
+            _lastClipText = text
+            clipboardAddItem('text', text, null, Buffer.byteLength(text, 'utf8'))
+            notifyClipboardUpdated()
+          }
         }
-      }
 
-      // Image (only when image format is present) — async to avoid blocking main thread on large screenshots
-      if (hasImage) {
-        const img = clipboard.readImage()
-        if (!img.isEmpty()) {
-          setImmediate(async () => {
+        // Image — 用 getSize() 快速判断是否变化，避免每次都读完整图片
+        if (hasImage) {
+          const img = clipboard.readImage()
+          if (!img.isEmpty()) {
+            const { width, height } = img.getSize()
+            const quickKey = `${width}x${height}`
+            if (quickKey === _lastClipImgHash) return  // 尺寸没变，大概率同一张图
+            _clipProcessing = true
             try {
               const buf = img.toPNG()
               const hash = createHash('sha256').update(buf).digest('hex')
@@ -349,14 +356,14 @@ function startClipboardPolling(): void {
                 clipboardAddItem('image', null, imgPath, buf.length, hash)
                 notifyClipboardUpdated()
               }
-            } catch { /* ignore */ }
-          })
+            } finally { _clipProcessing = false }
+          }
+        } else {
+          if (_lastClipImgHash) _lastClipImgHash = ''
         }
-      } else {
-        if (_lastClipImgHash) _lastClipImgHash = ''
-      }
-    } catch { /* ignore clipboard access errors */ }
-  }, 1000)
+      } catch { _clipProcessing = false }
+    })
+  }, 2000)  // 2 秒轮询（从 1 秒降低）
 }
 
 function buildTrayMenu(): Electron.Menu {

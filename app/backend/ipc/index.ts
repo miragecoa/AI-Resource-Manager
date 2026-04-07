@@ -65,10 +65,34 @@ const appIconCache = new LRUMap<string | null>(100)
 const thumbCache = new LRUMap<string | null>(200)
 
 
+// PowerShell 并发限制：避免同时 spawn 过多进程卡死系统
+let _psRunning = 0
+const _psQueue: Array<{ resolve: (v: string | null) => void; filePath: string }> = []
+const PS_MAX_CONCURRENT = 2
+
+function getIconViaShellItemFactory(filePath: string): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    _psQueue.push({ resolve, filePath })
+    _flushPsQueue()
+  })
+}
+
+function _flushPsQueue() {
+  while (_psRunning < PS_MAX_CONCURRENT && _psQueue.length > 0) {
+    const { resolve, filePath } = _psQueue.shift()!
+    _psRunning++
+    _doGetIcon(filePath).then(resolve).catch(() => resolve(null)).finally(() => {
+      _psRunning--
+      // 间隔 100ms 让出 CPU
+      setTimeout(_flushPsQueue, 100)
+    })
+  }
+}
+
 // IShellItemImageFactory —— 与 Windows 资源管理器完全相同的图标 API
 // 用 UTF-16LE EncodedCommand 保证中文路径正确传递
 // 用 GetObject 查真实 HBITMAP 尺寸（小图标可能只有 32px），GetDIBits 保留 alpha，裁剪透明边框
-function getIconViaShellItemFactory(filePath: string): Promise<string | null> {
+function _doGetIcon(filePath: string): Promise<string | null> {
   const csCode = [
     'using System;',
     'using System.Drawing;',

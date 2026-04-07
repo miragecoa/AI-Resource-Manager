@@ -2610,7 +2610,13 @@ let _autoFaviconDone = false
 
 onMounted(async () => {
   settingsStore.load()
-  // 首次加载：组件按 0→N mount 入队，reverse 后 pop() 从 0 开始（从上往下加载）
+  // 首次加载：数据加载完成、组件渲染后 reverse 队列（从上往下加载）
+  const stopLoadWatch = watch(() => store.loading, (loading) => {
+    if (!loading) {
+      nextTick(() => reverseQueue())
+      stopLoadWatch()
+    }
+  })
   document.addEventListener('keydown', onKeyDown)
   document.addEventListener('dragover', onDocDragOver)
   document.addEventListener('click', onDocCloseTypeFilter)
@@ -2875,7 +2881,7 @@ function onColResizeEnd() {
 }
 
 // ListRow 组件自行管理缩略图（同 ResourceCard），此处只需 preload/clearImageCache
-import { getCached, loadImage, preload, clearImageCache, cancelQueued, setPaused } from '../utils/image-cache'
+import { getCached, loadImage, preload, clearImageCache, cancelQueued, reverseQueue, setPaused } from '../utils/image-cache'
 
 // 切换视图时：回到顶部、重置渲染窗口、清理上一模式资源
 watch(() => viewMode.value, (mode) => {
@@ -2884,6 +2890,8 @@ watch(() => viewMode.value, (mode) => {
 
   // 切换时清理上一模式的图片缓存 + Chromium 内部缓存
   ;(window as any).__clearRendererCache?.()
+  // 新组件按 0→N mount 入队，reverse 后 pop() 从上往下加载
+  nextTick(() => reverseQueue())
   // 新组件按 0→N 入队，reverse 后 pop() 从上往下加载
   clearImageCache()
 
