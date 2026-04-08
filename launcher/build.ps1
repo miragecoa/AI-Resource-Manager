@@ -33,10 +33,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "rc.exe failed ($LASTEXITCODE)" }
 
     Write-Host "[2/2] Compiling launcher.c..." -ForegroundColor Cyan
-    & $clExe /nologo /O1 /W3 /utf-8 launcher.c launcher.res `
-        /link /SUBSYSTEM:WINDOWS /ENTRY:wWinMain `
+    # Pure Win32 — no full CRT, /GS- disables stack-cookie, vcruntime for memset
+    & $clExe /nologo /O1 /W3 /utf-8 /GS- launcher.c launcher.res `
+        /link /SUBSYSTEM:WINDOWS /ENTRY:wWinMain /NODEFAULTLIB `
         /OUT:AI-Cubby.exe `
-        kernel32.lib ucrt.lib vcruntime.lib
+        kernel32.lib user32.lib shell32.lib shlwapi.lib vcruntime.lib
     if ($LASTEXITCODE -ne 0) { throw "cl.exe failed ($LASTEXITCODE)" }
 
     Remove-Item launcher.obj, launcher.res -Force -EA SilentlyContinue
