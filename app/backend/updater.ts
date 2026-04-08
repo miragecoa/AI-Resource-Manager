@@ -228,20 +228,20 @@ export async function applyAndRestart(): Promise<void> {
   const psPath = join(tempDir, 'update.ps1')
   writeFileSync(psPath, '\uFEFF' + script, 'utf8')
 
-  const logPath = join(tempDir, 'update.log')
   const batPath = join(tempDir, 'update.cmd')
 
-  // Self-elevate the .cmd itself via RunAs. %~f0 is cmd's built-in for the
-  // current batch file's full path — PowerShell single-quotes keep it as one
-  // token even when the path contains spaces. The re-launched elevated cmd
-  // then uses %~dp0 (its own directory) to locate update.ps1, sidestepping
-  // all cross-shell path-quoting issues.
+  // IMPORTANT: the .cmd file content must be pure ASCII.
+  // cmd.exe reads .cmd files using the OEM code page (e.g. GBK on Chinese Windows),
+  // so any non-ASCII bytes written as UTF-8 would be garbled.
+  // Use %~dp0 (the .cmd's own directory, resolved by cmd.exe via wide-char API)
+  // to reference sibling files — this avoids embedding the appDir path (which may
+  // contain Chinese/special characters) anywhere in the .cmd content.
   writeFileSync(batPath, [
     '@echo off',
-    `echo [%date% %time%] Updater started > "${logPath}"`,
-    `echo [%date% %time%] Running extraction >> "${logPath}"`,
-    `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0update.ps1" >> "${logPath}" 2>&1`,
-    `echo [%date% %time%] PowerShell exited with code %ERRORLEVEL% >> "${logPath}"`,
+    'echo [%date% %time%] Updater started > "%~dp0update.log"',
+    'echo [%date% %time%] Running extraction >> "%~dp0update.log"',
+    'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0update.ps1" >> "%~dp0update.log" 2>&1',
+    'echo [%date% %time%] PowerShell exited with code %ERRORLEVEL% >> "%~dp0update.log"',
     'if %ERRORLEVEL% neq 0 pause',
   ].join('\r\n') + '\r\n')
 
