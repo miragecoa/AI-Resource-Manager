@@ -37,7 +37,7 @@ import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from '.
 import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
-import { initHeartbeat, flushAndStop, incShortcutMain, incShortcutClip, incWakeCount } from './heartbeat'
+import { initHeartbeat, flushAndStop, incShortcutMain, incShortcutClip, incWakeCount, incDrawerWake } from './heartbeat'
 
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
@@ -1072,7 +1072,8 @@ app.whenReady().then(() => {
       mainWindow.setSkipTaskbar(true)
       if (getSetting('drawerVisible') !== 'false') drawerWindow?.show()
     } else {
-      // 显示主窗口 → 任务栏可见，隐藏抽屉
+      // 显示主窗口 → 任务栏可见，隐藏抽屉（用户主动双击悬浮抽屉）
+      incDrawerWake()
       mainWindow?.setSkipTaskbar(false)
       mainWindow?.setAlwaysOnTop(true)
       mainWindow?.show()

@@ -1,6 +1,6 @@
 <template>
   <div ref="cardRef" class="card" :class="[{ 'is-selected': selected, 'no-card-bg': props.display?.cardBg === false, 'is-minimal': minimal }, heatLevel !== undefined ? `heat-lv${heatLevel}` : '']" :style="{ '--zoom': cardZoom }" @dblclick="selectable ? $emit('toggle-select', resource) : $emit('open', resource)" @contextmenu.prevent="!selectable && openMenu($event)" @click="handleCardClick($event)" @mouseenter="onMicroEnter" @mouseleave="onMicroLeave">
-    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' || resource.type === 'document' || resource.type.startsWith('cat_'), 'cover-solo': micro, 'cover-solo-labeled': micro && showMicroLabel }" @click.stop="handleCoverClick($event)">
+    <div class="cover" :class="{ 'is-app': resource.type === 'app' || resource.type === 'game' || resource.type === 'webpage' || resource.type === 'document' || resource.type === 'folder' || resource.type.startsWith('cat_'), 'cover-solo': micro, 'cover-solo-labeled': micro && showMicroLabel }" @click.stop="handleCoverClick($event)">
       <img v-if="thumbSrc" :src="thumbSrc" :alt="resource.title" />
       <div v-else class="cover-placeholder" style="pointer-events:none">
         <span class="type-icon" v-html="typeIcon" />
@@ -397,6 +397,10 @@ watchEffect(async () => {
     const hit = getCachedAnySize(r.file_path) ?? getCachedIcon(r.file_path)
     if (hit !== undefined) { thumbSrc.value = hit; return }
   }
+  if (r.type === 'folder' && !r.cover_path) {
+    const hit = getCachedIcon(r.file_path)
+    if (hit !== undefined) { thumbSrc.value = hit; return }
+  }
 
   if (r.cover_path) {
     thumbSrc.value = await getCachedImage(r.cover_path)
@@ -466,6 +470,17 @@ watchEffect(async () => {
     if (thumb && !r.cover_path && !hasSavedCover(r.id)) {
       markCoverSaved(r.id)
       window.api.files.saveCover(r.id, thumb).then(path => {
+        if (path) store.addOrUpdate({ ...r, cover_path: path })
+      }).catch(() => {})
+    }
+    return
+  }
+  if (r.type === 'folder') {
+    const icon = await getCachedAppIcon(r.file_path)
+    thumbSrc.value = icon
+    if (icon && !r.cover_path && !hasSavedCover(r.id)) {
+      markCoverSaved(r.id)
+      window.api.files.saveCover(r.id, icon).then(path => {
         if (path) store.addOrUpdate({ ...r, cover_path: path })
       }).catch(() => {})
     }

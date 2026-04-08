@@ -26,17 +26,27 @@ let _pendingTagUses  = 0
 let _pendingShortcutMain = 0
 let _pendingShortcutClip = 0
 let _pendingWakes = 0
+// Onboarding funnel events
+let _pendingDrawerWakes = 0   // 用户主动双击悬浮抽屉（呼出面板）
+let _pendingPanelAdds   = 0   // 添加到快捷面板的资源数
+let _resourceCount      = -1  // 启动时入库资源总数快照（-1 = 未设置）
 let _sid = ''
 let _sessionStart = 0
 
 /** Call each time the user opens or reveals a resource. */
-export function incLaunchCount(): void   { _pendingLaunches++ }
-export function incSearchCount(): void   { _pendingSearches++ }
-export function incTagUseCount(): void   { _pendingTagUses++ }
-export function incShortcutMain(): void  { _pendingShortcutMain++ }
-export function incShortcutClip(): void  { _pendingShortcutClip++ }
+export function incLaunchCount(): void    { _pendingLaunches++ }
+export function incSearchCount(): void    { _pendingSearches++ }
+export function incTagUseCount(): void    { _pendingTagUses++ }
+export function incShortcutMain(): void   { _pendingShortcutMain++ }
+export function incShortcutClip(): void   { _pendingShortcutClip++ }
 /** Call every time the main window is shown (tray, shortcut, taskbar, etc.) */
-export function incWakeCount(): void     { _pendingWakes++ }
+export function incWakeCount(): void      { _pendingWakes++ }
+/** Call when user double-clicks the floating drawer to reveal the main panel. */
+export function incDrawerWake(): void     { _pendingDrawerWakes++ }
+/** Call when resources are added to the Quick Panel. */
+export function incPanelAdd(n = 1): void  { _pendingPanelAdds += n }
+/** Set the total resource count snapshot once at startup. */
+export function setResourceCount(n: number): void { _resourceCount = n }
 
 /** Returns the persisted install_id, creating one on first run. */
 function getInstallId(): string {
@@ -55,18 +65,21 @@ function getInstallId(): string {
 
 /** Fires one heartbeat. Never throws. */
 async function sendHeartbeat(installId: string, version: string): Promise<void> {
-  const lc = _pendingLaunches;  _pendingLaunches = 0
-  const sc = _pendingSearches;  _pendingSearches = 0
-  const tc = _pendingTagUses;   _pendingTagUses  = 0
-  const sm = _pendingShortcutMain; _pendingShortcutMain = 0
+  const lc  = _pendingLaunches;     _pendingLaunches = 0
+  const sc  = _pendingSearches;     _pendingSearches = 0
+  const tc  = _pendingTagUses;      _pendingTagUses  = 0
+  const sm  = _pendingShortcutMain; _pendingShortcutMain = 0
   const scl = _pendingShortcutClip; _pendingShortcutClip = 0
-  const wk = _pendingWakes; _pendingWakes = 0
-  const se = Math.floor((Date.now() - _sessionStart) / 1000)
+  const wk  = _pendingWakes;        _pendingWakes = 0
+  const dw  = _pendingDrawerWakes;  _pendingDrawerWakes = 0
+  const pa  = _pendingPanelAdds;    _pendingPanelAdds = 0
+  const rc  = _resourceCount                           // snapshot, never reset
+  const se  = Math.floor((Date.now() - _sessionStart) / 1000)
   try {
     await fetch(ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: installId, v: version, lc, sc, tc, sm, scl, wk, sid: _sid, se }),
+      body: JSON.stringify({ id: installId, v: version, lc, sc, tc, sm, scl, wk, dw, pa, rc, sid: _sid, se }),
       signal: AbortSignal.timeout(8000),
     })
   } catch { /* offline, timeout, or any error — silently ignored */ }

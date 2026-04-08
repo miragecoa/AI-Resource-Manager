@@ -15,13 +15,13 @@ import {
   getBlockedDirs, addBlockedDir, removeBlockedDir
 } from '../db/queries'
 import { scanRecentFolder, scanProcesses, setMonitorPaused, getRunningSessions, killRunningResource, trackRunningProcess } from '../monitor/recent-files'
-import { dbPath, dataDir, clipboardGetItems, clipboardDeleteItem, clipboardClearAll, clipboardRecordUse } from '../db/index'
+import { dbPath, dataDir, getDb, clipboardGetItems, clipboardDeleteItem, clipboardClearAll, clipboardRecordUse } from '../db/index'
 import { getQuickPanelResources, setQuickPanel, batchSetQuickPanel, batchSetPinOrder, getAllPinGroups, createPinGroup, renamePinGroup, removePinGroup,
   setPinGroupForResource, setPinGroupOrder, setPinGroupCollapsed } from '../db/queries'
 import { checkForUpdate, downloadUpdate, applyAndRestart, skipUpdate, forceUpdate, getChangelog, getPendingUpdate } from '../updater'
 import { listProfiles, createProfile, deleteProfile, loadManifest, saveManifest } from '../db/profiles'
 import { listDrives, diskScan, isGuiExe, type DiskScanSignal } from '../disk-scan'
-import { incLaunchCount, incSearchCount, incTagUseCount } from '../heartbeat'
+import { incLaunchCount, incSearchCount, incTagUseCount, incPanelAdd, setResourceCount } from '../heartbeat'
 
 // 主进程级缓存：进程生命周期内有效，避免重复调用系统 API
 // 扫描目录时可识别的文件扩展名 → 资源类型
@@ -234,6 +234,12 @@ export function setOnLanguageChange(cb: () => void) { _onLanguageChange = cb }
 
 export function registerIpcHandlers(): void {
 
+  // 启动时快照入库资源总数，用于留存漏斗分析
+  try {
+    const row = getDb().prepare(`SELECT COUNT(*) as n FROM resources WHERE ignored = 0`).get() as { n: number }
+    setResourceCount(row?.n ?? 0)
+  } catch { /* non-critical */ }
+
   // ── Debug: 渲染进程日志转发到 terminal ──────────────────
   ipcMain.on('debug:log', (_e, ...args: unknown[]) => { console.log('[renderer]', ...args) })
 
@@ -258,9 +264,9 @@ export function registerIpcHandlers(): void {
 
   // ── Quick Panel ──────────────────────────────────────────
   ipcMain.handle('pinboard:getAll', () => getQuickPanelResources())
-  ipcMain.handle('pinboard:add', (_e, id: string) => setQuickPanel(id, true))
+  ipcMain.handle('pinboard:add', (_e, id: string) => { incPanelAdd(1); return setQuickPanel(id, true) })
   ipcMain.handle('pinboard:remove', (_e, id: string) => setQuickPanel(id, false))
-  ipcMain.handle('pinboard:batchAdd', (_e, ids: string[]) => batchSetQuickPanel(ids, true))
+  ipcMain.handle('pinboard:batchAdd', (_e, ids: string[]) => { incPanelAdd(ids.length); return batchSetQuickPanel(ids, true) })
   ipcMain.handle('pinboard:batchRemove', (_e, ids: string[]) => batchSetQuickPanel(ids, false))
   ipcMain.handle('pinboard:setOrder', (_e, items: Array<{ id: string; order: number }>) => batchSetPinOrder(items))
   ipcMain.handle('pinboard:getGroups', () => getAllPinGroups())

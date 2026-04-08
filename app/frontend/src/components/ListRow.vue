@@ -113,6 +113,9 @@ watchEffect(async () => {
   } else if (r.type === 'document' || r.type.startsWith('cat_')) {
     const hit = getCachedAnySize(r.file_path) ?? getCachedIcon(r.file_path)
     if (hit !== undefined) { thumbSrc.value = hit; return }
+  } else if (r.type === 'folder') {
+    const hit = getCachedIcon(r.file_path)
+    if (hit !== undefined) { thumbSrc.value = hit; return }
   }
 
   // 异步加载（未缓存的）
@@ -155,6 +158,17 @@ watchEffect(async () => {
     if (thumb && !hasSavedCover(r.id)) {
       markCoverSaved(r.id)
       window.api.files.saveCover(r.id, thumb).then((path: string | null) => {
+        if (path) store.addOrUpdate({ ...r, cover_path: path })
+      }).catch(() => {})
+    }
+    return
+  }
+  if (r.type === 'folder') {
+    const icon = await loadIcon(r.file_path)
+    thumbSrc.value = icon
+    if (icon && !hasSavedCover(r.id)) {
+      markCoverSaved(r.id)
+      window.api.files.saveCover(r.id, icon).then((path: string | null) => {
         if (path) store.addOrUpdate({ ...r, cover_path: path })
       }).catch(() => {})
     }
