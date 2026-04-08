@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
-import { join } from 'path'
-import { mkdirSync, unlinkSync, statSync } from 'fs'
+import { join, basename, normalize } from 'path'
+import { mkdirSync, unlinkSync, statSync, existsSync } from 'fs'
 import { SCHEMA_SQL } from './schema'
 import { loadManifest, getProfileDir } from './profiles'
 import { pinyin } from 'pinyin-pro'
@@ -88,6 +88,29 @@ export function initDatabase(profileId?: string): Database.Database {
     }
     db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('icon_refresh_v2', '1')`).run()
     console.log(`[migration] icon_refresh_v2: reset ${stale.length} stale app/game covers`)
+  }
+
+  // 修复 cover_path：文件夹改名后绝对路径失效，用文件名重新拼接到当前 dataDir
+  // 每次启动都检查（成本低），不依赖一次性 migration flag
+  {
+    const coversDir = join(dataDir, 'covers')
+    const normalDataDir = normalize(dataDir)
+    const allCovers = db.prepare(
+      `SELECT id, cover_path FROM resources WHERE cover_path IS NOT NULL`
+    ).all() as Array<{ id: string; cover_path: string }>
+    const stale = allCovers.filter(r => !normalize(r.cover_path).startsWith(normalDataDir))
+    if (stale.length > 0) {
+      const fixStmt = db.prepare(`UPDATE resources SET cover_path = ? WHERE id = ?`)
+      let fixed = 0
+      db.transaction(() => {
+        for (const r of stale) {
+          const newPath = join(coversDir, basename(r.cover_path))
+          fixStmt.run(existsSync(newPath) ? newPath : null, r.id)
+          fixed++
+        }
+      })()
+      console.log(`[migration] cover_path relocation: fixed ${fixed} stale paths after folder rename`)
+    }
   }
 
   // 补填 file_size（每次启动检查，确保新旧资源都有值）
