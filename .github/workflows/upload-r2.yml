@@ -8,6 +8,10 @@ on:
       tag:
         description: 'Release tag to upload (e.g. v0.1.28)'
         required: true
+      channel:
+        description: 'Channel: stable or beta (default: auto-detect from prerelease flag)'
+        required: false
+        default: 'auto'
 
 jobs:
   upload:
@@ -36,6 +40,20 @@ jobs:
           ENDPOINT="https://a851dc5e529a04a83d87176e91cfad51.r2.cloudflarestorage.com"
           PUBLIC_BASE="https://pub-e99883270f2047d9a6151090f7da8a5c.r2.dev"
 
+          # Determine channel: manual input → auto-detect from prerelease flag
+          CHANNEL_INPUT="${{ inputs.channel }}"
+          IS_PRERELEASE="${{ github.event.release.prerelease }}"
+          if [ "$CHANNEL_INPUT" = "beta" ]; then
+            IS_BETA=true
+          elif [ "$CHANNEL_INPUT" = "stable" ]; then
+            IS_BETA=false
+          elif [ "$IS_PRERELEASE" = "true" ]; then
+            IS_BETA=true
+          else
+            IS_BETA=false
+          fi
+          echo "Channel: $( [ "$IS_BETA" = "true" ] && echo beta || echo stable )"
+
           # Upload release zip
           for f in ./artifacts/*.zip; do
             [ -f "$f" ] || continue
@@ -46,30 +64,43 @@ jobs:
               --no-progress
             echo "URL: $PUBLIC_BASE/$TAG/$filename"
 
-            # Generate latest.json
+            # Generate manifest JSON
             size=$(stat -c%s "$f")
-            # Use release published_at if available, else current UTC time
             published="${{ github.event.release.published_at }}"
             if [ -z "$published" ]; then published=$(date -u +"%Y-%m-%dT%H:%M:%SZ"); fi
             node -e "
               const fs = require('fs');
-              fs.writeFileSync('latest.json', JSON.stringify({
+              const manifest = JSON.stringify({
                 version: '$VERSION',
                 tag: '$TAG',
                 filename: '$filename',
                 size: $size,
                 publishedAt: '$published'
-              }, null, 2));
+              }, null, 2);
+              fs.writeFileSync('manifest.json', manifest);
             "
           done
 
-          # Upload latest.json (overwrites previous, no-store prevents CDN/client caching)
-          aws s3 cp latest.json "s3://ai-resource-manager/latest.json" \
+          # Beta channel always gets latest-beta.json
+          aws s3 cp manifest.json "s3://ai-resource-manager/latest-beta.json" \
             --endpoint-url "$ENDPOINT" \
             --content-type "application/json" \
             --cache-control "no-store" \
             --no-progress
-          echo "latest.json updated -> $PUBLIC_BASE/latest.json"
+          echo "latest-beta.json updated -> $PUBLIC_BASE/latest-beta.json"
+
+          # Stable releases also update latest.json (beta releases never touch this)
+          # This ensures old app versions (which only know about latest.json) never see beta builds.
+          if [ "$IS_BETA" = "false" ]; then
+            aws s3 cp manifest.json "s3://ai-resource-manager/latest.json" \
+              --endpoint-url "$ENDPOINT" \
+              --content-type "application/json" \
+              --cache-control "no-store" \
+              --no-progress
+            echo "latest.json updated -> $PUBLIC_BASE/latest.json"
+          else
+            echo "Beta release: skipping latest.json update (stable users unaffected)"
+          fi
 
           # Generate and upload changelog.json from GitHub releases API.
           # Hosted on R2 so clients in China can fetch it without VPN.

@@ -245,12 +245,12 @@ contextBridge.exposeInMainWorld('api', {
   },
   // 自动更新
   updater: {
-    check:       (): Promise<any> => ipcRenderer.invoke('updater:check'),
+    check:       (channel?: 'stable' | 'beta'): Promise<any> => ipcRenderer.invoke('updater:check', channel),
     getPending:  (): Promise<any> => ipcRenderer.invoke('updater:getPending'),
     download:    (): Promise<any> => ipcRenderer.invoke('updater:download'),
     apply:       (): Promise<void> => ipcRenderer.invoke('updater:apply'),
     skip:        (): Promise<void> => ipcRenderer.invoke('updater:skip'),
-    forceUpdate: (): Promise<void> => ipcRenderer.invoke('updater:forceUpdate'),
+    forceUpdate: (channel?: 'stable' | 'beta'): Promise<void> => ipcRenderer.invoke('updater:forceUpdate', channel),
     getChangelog: (): Promise<Array<{ tag: string; name: string; body: string; publishedAt: string }>> =>
       ipcRenderer.invoke('updater:changelog'),
   },

@@ -856,8 +856,8 @@ public class WH { [DllImport("user32.dll")] public static extern bool SetWindowP
   ipcMain.handle('app:openUrl', (_e, url: string) => shell.openExternal(url))
 
   // ── 自动更新 ──────────────────────────────────────────
-  ipcMain.handle('updater:check', () => {
-    return checkForUpdate()
+  ipcMain.handle('updater:check', (_e, channel?: 'stable' | 'beta') => {
+    return checkForUpdate(channel)
   })
   ipcMain.handle('updater:getPending', () => {
     return getPendingUpdate()
@@ -878,8 +878,8 @@ public class WH { [DllImport("user32.dll")] public static extern bool SetWindowP
   ipcMain.handle('updater:skip', () => {
     skipUpdate()
   })
-  ipcMain.handle('updater:forceUpdate', (e) => {
-    return forceUpdate(e.sender)
+  ipcMain.handle('updater:forceUpdate', (e, channel?: 'stable' | 'beta') => {
+    return forceUpdate(e.sender, channel)
   })
   ipcMain.handle('updater:changelog', () => {
     return getChangelog()

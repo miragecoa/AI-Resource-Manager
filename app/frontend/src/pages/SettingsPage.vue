@@ -47,9 +47,25 @@
           <div class="setting-actions">
             <button v-if="updateCheckStatus === 'available'" class="profile-btn update-action-btn" @click="settingsDownloadAndApply">{{ t('settings.update.btnDownload') }}</button>
             <button v-else-if="updateCheckStatus === 'ready'" class="profile-btn update-action-btn" @click="settingsApplyUpdate">{{ t('settings.update.btnApply') }}</button>
-            <button v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="profile-btn" @click="manualCheckUpdate" :disabled="updateCheckStatus === 'checking'">{{ t('settings.update.btnCheck') }}</button>
+            <div v-else-if="updateCheckStatus !== 'downloading' && updateCheckStatus !== 'force-downloading'" class="btn-with-menu">
+              <button class="profile-btn" :class="{ 'btn-beta-active': settingsStore.updateChannel === 'beta' }" @click="manualCheckUpdate" @contextmenu.prevent="checkMenuVisible = !checkMenuVisible" :disabled="updateCheckStatus === 'checking'">
+                {{ t('settings.update.btnCheck') }}<span v-if="settingsStore.updateChannel === 'beta'" class="btn-beta-dot" />
+              </button>
+              <div v-if="checkMenuVisible" class="btn-dropdown" @mouseleave="checkMenuVisible = false">
+                <div class="btn-dropdown-item" @click="selectChannel('stable', 'check')">{{ t('settings.update.channelStable') }}</div>
+                <div class="btn-dropdown-item" @click="selectChannel('beta', 'check')">{{ t('settings.update.channelBeta') }}</div>
+              </div>
+            </div>
             <button class="profile-btn" @click="openGitHubRelease">{{ t('settings.update.btnGithub') }}</button>
-            <button class="profile-btn" @click="forceUpdateLatest" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">{{ t('settings.update.btnForce') }}</button>
+            <div class="btn-with-menu">
+              <button class="profile-btn" :class="{ 'btn-beta-active': settingsStore.updateChannel === 'beta' }" @click="forceUpdateLatest" @contextmenu.prevent="forceMenuVisible = !forceMenuVisible" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">
+                {{ t('settings.update.btnForce') }}<span v-if="settingsStore.updateChannel === 'beta'" class="btn-beta-dot" />
+              </button>
+              <div v-if="forceMenuVisible" class="btn-dropdown" @mouseleave="forceMenuVisible = false">
+                <div class="btn-dropdown-item" @click="selectChannel('stable', 'force')">{{ t('settings.update.channelStable') }}</div>
+                <div class="btn-dropdown-item" @click="selectChannel('beta', 'force')">{{ t('settings.update.channelBeta') }}</div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="update-tips-box">
@@ -692,6 +708,8 @@ const lastUpdateTime = ref('')
 const updateCheckStatus = ref<'idle' | 'checking' | 'up-to-date' | 'available' | 'downloading' | 'ready' | 'error'>('idle')
 const updateCheckInfo = ref<any>(null)
 const updateDownloadPercent = ref(0)
+const checkMenuVisible = ref(false)
+const forceMenuVisible = ref(false)
 
 // ── Changelog ──
 interface ReleaseNote { tag: string; name: string; body: string; publishedAt: string }
@@ -706,14 +724,25 @@ function formatDate(iso: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-async function manualCheckUpdate() {
+async function manualCheckUpdate(channel?: 'stable' | 'beta') {
   updateCheckStatus.value = 'checking'
   try {
-    const info = await window.api.updater.check()
+    const info = await window.api.updater.check(channel)
     updateCheckInfo.value = info
     updateCheckStatus.value = info.hasUpdate ? 'available' : 'up-to-date'
   } catch {
     updateCheckStatus.value = 'error'
+  }
+}
+
+async function selectChannel(channel: 'stable' | 'beta', action: 'check' | 'force') {
+  checkMenuVisible.value = false
+  forceMenuVisible.value = false
+  await settingsStore.setUpdateChannel(channel)
+  if (action === 'check') {
+    await manualCheckUpdate(channel)
+  } else {
+    await forceUpdateLatest(channel)
   }
 }
 
@@ -747,10 +776,10 @@ function openGitHubRelease() {
   window.api.app.openUrl('https://aicubby.app')
 }
 
-async function forceUpdateLatest() {
+async function forceUpdateLatest(channel?: 'stable' | 'beta') {
   updateCheckStatus.value = 'force-downloading'
   try {
-    await window.api.updater.forceUpdate()
+    await window.api.updater.forceUpdate(channel)
   } catch {
     updateCheckStatus.value = 'error'
   }
@@ -1688,6 +1717,54 @@ function onColorChange(key: string, e: Event) {
 .profile-btn.danger:hover:not(:disabled) {
   border-color: #ef4444;
   color: #ef4444;
+}
+
+.btn-with-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.btn-beta-active {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.btn-beta-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 5px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+.btn-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 130px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.btn-dropdown-item {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.btn-dropdown-item:hover {
+  background: var(--surface-3);
+  color: var(--text);
 }
 
 .reset-row .setting-info { flex: 1; }

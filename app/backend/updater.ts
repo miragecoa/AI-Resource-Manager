@@ -61,13 +61,15 @@ interface LatestJson {
   publishedAt: string
 }
 
-export async function checkForUpdate(): Promise<UpdateInfo> {
+export async function checkForUpdate(channel?: 'stable' | 'beta'): Promise<UpdateInfo> {
   const currentVersion = app.getVersion()
 
   // Check from R2 (China-accessible, no GitHub API dependency)
   // cache: 'no-store' bypasses Electron/Chromium disk cache; ?_t= busts CDN cache
+  const resolvedChannel = channel ?? (getSetting('updateChannel') === 'beta' ? 'beta' : 'stable')
+  const manifestFile = resolvedChannel === 'beta' ? 'latest-beta.json' : 'latest.json'
   const resp = await fetchWithTimeout(
-    `${R2_PUBLIC_URL}/latest.json?_t=${Date.now()}`,
+    `${R2_PUBLIC_URL}/${manifestFile}?_t=${Date.now()}`,
     { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
   )
   if (!resp.ok) throw new Error(`R2 update check failed: ${resp.status}`)
@@ -171,9 +173,11 @@ async function followDownload(url: string, totalSize: number, wc: WebContents | 
 }
 
 /** 强制拉取最新 Release（无视版本号），下载并应用 */
-export async function forceUpdate(wc: WebContents | null = null): Promise<void> {
+export async function forceUpdate(wc: WebContents | null = null, channel?: 'stable' | 'beta'): Promise<void> {
+  const resolvedChannel = channel ?? (getSetting('updateChannel') === 'beta' ? 'beta' : 'stable')
+  const manifestFile = resolvedChannel === 'beta' ? 'latest-beta.json' : 'latest.json'
   const resp = await fetchWithTimeout(
-    `${R2_PUBLIC_URL}/latest.json?_t=${Date.now()}`,
+    `${R2_PUBLIC_URL}/${manifestFile}?_t=${Date.now()}`,
     { cache: 'no-store', headers: { 'User-Agent': 'AI-Resource-Manager-Updater' } }
   )
   if (!resp.ok) throw new Error(`R2 fetch failed: ${resp.status}`)
