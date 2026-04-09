@@ -106,7 +106,7 @@ import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
-const sidebarWidth = ref(210)
+const sidebarWidth = ref(52)
 const isResizing = ref(false)
 const isNarrow = computed(() => !settingsStore.sidebarCollapsed && sidebarWidth.value < 80)
 import { useRouter } from 'vue-router'
