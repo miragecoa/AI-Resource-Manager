@@ -139,6 +139,11 @@ if (Test-Path $coreDir) {
         'icudtl.dat','snapshot_blob.bin','v8_context_snapshot.bin',
         'LICENSE.electron.txt','LICENSES.chromium.html'
     )
+
+    # Detect first-time migration from flat layout (pre-0.3.0):
+    # flat Electron files still exist in appDir root — they aren't in the new zip
+    $isFirstMigration = Test-Path (Join-Path $appDir 'ffmpeg.dll')
+
     foreach ($f in $oldFiles) {
         $fp = Join-Path $appDir $f
         if (Test-Path $fp) { Remove-Item $fp -Force -EA SilentlyContinue }
@@ -151,6 +156,46 @@ if (Test-Path $coreDir) {
         }
     }
     Write-Host 'Migration: cleaned up old flat Electron files.' -ForegroundColor DarkGray
+
+    # Create upgrade readme only on first migration (flat → core layout)
+    if ($isFirstMigration) {
+        $readmeContent = [System.Text.Encoding]::UTF8.GetPreamble() + [System.Text.Encoding]::UTF8.GetBytes(@'
+=======================================================
+  AI 小抽屉 v0.3.0 升级说明
+=======================================================
+
+感谢更新到 v0.3.0！本次更新调整了文件目录结构，
+软件内部文件已整理到 core\ 子文件夹中，根目录更整洁。
+
+-------------------------------------------------------
+新版目录结构
+-------------------------------------------------------
+
+  AI小抽屉.exe        ← 启动器（双击此文件运行）
+  core\               ← 软件内部文件（无需手动操作）
+  profiles\           ← 你的数据文件（标签、资源记录等）
+  .update-temp\       ← 自动更新临时文件（可忽略）
+
+你的所有数据均保存在 profiles\ 文件夹中，升级前后不受影响。
+
+-------------------------------------------------------
+如果自动更新失败，如何手动更新？
+-------------------------------------------------------
+
+1. 前往官网下载最新版压缩包：https://aicubby.app
+2. 将压缩包解压到一个新文件夹
+3. 把旧版的 profiles\ 文件夹复制到新文件夹中
+4. 双击新文件夹中的 AI小抽屉.exe 即可使用
+
+所有标签、资源记录等数据都在 profiles\ 里，
+只要保留该文件夹，重装后数据完整恢复。
+
+-------------------------------------------------------
+此说明文件仅在首次从旧版升级时生成，以后不再出现。
+=======================================================
+'@)
+        [System.IO.File]::WriteAllBytes((Join-Path $appDir '[升级说明] 请阅读.txt'), $readmeContent)
+    }
 }
 
 Write-Host 'Done! Launching...' -ForegroundColor Green
