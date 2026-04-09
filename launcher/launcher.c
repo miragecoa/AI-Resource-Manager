@@ -83,22 +83,29 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nCmd
     /* ── 5. Set LAUNCHER_EXE so Electron resolves paths from root dir ─── */
     SetEnvironmentVariableW(L"LAUNCHER_EXE", launcherPath);
 
-    /* ── 6. Launch core\AI-Cubby.exe ─────────────────────────────────── */
-    SHELLEXECUTEINFOW sei = {0};
-    sei.cbSize       = sizeof(sei);
-    sei.fMask        = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
-    sei.lpVerb       = NULL;
-    sei.lpFile       = target;
-    sei.lpParameters = lpCmdLine;   /* forward any args (e.g. --hidden) */
-    sei.lpDirectory  = dir;
-    sei.nShow        = SW_SHOWNORMAL;
+    /* ── 6. Launch core\AI-Cubby.exe via CreateProcessW ─────────────────
+       Use CreateProcessW instead of ShellExecuteExW so the launcher process
+       exits immediately — ShellExecuteExW with SEE_MASK_NOASYNC can block.   */
+    wchar_t cmdLine[MAX_PATH * 2] = {0};
+    lstrcpynW(cmdLine, L"\"", MAX_PATH * 2);
+    lstrcatW(cmdLine, target);
+    lstrcatW(cmdLine, L"\"");
+    if (lpCmdLine && lpCmdLine[0]) {
+        lstrcatW(cmdLine, L" ");
+        lstrcatW(cmdLine, lpCmdLine);
+    }
 
-    if (!ShellExecuteExW(&sei)) {
-        MessageBoxW(NULL, L"ShellExecuteExW failed to start core\\AI-Cubby.exe.",
+    STARTUPINFOW si = {0};
+    si.cb = sizeof(si);
+    PROCESS_INFORMATION pi = {0};
+
+    if (!CreateProcessW(NULL, cmdLine, NULL, NULL, FALSE, 0, NULL, dir, &si, &pi)) {
+        MessageBoxW(NULL, L"CreateProcessW failed to start core\\AI-Cubby.exe.",
                     L"AI Cubby", MB_OK | MB_ICONERROR);
         return 1;
     }
 
-    if (sei.hProcess) CloseHandle(sei.hProcess);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
     return 0;
 }
