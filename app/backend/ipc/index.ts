@@ -278,7 +278,7 @@ export function registerIpcHandlers(): void {
   })
 
   // ── Quick Panel ──────────────────────────────────────────
-  ipcMain.handle('pinboard:getAll', () => getQuickPanelResources())
+  ipcMain.handle('pinboard:getAll', () => getQuickPanelResources(getSetting('privacyMode') === 'true'))
   ipcMain.handle('pinboard:add', (_e, id: string) => { incPanelAdd(1); return setQuickPanel(id, true) })
   ipcMain.handle('pinboard:remove', (_e, id: string) => setQuickPanel(id, false))
   ipcMain.handle('pinboard:batchAdd', (_e, ids: string[]) => { incPanelAdd(ids.length); return batchSetQuickPanel(ids, true) })
@@ -292,8 +292,31 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('pinboard:setGroupOrder', (_e, id: string, order: number) => setPinGroupOrder(id, order))
   ipcMain.handle('pinboard:setGroupCollapsed', (_e, id: string, collapsed: boolean) => setPinGroupCollapsed(id, collapsed))
 
+  // ── 隐私模式 ──────────────────────────────────────────
+  ipcMain.handle('privacy:getMode', () => getSetting('privacyMode') === 'true')
+  ipcMain.handle('privacy:setMode', (_e, enabled: boolean) => {
+    setSetting('privacyMode', enabled ? 'true' : 'false')
+    for (const wc of webContents.getAllWebContents()) {
+      try { wc.send('privacy:modeChanged', enabled) } catch { }
+    }
+    return true
+  })
+
   // ── 资源 ──────────────────────────────────────────────
-  ipcMain.handle('resources:getAll', (_e, type?: string) => getAllResources(type))
+  ipcMain.handle('resources:getAll', (_e, type?: string) => {
+    const hidePrivate = getSetting('privacyMode') === 'true'
+    return getAllResources(type, hidePrivate)
+  })
+
+  ipcMain.handle('resources:setPrivate', (_e, id: string, isPrivate: boolean) => {
+    updateResource(id, { is_private: isPrivate ? 1 : 0 })
+    return getResourceById(id)
+  })
+
+  ipcMain.handle('resources:batchSetPrivate', (_e, ids: string[], isPrivate: boolean) => {
+    for (const id of ids) updateResource(id, { is_private: isPrivate ? 1 : 0 })
+    return true
+  })
   ipcMain.handle('resources:getById', (_e, id: string) => getResourceById(id))
 
   ipcMain.handle('resources:update', (_e, id: string, data: object) => {

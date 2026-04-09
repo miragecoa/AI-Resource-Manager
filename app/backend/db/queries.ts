@@ -21,6 +21,7 @@ export interface Resource {
   user_modified?: number
   stat_paused?: number
   file_size?: number
+  is_private?: number
   tags?: Tag[]
 }
 
@@ -33,12 +34,12 @@ export interface Tag {
 
 // ── 资源查询 ────────────────────────────────────────────
 
-export function getAllResources(type?: string): Resource[] {
+export function getAllResources(type?: string, hidePrivate = false): Resource[] {
   const db = getDb()
+  const priv = hidePrivate ? ' AND (is_private IS NULL OR is_private = 0)' : ''
   const rows = type
-    ? db.prepare('SELECT * FROM resources WHERE type = ? ORDER BY added_at DESC').all(type)
-    : db.prepare('SELECT * FROM resources ORDER BY added_at DESC').all()
-
+    ? db.prepare(`SELECT * FROM resources WHERE type = ?${priv} ORDER BY added_at DESC`).all(type)
+    : db.prepare(`SELECT * FROM resources WHERE 1=1${priv} ORDER BY added_at DESC`).all()
   return (rows as Resource[]).map(attachTags)
 }
 
@@ -562,9 +563,10 @@ export interface PinGroup {
   id: string; name: string; sort_order: number; collapsed: number; created_at: number
 }
 
-export function getQuickPanelResources(): Resource[] {
+export function getQuickPanelResources(hidePrivate = false): Resource[] {
   const db = getDb()
-  const rows = db.prepare(`SELECT * FROM resources WHERE in_quickpanel = 1 ORDER BY pin_order ASC, added_at DESC`).all() as Resource[]
+  const priv = hidePrivate ? ' AND (is_private IS NULL OR is_private = 0)' : ''
+  const rows = db.prepare(`SELECT * FROM resources WHERE in_quickpanel = 1${priv} ORDER BY pin_order ASC, added_at DESC`).all() as Resource[]
   return rows.map(attachTags)
 }
 

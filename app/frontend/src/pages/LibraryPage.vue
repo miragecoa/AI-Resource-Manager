@@ -3,17 +3,17 @@
     <!-- 顶部工具栏 -->
     <div v-if="!batchMode" class="toolbar-wrap" @keydown.esc.stop="selectedId = null">
       <div class="toolbar-row">
-        <button v-if="!showIgnored" class="add-btn" @click="showAddModal = true" :title="t('library.addTitle')">
+        <button v-if="!showPrivacy" class="add-btn" @click="showAddModal = true" :title="t('library.addTitle')">
           <span class="btn-icon" v-html="addSvg" />
           <span class="btn-text">{{ t('library.add') }}</span>
         </button>
 
-        <button v-if="!showIgnored" class="add-btn batch-enter-btn" @click="enterBatchMode" :title="t('library.batchTitle')">
+        <button v-if="!showPrivacy" class="add-btn batch-enter-btn" @click="enterBatchMode" :title="t('library.batchTitle')">
           <span class="btn-icon" v-html="batchSvg" />
           <span class="btn-text">{{ t('library.batch') }}</span>
         </button>
 
-        <div class="search-wrap combined" v-if="!showIgnored">
+        <div class="search-wrap combined" v-if="!showPrivacy">
           <span class="search-icon" v-html="searchSvg" />
           <input
             ref="searchInputRef"
@@ -32,7 +32,7 @@
         </div>
 
         <div class="toolbar-right">
-          <div class="zoom-slider-wrap" v-if="!showIgnored" :title="t('library.adjustCard')">
+          <div class="zoom-slider-wrap" v-if="!showPrivacy" :title="t('library.adjustCard')">
             <span class="zoom-icon" v-html="gridSvg" />
             <input
               type="range"
@@ -57,16 +57,16 @@
 
           <button
             class="ignored-toggle"
-            :class="{ active: showIgnored }"
-            @click="toggleIgnored"
+            :class="{ active: showPrivacy, 'privacy-mode-on': privacyMode }"
+            @click="togglePrivacyPanel"
           >
-            <span class="btn-icon" v-html="ignoreListSvg" />
-            <span class="btn-text">{{ t('library.ignored') }}{{ ignoredFiltered.length ? ` (${ignoredFiltered.length})` : '' }}</span>
+            <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            <span class="btn-text">{{ t('library.privacy') }}</span>
           </button>
         </div>
       </div>
 
-      <div class="toolbar-row" v-if="!showIgnored">
+      <div class="toolbar-row" v-if="!showPrivacy">
         <button class="ai-btn" @click="showAiComingSoon = true" :title="t('library.aiSettings')">
           <span class="btn-icon" v-html="aiSvg" />
           <span class="btn-text">{{ t('library.aiSettings') }}</span>
@@ -133,6 +133,9 @@
               <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><circle cx="5" cy="5" r="2"/><circle cx="12" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="12" cy="19" r="2"/><circle cx="19" cy="19" r="2"/></svg>
             </span>{{ t('library.batchAddToQuickPanel') }}
           </button>
+          <button class="batch-action-btn" :disabled="selectedIds.size === 0" @click="batchSetPrivate(true)">
+            <svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>{{ t('library.batchSetPrivate') }}
+          </button>
           <button class="batch-action-btn batch-warn" :disabled="selectedIds.size === 0" @click="showBatchIgnore = true">
             <span class="btn-icon" v-html="ignoreSvg" />{{ t('library.batchIgnore') }}
           </button>
@@ -164,15 +167,46 @@
           <div class="drop-text">{{ t('library.dropOverlay') }}</div>
         </div>
         <!-- 已忽略文件视图 -->
-        <template v-if="showIgnored">
-          <!-- Tab 切换 -->
+        <template v-if="showPrivacy">
+          <!-- 隐私设置面板 Tab 切换 -->
           <div class="ignored-tabs">
-            <button class="ignored-tab" :class="{ active: ignoredTab === 'files' }" @click="ignoredTab = 'files'">{{ t('library.ignoredTab.files') }}</button>
-            <button class="ignored-tab" :class="{ active: ignoredTab === 'dirs' }" @click="switchToBlockedDirs">{{ t('library.ignoredTab.dirs') }}</button>
+            <button class="ignored-tab" :class="{ active: privacyTab === 'privacy' }" @click="privacyTab = 'privacy'">{{ t('library.privacyTab.privacy') }}</button>
+            <button class="ignored-tab" :class="{ active: privacyTab === 'ignored' }" @click="openIgnoredTab">{{ t('library.privacyTab.ignored') }}</button>
+            <button class="ignored-tab" :class="{ active: privacyTab === 'blocked' }" @click="openBlockedTab">{{ t('library.privacyTab.blocked') }}</button>
           </div>
 
-          <!-- 文件忽略 tab -->
-          <template v-if="ignoredTab === 'files'">
+          <!-- 隐私文件 tab -->
+          <template v-if="privacyTab === 'privacy'">
+            <!-- 隐私模式开关 -->
+            <div class="privacy-toggle-row">
+              <div class="privacy-toggle-info">
+                <div class="privacy-toggle-label">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                  {{ t('library.privacyMode') }}
+                </div>
+                <div class="privacy-toggle-desc">{{ t('library.privacyModeDesc') }}</div>
+              </div>
+              <button class="privacy-switch" :class="{ on: privacyMode }" @click="togglePrivacyMode">
+                <span class="privacy-switch-knob" />
+              </button>
+            </div>
+
+            <!-- 隐私文件列表 -->
+            <div class="privacy-files-header">
+              {{ t('library.privateFiles') }} ({{ privateItems.length }})
+            </div>
+            <div v-if="privateItems.length === 0" class="blocked-empty-hint">{{ t('library.privateEmpty') }}</div>
+            <div v-else class="ignored-list">
+              <div v-for="item in privateItems" :key="item.id" class="ignored-row">
+                <span class="ignored-name" :title="item.file_path">{{ item.title }}</span>
+                <span class="ignored-path" :title="item.file_path">{{ item.file_path }}</span>
+                <button class="unignore-btn" @click="setResourcePrivate(item, false)">{{ t('library.unsetPrivate') }}</button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 已忽略 tab -->
+          <template v-else-if="privacyTab === 'ignored'">
             <div v-if="ignoredFiltered.length === 0" class="empty-state">
               <span class="empty-icon" v-html="ignoreListSvg" />
               <div class="empty-text">{{ t('library.ignoredEmpty') }}</div>
@@ -195,7 +229,7 @@
             </div>
           </template>
 
-          <!-- 隐私目录 tab -->
+          <!-- 屏蔽目录 tab -->
           <template v-else>
             <div class="ignored-list">
               <div v-if="blockedDirs.length === 0" class="blocked-empty-hint">
@@ -402,6 +436,7 @@
                   @open="openResource"
                   @remove="removeResource"
                   @ignore="ignoreResource"
+                  @set-private="setResourcePrivate"
                 />
             </div>
             <!-- 列表视图 -->
@@ -506,6 +541,9 @@
                 </button>
                 <button @click="addToQuickPanel(listMenu.item!); listMenu.show = false">
                   <span v-html="ctxIcons.play" />{{ t('resource.addToQuickPanel') }}
+                </button>
+                <button @click="setResourcePrivate(listMenu.item!, !listMenu.item!.is_private); listMenu.show = false">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>{{ listMenu.item!.is_private ? t('resource.unsetPrivate') : t('resource.setPrivate') }}
                 </button>
                 <hr />
                 <button @click="ignoreResource(listMenu.item!); listMenu.show = false" class="danger">
@@ -1990,7 +2028,7 @@ function clearFallback() {
 }
 
 function onDragOver(e: DragEvent) {
-  if (showIgnored.value || batchMode.value) return
+  if (showPrivacy.value || batchMode.value) return
   _isPinboardDrag = !!e.dataTransfer?.types.includes('text/x-pinboard')
   if (_isPinboardDrag) return
   if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
@@ -2337,7 +2375,7 @@ function onListRowClick(e: MouseEvent, item: Resource) {
 const boxSel = reactive({ active: false, x0: 0, y0: 0, x1: 0, y1: 0 })
 
 function onGridMousedown(e: MouseEvent) {
-  if (e.button !== 0 || showIgnored.value) return
+  if (e.button !== 0 || showPrivacy.value) return
   const target = e.target as HTMLElement
   if (target.closest('.card') || target.closest('.list-row')) return   // 点在卡片上，不触发框选
   if (viewMode.value === 'pinboard' && target.closest('.pb-cell')) return  // 快捷面板图标上不框选（留给拖拽）
@@ -2924,6 +2962,14 @@ onMounted(async () => {
   const savedTagW = await window.api.settings.get('tag_panel_width')
   if (savedTagW) tagPanelWidth.value = Math.max(140, Math.min(500, parseInt(savedTagW) || 212))
 
+  // 加载隐私模式状态
+  privacyMode.value = await window.api.privacy.getMode()
+  // 监听隐私模式变更（其他窗口同步）
+  window.api.privacy.onChange(async (enabled: boolean) => {
+    privacyMode.value = enabled
+    await Promise.all([store.loadAll(), pinBoardRef.value?.reload()])
+  })
+
   // 首次启动（自动收录模式）：自动扫描 + 导入 Chrome 书签
   const pending = await window.api.settings.get('pending_first_scan')
   if (pending === '1') {
@@ -3088,10 +3134,53 @@ function onSortChange(e: Event) {
   settingsStore.setResourceSort((e.target as HTMLSelectElement).value as ResourceSortField)
 }
 
-const showIgnored = ref(false)
+const showPrivacy = ref(false)
+const privacyTab = ref<'privacy' | 'ignored' | 'blocked'>('privacy')
+const privacyMode = ref(false)
 const ignoredTab = ref<'files' | 'dirs'>('files')
 const ignoredPaths = ref<string[]>([])
 const blockedDirs = ref<string[]>([])
+
+const privateItems = computed(() => store.items.filter(r => r.is_private))
+
+async function togglePrivacyPanel() {
+  showPrivacy.value = !showPrivacy.value
+  if (showPrivacy.value) {
+    privacyTab.value = 'privacy'
+  }
+}
+
+async function togglePrivacyMode() {
+  privacyMode.value = !privacyMode.value
+  await window.api.privacy.setMode(privacyMode.value)
+  await Promise.all([store.loadAll(), pinBoardRef.value?.reload()])
+}
+
+async function setResourcePrivate(resource: Resource, isPrivate: boolean) {
+  const updated = await window.api.privacy.setResourcePrivate(resource.id, isPrivate)
+  if (updated) store.addOrUpdate({ ...resource, is_private: isPrivate ? 1 : 0 })
+}
+
+async function batchSetPrivate(isPrivate: boolean) {
+  const ids = [...selectedIds]
+  await window.api.privacy.batchSetPrivate(ids, isPrivate)
+  for (const id of ids) {
+    const r = store.items.find(x => x.id === id)
+    if (r) store.addOrUpdate({ ...r, is_private: isPrivate ? 1 : 0 })
+  }
+  exitBatchMode()
+}
+
+async function openIgnoredTab() {
+  privacyTab.value = 'ignored'
+  ignoredPaths.value = await window.api.ignoredPaths.getAll()
+}
+
+async function openBlockedTab() {
+  privacyTab.value = 'blocked'
+  blockedDirs.value = await window.api.blockedDirs.getAll()
+}
+
 
 const TYPE_BY_EXT: Record<string, ResourceType> = {
   '.jpg': 'image', '.jpeg': 'image', '.png': 'image',
@@ -3210,18 +3299,6 @@ const ignoredFiltered = computed(() => {
   if (store.activeType === 'all') return ignoredPaths.value
   return ignoredPaths.value.filter(p => inferType(p) === store.activeType)
 })
-
-async function toggleIgnored() {
-  showIgnored.value = !showIgnored.value
-  if (showIgnored.value) {
-    ignoredPaths.value = await window.api.ignoredPaths.getAll()
-  }
-}
-
-async function switchToBlockedDirs() {
-  ignoredTab.value = 'dirs'
-  blockedDirs.value = await window.api.blockedDirs.getAll()
-}
 
 async function addBlockedDir() {
   const dir = await window.api.files.pickFolder()
@@ -4349,7 +4426,64 @@ async function deleteIgnored(filePath: string) {
 }
 
 .ignored-toggle:hover { border-color: var(--text-3); color: var(--text-2); }
-.ignored-toggle.active { border-color: var(--danger); color: var(--danger); background: rgba(239, 68, 68, 0.08); }
+.ignored-toggle.active { border-color: var(--accent); color: var(--accent); background: rgba(99, 102, 241, 0.08); }
+.ignored-toggle.privacy-mode-on { color: var(--accent); }
+
+/* 隐私模式开关 */
+.privacy-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.privacy-toggle-info { flex: 1; min-width: 0; }
+.privacy-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.privacy-toggle-desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.privacy-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s;
+  padding: 0;
+}
+.privacy-switch.on { background: var(--accent); border-color: var(--accent); }
+.privacy-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-3);
+  border-radius: 50%;
+  transition: left 0.2s, background 0.2s;
+}
+.privacy-switch.on .privacy-switch-knob { left: 20px; background: var(--bg); }
+
+.privacy-files-header {
+  padding: 10px 16px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -4684,6 +4818,7 @@ async function deleteIgnored(filePath: string) {
 .tfi-ext { font-family: monospace; font-size: 12px; }
 
 .list-view :deep(.lr-name) { display: flex; align-items: center; gap: 6px; }
+.list-view :deep(.lr-private-icon) { flex-shrink: 0; color: var(--accent); opacity: 0.8; }
 .list-view :deep(.lr-checkbox) { accent-color: var(--accent); }
 .list-view :deep(.lr-type) { font-size: 12px; color: var(--text-3); display: flex; align-items: center; gap: 4px; overflow: hidden; }
 .list-view :deep(.lr-type-ext) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

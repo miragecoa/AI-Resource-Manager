@@ -54,6 +54,21 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('tags:pin', id, pinned),
   },
 
+  // 隐私模式
+  privacy: {
+    getMode: (): Promise<boolean> => ipcRenderer.invoke('privacy:getMode'),
+    setMode: (enabled: boolean): Promise<boolean> => ipcRenderer.invoke('privacy:setMode', enabled),
+    onChange: (callback: (enabled: boolean) => void) => {
+      const handler = (_e: any, enabled: boolean) => callback(enabled)
+      ipcRenderer.on('privacy:modeChanged', handler)
+      return () => ipcRenderer.removeListener('privacy:modeChanged', handler)
+    },
+    setResourcePrivate: (id: string, isPrivate: boolean): Promise<any> =>
+      ipcRenderer.invoke('resources:setPrivate', id, isPrivate),
+    batchSetPrivate: (ids: string[], isPrivate: boolean): Promise<boolean> =>
+      ipcRenderer.invoke('resources:batchSetPrivate', ids, isPrivate),
+  },
+
   // 音乐元数据
   music: {
     autoTag: (resourceId: string, filePath: string): Promise<Array<{ id: number; name: string }>> =>

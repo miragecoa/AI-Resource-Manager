@@ -40,6 +40,10 @@
       >
         <span v-html="ignoreIcon" />
       </button>
+      <!-- 隐私徽章：左下角，is_private 时常驻显示 -->
+      <div v-if="resource.is_private && !selectable" class="private-badge" :class="{ 'badge-compact': compact }" :title="t('resource.private')">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      </div>
     </div>
 
     <!-- 精简模式：正方形图标 + 名称（任意缩放都显示名字） -->
@@ -125,6 +129,9 @@
         </button>
         <button @click="addToQuickPanel(); showMenu = false">
           <span v-html="pinIcon" />{{ t('resource.addToQuickPanel') }}
+        </button>
+        <button @click="$emit('set-private', resource, !resource.is_private); showMenu = false">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>{{ resource.is_private ? t('resource.unsetPrivate') : t('resource.setPrivate') }}
         </button>
         <hr />
         <button @click="$emit('ignore', resource); showMenu = false" class="danger">
@@ -956,6 +963,31 @@ function openInExplorer() {
 }
 
 /* ── 运行中徽章 ── */
+.private-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  color: var(--accent);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.private-badge.badge-compact {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  bottom: 3px;
+  right: 3px;
+}
+.private-badge.badge-compact svg { width: 8px; height: 8px; }
+
 .running-badge {
   position: absolute;
   bottom: 6px;

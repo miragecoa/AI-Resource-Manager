@@ -48,6 +48,9 @@
             <img v-if="getThumb(item.resource!)" :src="getThumb(item.resource!)!" class="pb-icon-img" />
             <div v-else class="pb-icon-placeholder"><span v-html="typeIcon(item.resource!.type)" /></div>
             <div v-if="dragId === item.id && dragIds.length > 1" class="pb-drag-count">{{ dragIds.length }}</div>
+            <div v-if="item.resource!.is_private" class="pb-private-badge">
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+            </div>
           </div>
           <div class="pb-label">{{ item.resource!.title }}</div>
         </template>
@@ -72,6 +75,9 @@
               <div class="pb-icon">
                 <img v-if="getThumb(child)" :src="getThumb(child)!" class="pb-icon-img" />
                 <div v-else class="pb-icon-placeholder"><span v-html="typeIcon(child.type)" /></div>
+                <div v-if="child.is_private" class="pb-private-badge">
+                  <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                </div>
               </div>
               <div class="pb-label">{{ child.title }}</div>
             </div>
@@ -515,6 +521,7 @@ async function reload() {
 .pb-cell.merge-target { transform: scale(1.12); background: rgba(99,102,241,0.18); border-radius: 14px; }
 
 .pb-icon { width: var(--pb-icon-size, 56px); height: var(--pb-icon-size, 56px); border-radius: 14px; overflow: visible; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; position: relative; }
+.pb-private-badge { position: absolute; bottom: -4px; right: -4px; width: 16px; height: 16px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); border-radius: 5px; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 10; }
 .pb-drag-count { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; background: var(--accent, #6366f1); color: #fff; border-radius: 9px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; pointer-events: none; z-index: 10; border: 2px solid var(--bg, #0C0C18); }
 .pb-icon-img { width: 100%; height: 100%; object-fit: cover; }
 .pb-icon-placeholder { color: var(--text-3); }
