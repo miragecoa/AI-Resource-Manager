@@ -251,7 +251,7 @@ export function registerIpcHandlers(): void {
 
   // 启动时快照入库资源总数，用于留存漏斗分析
   try {
-    const row = getDb().prepare(`SELECT COUNT(*) as n FROM resources WHERE ignored = 0`).get() as { n: number }
+    const row = getDb().prepare(`SELECT COUNT(*) as n FROM resources`).get() as { n: number }
     setResourceCount(row?.n ?? 0)
   } catch { /* non-critical */ }
 
@@ -815,7 +815,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle('loginItem:get', () => getSetting('autoStartDisabled') !== 'true')
   ipcMain.handle('loginItem:set', (_e, enable: boolean) => {
     if (app.isPackaged) {
-      app.setLoginItemSettings({ openAtLogin: enable, path: process.execPath, args: ['--hidden'] })
+      const exePath = process.env.LAUNCHER_EXE ?? process.execPath
+      app.setLoginItemSettings({ openAtLogin: enable, path: exePath, args: ['--hidden'] })
     }
     // 记录用户的手动选择，防止自动修正逻辑覆盖
     setSetting('autoStartDisabled', enable ? 'false' : 'true')
@@ -1024,9 +1025,18 @@ public class WH { [DllImport("user32.dll")] public static extern bool SetWindowP
     const localAppData = process.env.LOCALAPPDATA || ''
     const appData = process.env.APPDATA || ''
     const sources = [
+      // 国际主流
       readBrowserBookmarks(join(localAppData, 'Google', 'Chrome', 'User Data')),
       readBrowserBookmarks(join(localAppData, 'Microsoft', 'Edge', 'User Data')),
+      readBrowserBookmarks(join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data')),
+      readBrowserBookmarks(join(localAppData, 'Vivaldi', 'User Data')),
+      readBrowserBookmarks(join(appData, 'Opera Software', 'Opera Stable')),
+      // 国内主流
+      readBrowserBookmarks(join(localAppData, '360Chrome', 'Chrome', 'User Data')),
+      readBrowserBookmarks(join(localAppData, '360ChromeX', 'Chrome', 'User Data')),
+      readBrowserBookmarks(join(appData, '360se6', 'User Data')),
       readBrowserBookmarks(join(localAppData, 'Tencent', 'QQBrowser', 'User Data')),
+      readBrowserBookmarks(join(localAppData, 'CentBrowser', 'User Data')),
       readBrowserBookmarks(join(appData, 'SogouExplorer', 'Webkit')),
     ]
     // Merge, deduplicate by URL
@@ -1038,6 +1048,27 @@ public class WH { [DllImport("user32.dll")] public static extern bool SetWindowP
       }
     }
     return merged
+  })
+
+  ipcMain.handle('webpage:importBookmarksHtml', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const res = await dialog.showOpenDialog(win!, {
+      title: 'Import Bookmarks HTML',
+      filters: [{ name: 'HTML', extensions: ['html', 'htm'] }],
+      properties: ['openFile'],
+    })
+    if (res.canceled || !res.filePaths.length) return []
+    try {
+      const html = readFileSync(res.filePaths[0], 'utf8')
+      return parseBookmarksHtml(html)
+    } catch { return [] }
+  })
+
+  ipcMain.handle('webpage:parseBookmarksHtml', (_e, filePath: string) => {
+    try {
+      const html = readFileSync(filePath, 'utf8')
+      return parseBookmarksHtml(html)
+    } catch { return [] }
   })
 
   // ── 剪贴板历史 ────────────────────────────────────────────
@@ -1084,9 +1115,54 @@ public class WH { [DllImport("user32.dll")] public static extern bool SetWindowP
 }
 // clipboard:getHotkey 和 clipboard:setHotkey 在 main.ts 中注册（需要调用 registerClipboardShortcut）
 
+function parseBookmarksHtml(html: string): Array<{ name: string; url: string; folder: string }> {
+  const results: Array<{ name: string; url: string; folder: string }> = []
+  const folderStack: string[] = []
+  const lines = html.split('\n')
+  for (const line of lines) {
+    const trimmed = line.trim()
+    // Folder open: <DT><H3 ...>FolderName</H3>
+    const folderMatch = trimmed.match(/<H3[^>]*>([^<]+)<\/H3>/i)
+    if (folderMatch) {
+      folderStack.push(folderMatch[1])
+      continue
+    }
+    // Folder close: </DL>
+    if (trimmed.toUpperCase() === '</DL><P>' || trimmed.toUpperCase() === '</DL>') {
+      folderStack.pop()
+      continue
+    }
+    // Bookmark: <DT><A HREF="url" ...>Name</A>
+    const linkMatch = trimmed.match(/<A\s[^>]*HREF="([^"]+)"[^>]*>([^<]*)<\/A>/i)
+    if (linkMatch) {
+      const url = linkMatch[1]
+      const name = linkMatch[2] || ''
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        results.push({ name, url, folder: folderStack.join('/') })
+      }
+    }
+  }
+  return results
+}
+
 function readBrowserBookmarks(baseDir: string): Array<{ name: string; url: string; folder: string }> {
   if (!existsSync(baseDir)) return []
   const results: Array<{ name: string; url: string; folder: string }> = []
+
+  // Opera 等浏览器的 Bookmarks 直接在根目录，先尝试
+  const rootBookmarks = join(baseDir, 'Bookmarks')
+  if (existsSync(rootBookmarks)) {
+    try {
+      const data = JSON.parse(readFileSync(rootBookmarks, 'utf8'))
+      const roots = data.roots || {}
+      for (const key of ['bookmark_bar', 'other', 'synced']) {
+        if (roots[key]) flattenBookmarks(roots[key], '', results)
+      }
+      if (results.length > 0) return results
+    } catch { /* fallthrough to profile scan */ }
+  }
+
+  // Chromium 标准: Default / Profile N 子目录
   const profiles = ['Default']
   try {
     for (const d of readdirSync(baseDir)) {

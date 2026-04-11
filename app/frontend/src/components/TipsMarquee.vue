@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { TipSummary } from '../composables/useTips'
 
@@ -22,8 +22,23 @@ const { locale } = useI18n()
 const isZh = computed(() => locale.value === 'zh')
 
 const expanded = ref(true)
-const currentIndex = ref(0)
+const shuffledOrder = ref<number[]>([])
+const queuePos = ref(0)
 let timer: ReturnType<typeof setInterval> | null = null
+
+function shuffle(len: number): number[] {
+  const arr = Array.from({ length: len }, (_, i) => i)
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+const currentIndex = computed(() => {
+  if (!shuffledOrder.value.length) return 0
+  return shuffledOrder.value[queuePos.value % shuffledOrder.value.length]
+})
 
 const currentText = computed(() => {
   if (!props.tips.length) return ''
@@ -45,9 +60,22 @@ function toggle() {
 
 onMounted(() => {
   try { const v = localStorage.getItem('tips_expanded'); if (v === '0') expanded.value = false } catch {}
-  // 5 秒轮播
+  if (props.tips.length > 0) shuffledOrder.value = shuffle(props.tips.length)
+  watch(() => props.tips.length, (len) => {
+    if (len > 0 && shuffledOrder.value.length !== len) {
+      shuffledOrder.value = shuffle(len)
+      queuePos.value = 0
+    }
+  })
   timer = setInterval(() => {
-    if (props.tips.length > 1) currentIndex.value = (currentIndex.value + 1) % props.tips.length
+    if (props.tips.length <= 1) return
+    const next = queuePos.value + 1
+    if (next >= shuffledOrder.value.length) {
+      shuffledOrder.value = shuffle(props.tips.length)
+      queuePos.value = 0
+    } else {
+      queuePos.value = next
+    }
   }, 20000)
 })
 

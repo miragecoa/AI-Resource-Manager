@@ -95,9 +95,7 @@
 
       <!-- 托盘呼出快捷键提示 -->
       <Transition name="tray-hint">
-        <div v-if="trayHintVisible" class="tray-hint-bar" @click="trayHintVisible = false">
-          💡 提示：下次试试按 <kbd>Alt + Space</kbd> 秒开小抽屉，效率提升 300%！
-        </div>
+        <div v-if="trayHintVisible" class="tray-hint-bar" @click="trayHintVisible = false" v-html="trayHintText" />
       </Transition>
 
     </div>
@@ -157,6 +155,44 @@
       :resolved="dropResolved"
       @confirm="onDropConfirm"
     />
+
+    <!-- 书签导入弹窗 -->
+    <Teleport to="body">
+      <div v-if="showBookmarkModal" class="bm-overlay" @mousedown.self="showBookmarkModal = false">
+        <div class="bm-dialog">
+          <div class="bm-title">{{ t('library.bookmarkModalTitle') }}</div>
+
+          <button class="bm-option" @click="showBookmarkModal = false; importBrowserBookmarks()" :disabled="browserImporting">
+            <div class="bm-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
+            </div>
+            <div class="bm-option-info">
+              <div class="bm-option-label">{{ t('library.bookmarkAuto') }}</div>
+              <div class="bm-option-desc">{{ t('library.bookmarkAutoDesc') }}</div>
+            </div>
+          </button>
+
+          <div
+            class="bm-option bm-drop-zone"
+            :class="{ 'bm-drag-over': bmDragOver }"
+            @click="importBookmarksHtml(); showBookmarkModal = false"
+            @dragover.prevent.stop="bmDragOver = true"
+            @dragleave.prevent.stop="bmDragOver = false"
+            @drop.prevent.stop="onBmDrop($event)"
+          >
+            <div class="bm-option-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="24" height="24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div class="bm-option-info">
+              <div class="bm-option-label">{{ t('library.bookmarkHtml') }}</div>
+              <div class="bm-option-desc">{{ t('library.bookmarkHtmlDesc') }}</div>
+            </div>
+          </div>
+
+          <button class="bm-cancel" @click="showBookmarkModal = false">{{ t('library.bookmarkCancel') }}</button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 主内容区域：库视图 + 标签面板 -->
     <div class="content-area">
@@ -397,7 +433,7 @@
             <div class="empty-text">{{ t('library.empty') }}</div>
             <div v-if="store.activeType === 'webpage'" class="empty-hint">
               {{ t('library.emptyWebpageHint') }}
-              <button class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
+              <button class="import-footer-btn" @click="showBookmarkModal = true" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
                 {{ browserImporting ? t('library.importingBookmarks') : t('library.importBookmarks') }}
               </button>
@@ -592,7 +628,7 @@
               class="import-footer"
               :class="{ visible: footerVisible }"
             >
-              <button v-if="store.activeType === 'webpage'" class="import-footer-btn" @click="importBrowserBookmarks" :disabled="browserImporting">
+              <button v-if="store.activeType === 'webpage'" class="import-footer-btn" @click="showBookmarkModal = true" :disabled="browserImporting">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M21.17 8H12"/><path d="M3.95 6.06L8.54 14"/><path d="M10.88 21.94L15.46 14"/></svg>
                 {{ browserImporting ? t('library.importingBookmarks') : t('library.importBookmarks') }}
               </button>
@@ -1709,51 +1745,86 @@ watch(gridScrollRef, (el, oldEl) => {
   }
 })
 const browserImporting = ref(false)
+const showBookmarkModal = ref(false)
+const bmDragOver = ref(false)
+
+async function onBmDrop(e: DragEvent) {
+  bmDragOver.value = false
+  showBookmarkModal.value = false
+  const file = e.dataTransfer?.files?.[0]
+  if (!file) return
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext !== 'html' && ext !== 'htm') {
+    alert(t('library.bookmarkHtmlOnly'))
+    return
+  }
+  browserImporting.value = true
+  try {
+    const bookmarks = await window.api.webpage.parseBookmarksHtml(file.path)
+    await importBookmarksFromList(bookmarks)
+  } catch (e: any) {
+    alert(t('library.bookmarkFailed', { msg: e?.message ?? '' }))
+  } finally {
+    browserImporting.value = false
+  }
+}
+
+async function importBookmarksFromList(bookmarks: Array<{ name: string; url: string; folder: string }>) {
+  if (!bookmarks.length) {
+    alert(t('library.bookmarkNotFound'))
+    return
+  }
+  const items = bookmarks.map(b => ({
+    type: 'webpage',
+    title: b.name || new URL(b.url).hostname,
+    file_path: b.url,
+  }))
+  const { added, existing } = await window.api.resources.batchAdd(items)
+  const allResources = [...added, ...existing]
+  const urlToFolder = new Map<string, string>()
+  for (const b of bookmarks) {
+    if (b.folder) urlToFolder.set(b.url, b.folder)
+  }
+  const assignments: Array<{ resourceId: string; tagNames: string[] }> = []
+  for (const resource of allResources) {
+    const folder = urlToFolder.get(resource.file_path)
+    if (!folder) continue
+    const tagNames = folder.split('/').filter(s => s)
+    if (tagNames.length) assignments.push({ resourceId: resource.id, tagNames })
+  }
+  if (assignments.length) {
+    await window.api.tags.batchAssign(assignments, 'browser-import')
+  }
+  await store.loadAll()
+  alert(existing.length > 0 ? t('library.bookmarkImported', { n: added.length, e: existing.length }) : t('library.bookmarkImportedOnly', { n: added.length }))
+  for (const resource of added) {
+    window.api.webpage.fetchFavicon(resource.file_path).then(async icon => {
+      if (!icon) return
+      const coverPath = await window.api.files.saveCover(resource.id, icon)
+      if (!coverPath) return
+      const current = store.items.find(r => r.id === resource.id)
+      store.addOrUpdate({ ...(current || resource), cover_path: coverPath })
+    }).catch(() => {})
+  }
+}
+
+async function importBookmarksHtml() {
+  browserImporting.value = true
+  try {
+    const bookmarks = await window.api.webpage.importBookmarksHtml()
+    await importBookmarksFromList(bookmarks)
+  } catch (e: any) {
+    alert(t('library.bookmarkFailed', { msg: e?.message ?? '' }))
+  } finally {
+    browserImporting.value = false
+  }
+}
+
 async function importBrowserBookmarks() {
   browserImporting.value = true
   try {
     const bookmarks = await window.api.webpage.importBrowserBookmarks()
-    if (!bookmarks.length) {
-      alert(t('library.bookmarkNotFound'))
-      return
-    }
-    const items = bookmarks.map(b => ({
-      type: 'webpage',
-      title: b.name || new URL(b.url).hostname,
-      file_path: b.url,
-    }))
-    const { added, existing } = await window.api.resources.batchAdd(items)
-    const allResources = [...added, ...existing]
-
-    // 根据书签文件夹路径自动创建标签并关联（单次 IPC 调用）
-    const urlToFolder = new Map<string, string>()
-    for (const b of bookmarks) {
-      if (b.folder) urlToFolder.set(b.url, b.folder)
-    }
-    const assignments: Array<{ resourceId: string; tagNames: string[] }> = []
-    for (const resource of allResources) {
-      const folder = urlToFolder.get(resource.file_path)
-      if (!folder) continue
-      const tagNames = folder.split('/').filter(s => s)
-      if (tagNames.length) assignments.push({ resourceId: resource.id, tagNames })
-    }
-    if (assignments.length) {
-      await window.api.tags.batchAssign(assignments, 'browser-import')
-    }
-
-    // 标签关联完成后刷新列表
-    await store.loadAll()
-    alert(existing.length > 0 ? t('library.bookmarkImported', { n: added.length, e: existing.length }) : t('library.bookmarkImportedOnly', { n: added.length }))
-    // 后台批量获取 favicon（仅新增的）
-    for (const resource of added) {
-      window.api.webpage.fetchFavicon(resource.file_path).then(async icon => {
-        if (!icon) return
-        const coverPath = await window.api.files.saveCover(resource.id, icon)
-        if (!coverPath) return
-        const current = store.items.find(r => r.id === resource.id)
-        store.addOrUpdate({ ...(current || resource), cover_path: coverPath })
-      }).catch(() => {})
-    }
+    await importBookmarksFromList(bookmarks)
   } catch (e: any) {
     alert(t('library.bookmarkFailed', { msg: e?.message ?? '' }))
   } finally {
@@ -3034,13 +3105,45 @@ const unsubWake = window.api.onWake(() => {
 
 // ── 托盘呼出提示：每天最多显示一次 ──────────────────────
 const trayHintVisible = ref(false)
+const trayHintText = ref('')
 let _trayHintTimer: ReturnType<typeof setTimeout> | null = null
 const TRAY_HINT_KEY = 'trayHintLastDate'
+const TRAY_HINT_QUEUE_KEY = 'trayHintQueue'
+
+const TRAY_HINTS = [
+  '💡 提示：按 <kbd>Alt + Space</kbd> 可随时呼出小抽屉，无需鼠标点击！',
+  '💡 提示：右键资源卡片可快速「置顶」或「加入快捷面板」。',
+  '💡 提示：支持拖拽文件到窗口直接入库，试试拖一个游戏或图片进来！',
+  '💡 提示：按住 Shift 单击可批量选中资源，然后统一打标签或忽略。',
+  '💡 提示：悬浮小抽屉双击可呼出主窗口，右键可打开设置。',
+  '💡 提示：在设置中可以自定义快捷键，呼出主窗口或剪贴板。',
+  '💡 提示：标签支持拼音搜索，输入 "yy" 可快速找到「游戏」标签。',
+  '💡 提示：快捷面板支持拖拽排序，把常用应用拖到最前面！',
+  '💡 提示：点击资源卡片右下角的时长，可以查看详细使用统计。',
+  '💡 提示：右键标签面板齿轮图标可以管理、置顶或删除标签。',
+]
+
+function nextHint(): string {
+  let queue: number[] = []
+  try { queue = JSON.parse(localStorage.getItem(TRAY_HINT_QUEUE_KEY) || '[]') } catch { }
+  if (!queue.length) {
+    // 生成新的随机顺序队列（Fisher-Yates shuffle）
+    queue = TRAY_HINTS.map((_, i) => i)
+    for (let i = queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [queue[i], queue[j]] = [queue[j], queue[i]]
+    }
+  }
+  const idx = queue.shift()!
+  localStorage.setItem(TRAY_HINT_QUEUE_KEY, JSON.stringify(queue))
+  return TRAY_HINTS[idx]
+}
 
 const unsubTrayWake = window.api.onTrayWake(() => {
   const today = new Date().toDateString()
   if (localStorage.getItem(TRAY_HINT_KEY) === today) return
   localStorage.setItem(TRAY_HINT_KEY, today)
+  trayHintText.value = nextHint()
   trayHintVisible.value = true
   if (_trayHintTimer) clearTimeout(_trayHintTimer)
   _trayHintTimer = setTimeout(() => { trayHintVisible.value = false }, 8000)
@@ -6358,6 +6461,41 @@ async function deleteIgnored(filePath: string) {
 .context-menu hr {
   border: none; border-top: 1px solid var(--border); margin: 4px 0;
 }
+/* 书签导入弹窗 */
+.bm-overlay {
+  position: fixed; inset: 0; z-index: 1001;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,.55);
+}
+.bm-dialog {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 24px; width: 400px; max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(0,0,0,.4);
+}
+.bm-title {
+  font-size: 16px; font-weight: 600; color: var(--text); margin-bottom: 16px;
+}
+.bm-option {
+  width: 100%; display: flex; align-items: center; gap: 14px;
+  padding: 14px 16px; background: var(--surface-3); border: 1px solid var(--border);
+  border-radius: 10px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  margin-bottom: 10px; text-align: left; font-family: inherit; color: var(--text);
+}
+.bm-option:hover { border-color: var(--accent); background: rgba(99, 102, 241, 0.06); }
+.bm-option:disabled { opacity: 0.5; pointer-events: none; }
+.bm-drop-zone { border-style: dashed; }
+.bm-drop-zone.bm-drag-over { border-color: var(--accent); background: rgba(99, 102, 241, 0.12); }
+.bm-option-icon { flex-shrink: 0; color: var(--accent); }
+.bm-option-info { min-width: 0; }
+.bm-option-label { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.bm-option-desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.bm-cancel {
+  width: 100%; padding: 8px; background: none; border: none;
+  color: var(--text-3); font-size: 13px; font-family: inherit;
+  cursor: pointer; margin-top: 4px; border-radius: 6px;
+}
+.bm-cancel:hover { color: var(--text-2); background: var(--surface-3); }
+
 .kill-overlay {
   position: fixed; inset: 0; z-index: 1001;
   display: flex; align-items: center; justify-content: center;

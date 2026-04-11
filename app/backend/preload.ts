@@ -321,6 +321,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('webpage:importChromeBookmarks'),
     importBrowserBookmarks: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
       ipcRenderer.invoke('webpage:importBrowserBookmarks'),
+    importBookmarksHtml: (): Promise<Array<{ name: string; url: string; folder: string }>> =>
+      ipcRenderer.invoke('webpage:importBookmarksHtml'),
+    parseBookmarksHtml: (filePath: string): Promise<Array<{ name: string; url: string; folder: string }>> =>
+      ipcRenderer.invoke('webpage:parseBookmarksHtml', filePath),
   },
 
   // 瀑布流窗口
