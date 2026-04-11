@@ -45,7 +45,7 @@ class LRUCache<V> {
 type LoadFn = () => Promise<string | null>
 interface QueueItem { key: string; fn: LoadFn; resolve: (v: string | null) => void }
 
-const MAX_CONCURRENT = 3  // 降低并发，避免启动时大量 IPC 卡死主进程
+const MAX_CONCURRENT = 3  // IPC 并发数，后端有独立队列限制实际 native 调用数
 let _running = 0
 const _queue: QueueItem[] = []
 let _paused = false
@@ -109,8 +109,7 @@ function flush() {
       item.resolve(null)
     }).finally(() => {
       _running--
-      // 延迟 50ms 再启动下一个，让主线程处理 UI/鼠标事件，避免卡顿
-      setTimeout(flush, 50)
+      flush()
     })
   }
 }

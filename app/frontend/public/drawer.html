@@ -132,17 +132,19 @@
     // ── i18n ─────────────────────────────────────────────────────────────
     const _DRAWER_I18N = {
       zh: { dropLabel: '松开导入' },
+      zht: { dropLabel: '鬆開匯入' },
       en: { dropLabel: 'Drop to import' },
     }
     const _drawerDp = new URLSearchParams(window.location.search)
-    let _drawerLang = _drawerDp.get('lang') === 'en' ? 'en' : 'zh'
+    let _drawerLang = _drawerDp.get('lang') || 'zh'
+    if (!_DRAWER_I18N[_drawerLang]) _drawerLang = 'zh'
     function _tDrawer(key) { return (_DRAWER_I18N[_drawerLang] || _DRAWER_I18N.zh)[key] || key }
     function _applyDrawerLang() {
       document.getElementById('dropLabel').textContent = _tDrawer('dropLabel')
     }
     _applyDrawerLang()
     window.drawerApi?.onLanguageChange?.(lang => {
-      _drawerLang = lang === 'en' ? 'en' : 'zh'
+      _drawerLang = _DRAWER_I18N[lang] ? lang : 'zh'
       _applyDrawerLang()
     })
 

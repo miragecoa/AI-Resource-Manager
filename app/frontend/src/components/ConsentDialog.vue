@@ -12,7 +12,10 @@
         <div class="lang-row">
           <span class="lang-label">{{ t('consent.langLabel') }}</span>
           <div class="lang-btns">
-            <button class="lang-btn" :class="{ active: settingsStore.language === 'zh' }" @click="setLang('zh')">中文</button>
+            <div class="lang-toggle" :class="{ active: settingsStore.language === 'zh' || settingsStore.language === 'zht' }">
+              <button class="lang-half" :class="{ active: settingsStore.language === 'zh' }" @click="setLang('zh')">简</button>
+              <button class="lang-half" :class="{ active: settingsStore.language === 'zht' }" @click="setLang('zht')">繁</button>
+            </div>
             <button class="lang-btn" :class="{ active: settingsStore.language === 'en' }" @click="setLang('en')">English</button>
           </div>
         </div>
@@ -242,6 +245,31 @@ async function quit() {
 
 .lang-btn.active {
   border-color: var(--accent);
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.lang-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.lang-toggle.active { border-color: var(--accent); }
+.lang-half {
+  padding: 3px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--surface-2);
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.lang-half:first-child { border-right: 1px solid var(--border); }
+.lang-half:hover { color: var(--text); }
+.lang-half.active {
   color: var(--accent-2);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }

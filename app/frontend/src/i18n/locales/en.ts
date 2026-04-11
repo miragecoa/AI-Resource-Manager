@@ -750,4 +750,7 @@ export default {
     batchRemove: 'Remove from Quick Panel',
     confirmBulkAdd: 'Add {n} items to Quick Panel?',
   },
+  tips: {
+    altSpace: '💡 Tip: Press <kbd>Alt + Space</kbd> to quickly open the drawer anytime!',
+  },
 }

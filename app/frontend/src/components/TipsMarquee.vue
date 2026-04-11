@@ -15,11 +15,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Converter } from 'opencc-js'
 import type { TipSummary } from '../composables/useTips'
 
 const props = defineProps<{ tips: TipSummary[] }>()
 const { locale } = useI18n()
-const isZh = computed(() => locale.value === 'zh')
+const isZh = computed(() => locale.value === 'zh' || locale.value === 'zht')
+const isZht = computed(() => locale.value === 'zht')
+const s2t = Converter({ from: 'cn', to: 'twp' })
 
 const expanded = ref(true)
 const shuffledOrder = ref<number[]>([])
@@ -43,7 +46,8 @@ const currentIndex = computed(() => {
 const currentText = computed(() => {
   if (!props.tips.length) return ''
   const tip = props.tips[currentIndex.value % props.tips.length]
-  return isZh.value ? tip.title_zh : (tip.title_en || tip.title_zh)
+  const text = isZh.value ? tip.title_zh : (tip.title_en || tip.title_zh)
+  return isZht.value ? s2t(text) : text
 })
 
 function openCurrentTip() {

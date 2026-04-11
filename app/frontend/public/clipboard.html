@@ -448,9 +448,25 @@ const _CB_I18N = {
     autoDay7: '7 days', autoDay30: '30 days', autoDay90: '90 days', autoDay180: '180 days',
     cancel: 'Cancel',
   },
+  zht: {
+    title: '剪貼簿', cleanupTitle: '清理歷史', close: '關閉',
+    searchPlaceholder: '搜尋剪貼簿...',
+    filterAll: '全部類型', filterText: '文字', filterImage: '圖片',
+    sortRecent: '最新新增', sortLastUsed: '最近使用', sortMostUsed: '使用最多',
+    justNow: '剛剛', minAgo: '{n}分鐘前', hrAgo: '{n}小時前', dayAgo: '{n}天前',
+    noResults: '沒有匹配結果', noHistory: '暫無記錄',
+    typeImage: '圖片', typeText: '文字',
+    pinned: '取消固定', pin: '固定', copy: '複製', saveToLib: '儲存到圖片庫', delete: '刪除',
+    cleanupModalTitle: '清理歷史記錄', pinnedNotCleared: '已固定的條目不會被清理',
+    opt1h: '1 小時前的記錄', opt24h: '24 小時前的記錄', opt7d: '7 天前的記錄', opt30d: '30 天前的記錄', optAll: '全部記錄',
+    autoClean: '自動清理', off: '關閉',
+    autoDay7: '7 天前', autoDay30: '30 天前', autoDay90: '90 天前', autoDay180: '180 天前',
+    cancel: '取消',
+  },
 }
 const _cbDp = new URLSearchParams(window.location.search)
-let _cbLang = _cbDp.get('lang') === 'en' ? 'en' : 'zh'
+let _cbLang = _cbDp.get('lang') || 'zh'
+if (!_CB_I18N[_cbLang]) _cbLang = 'zh'
 function _tCb(key) { return (_CB_I18N[_cbLang] || _CB_I18N.zh)[key] ?? key }
 function _applyLang() {
   document.getElementById('cbTitle').textContent = _tCb('title')
@@ -481,7 +497,7 @@ function _applyLang() {
 }
 _applyLang()
 window.clipboardApi?.onLanguageChange?.(lang => {
-  _cbLang = lang === 'en' ? 'en' : 'zh'
+  _cbLang = _CB_I18N[lang] ? lang : 'zh'
   _applyLang()
   render()
 })

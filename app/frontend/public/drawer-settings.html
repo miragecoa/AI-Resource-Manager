@@ -246,6 +246,15 @@
         showMain: '显示主窗口', hideDrawer: '隐藏悬浮窗',
         hint: '将文件拖入悬浮图标可快速导入',
       },
+      zht: {
+        title: '懸浮窗設定', opacity: '透明度', size: '大小', edge: '收起方向',
+        snap: '自動貼邊',
+        edgeOff: '無', edgeLeft: '左', edgeRight: '右', edgeTop: '上', edgeBottom: '下',
+        stripLen: '條長', stripWid: '條寬',
+        pickIcon: '自訂圖示', clearIcon: '恢復預設圖示',
+        showMain: '顯示主視窗', hideDrawer: '隱藏懸浮窗',
+        hint: '將檔案拖入懸浮圖示可快速匯入',
+      },
       en: {
         title: 'Drawer Settings', opacity: 'Opacity', size: 'Size', edge: 'Collapse',
         snap: 'Auto snap',
@@ -257,7 +266,8 @@
       },
     }
     const _dsp = new URLSearchParams(window.location.search)
-    let _dsLang = _dsp.get('lang') === 'en' ? 'en' : 'zh'
+    let _dsLang = _dsp.get('lang') || 'zh'
+    if (!_DS_I18N[_dsLang]) _dsLang = 'zh'
     function _tDs(key) { return (_DS_I18N[_dsLang] || _DS_I18N.zh)[key] || key }
     function _applyDsLang() {
       const T = _DS_I18N[_dsLang] || _DS_I18N.zh
@@ -281,7 +291,7 @@
     }
     _applyDsLang()
     window.settingsApi?.onLanguageChange?.(lang => {
-      _dsLang = lang === 'en' ? 'en' : 'zh'
+      _dsLang = _DS_I18N[lang] ? lang : 'zh'
       _applyDsLang()
     })
 

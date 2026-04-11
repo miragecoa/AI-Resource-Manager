@@ -853,7 +853,7 @@ export const useSettingsStore = defineStore('settings', () => {
     await window.api.settings.set('language', lang)
     // If still on default title, switch to the new locale's default
     if (appTitle.value === 'AI小抽屉' || appTitle.value === 'AI Cubby') {
-      const newTitle = lang === 'en' ? 'AI Cubby' : 'AI小抽屉'
+      const newTitle = lang === 'en' ? 'AI Cubby' : (lang === 'zht' ? 'AI小抽屜' : 'AI小抽屉')
       appTitle.value = newTitle
       await window.api.settings.set('appTitle', newTitle)
       window.api.app.setTitle(newTitle)

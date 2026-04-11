@@ -67,6 +67,30 @@ class LRUMap<V> {
 const appIconCache = new LRUMap<string | null>(100)
 const thumbCache = new LRUMap<string | null>(200)
 
+// 缩略图并发限制：createThumbnailFromPath 是 CPU 密集型操作，
+// 不限制会阻塞 Electron 主进程导致 UI 卡顿
+let _thumbRunning = 0
+const _thumbQueue: Array<{ resolve: (v: string | null) => void; fn: () => Promise<string | null> }> = []
+const THUMB_MAX_CONCURRENT = 3
+
+function enqueueThumb(fn: () => Promise<string | null>): Promise<string | null> {
+  return new Promise<string | null>(resolve => {
+    _thumbQueue.push({ resolve, fn })
+    flushThumbQueue()
+  })
+}
+
+function flushThumbQueue() {
+  while (_thumbRunning < THUMB_MAX_CONCURRENT && _thumbQueue.length > 0) {
+    const item = _thumbQueue.shift()!
+    _thumbRunning++
+    item.fn().then(r => item.resolve(r)).catch(() => item.resolve(null)).finally(() => {
+      _thumbRunning--
+      flushThumbQueue()
+    })
+  }
+}
+
 const AUDIO_EXTS = new Set(['.mp3', '.flac', '.aac', '.ogg', '.m4a', '.wma', '.ape', '.wav'])
 const _audioTagged = new Set<string>() // 本次进程会话内已导入元数据的资源
 
@@ -176,7 +200,7 @@ function _doGetIcon(filePath: string): Promise<string | null> {
     '            if(cw>0&&ch>0){fin=bmp.Clone(new Rectangle(cx,cy2,cw,ch),PixelFormat.Format32bppArgb);fw=cw;fh=ch;}',
     '          }',
     '          using(var ms=new MemoryStream()){fin.Save(ms,ImageFormat.Png);',
-    '            return String.Format("DBG:hbm={0}x{1},ring={2}%({3}/{4}),frame={5},bounds={6},{7},{8},{9},fin={10}x{11}\\n{12}",W,H,ringTotal>0?ringBg*100/ringTotal:0,ringBg,ringTotal,hasFrame,lx,ly,rx,ry,fw,fh,Convert.ToBase64String(ms.ToArray()));}',
+    '            return Convert.ToBase64String(ms.ToArray());}',
     '        }',
     '      }finally{DeleteObject(hbm);}',
     '    }catch{return "";}',
@@ -191,18 +215,9 @@ function _doGetIcon(filePath: string): Promise<string | null> {
     execFile('powershell.exe',
       ['-NoProfile', '-NonInteractive', '-EncodedCommand', encoded],
       { timeout: 12000 },
-      (_err, stdout, stderr) => {
+      (_err, stdout) => {
         const raw = stdout?.trim() ?? ''
-        const nlIdx = raw.indexOf('\n')
-        if (nlIdx > 0 && raw.startsWith('DBG:')) {
-          const dbg = raw.substring(0, nlIdx).trim()
-          const b64 = raw.substring(nlIdx + 1).trim()
-          console.log(`[icon] ${filePath.split(/[\\/]/).pop()} | ${dbg}`)
-          resolve(b64 ? `data:image/png;base64,${b64}` : null)
-        } else {
-          if (stderr?.trim()) console.log(`[icon-err] ${filePath.split(/[\\/]/).pop()} | ${stderr.trim().substring(0, 200)}`)
-          resolve(raw ? `data:image/png;base64,${raw}` : null)
-        }
+        resolve(raw ? `data:image/png;base64,${raw}` : null)
       }
     )
   })
@@ -574,17 +589,18 @@ export function registerIpcHandlers(): void {
     if (thumbCache.has(cacheKey)) return thumbCache.get(cacheKey) ?? null
     const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase()
     const isAudio = AUDIO_EXTS.has(ext)
-    try {
-      const thumb = await nativeImage.createThumbnailFromPath(filePath, { width: dim, height: dim })
-      let result: string | null = thumb.isEmpty() ? null : thumb.toDataURL()
-      if (!result && isAudio) result = await extractAudioCover(filePath)
-      thumbCache.set(cacheKey, result)
-      return result
-    } catch {
-      const result = isAudio ? await extractAudioCover(filePath) : null
-      thumbCache.set(cacheKey, result)
-      return result
-    }
+    const result = await enqueueThumb(async () => {
+      try {
+        const thumb = await nativeImage.createThumbnailFromPath(filePath, { width: dim, height: dim })
+        let r: string | null = thumb.isEmpty() ? null : thumb.toDataURL()
+        if (!r && isAudio) r = await extractAudioCover(filePath)
+        return r
+      } catch {
+        return isAudio ? await extractAudioCover(filePath) : null
+      }
+    })
+    thumbCache.set(cacheKey, result)
+    return result
   })
 
   // 从音乐文件提取元数据并自动打标签（artist / genre），每次进程会话只执行一次

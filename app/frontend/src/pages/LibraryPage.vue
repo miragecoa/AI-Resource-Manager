@@ -3103,47 +3103,17 @@ const unsubWake = window.api.onWake(() => {
   })
 })
 
-// ── 托盘呼出提示：每天最多显示一次 ──────────────────────
+// ── 托盘呼出提示：每天最多显示一次，仅提示快捷键 ──────────────────────
 const trayHintVisible = ref(false)
 const trayHintText = ref('')
 let _trayHintTimer: ReturnType<typeof setTimeout> | null = null
 const TRAY_HINT_KEY = 'trayHintLastDate'
-const TRAY_HINT_QUEUE_KEY = 'trayHintQueue'
-
-const TRAY_HINTS = [
-  '💡 提示：按 <kbd>Alt + Space</kbd> 可随时呼出小抽屉，无需鼠标点击！',
-  '💡 提示：右键资源卡片可快速「置顶」或「加入快捷面板」。',
-  '💡 提示：支持拖拽文件到窗口直接入库，试试拖一个游戏或图片进来！',
-  '💡 提示：按住 Shift 单击可批量选中资源，然后统一打标签或忽略。',
-  '💡 提示：悬浮小抽屉双击可呼出主窗口，右键可打开设置。',
-  '💡 提示：在设置中可以自定义快捷键，呼出主窗口或剪贴板。',
-  '💡 提示：标签支持拼音搜索，输入 "yy" 可快速找到「游戏」标签。',
-  '💡 提示：快捷面板支持拖拽排序，把常用应用拖到最前面！',
-  '💡 提示：点击资源卡片右下角的时长，可以查看详细使用统计。',
-  '💡 提示：右键标签面板齿轮图标可以管理、置顶或删除标签。',
-]
-
-function nextHint(): string {
-  let queue: number[] = []
-  try { queue = JSON.parse(localStorage.getItem(TRAY_HINT_QUEUE_KEY) || '[]') } catch { }
-  if (!queue.length) {
-    // 生成新的随机顺序队列（Fisher-Yates shuffle）
-    queue = TRAY_HINTS.map((_, i) => i)
-    for (let i = queue.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [queue[i], queue[j]] = [queue[j], queue[i]]
-    }
-  }
-  const idx = queue.shift()!
-  localStorage.setItem(TRAY_HINT_QUEUE_KEY, JSON.stringify(queue))
-  return TRAY_HINTS[idx]
-}
 
 const unsubTrayWake = window.api.onTrayWake(() => {
   const today = new Date().toDateString()
   if (localStorage.getItem(TRAY_HINT_KEY) === today) return
   localStorage.setItem(TRAY_HINT_KEY, today)
-  trayHintText.value = nextHint()
+  trayHintText.value = t('tips.altSpace' as any)
   trayHintVisible.value = true
   if (_trayHintTimer) clearTimeout(_trayHintTimer)
   _trayHintTimer = setTimeout(() => { trayHintVisible.value = false }, 8000)

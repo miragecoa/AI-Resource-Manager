@@ -750,4 +750,7 @@ export default {
     batchRemove: '移出快捷面板',
     confirmBulkAdd: '即将把 {n} 个项目放入快捷面板，确定吗？',
   },
+  tips: {
+    altSpace: '💡 提示：按 <kbd>Alt + Space</kbd> 可随时呼出小抽屉，无需鼠标点击！',
+  },
 }
