@@ -966,14 +966,33 @@ app.whenReady().then(() => {
         console.log('[AutoStart] Self-healed LAUNCHER_EXE:', inferred)
       }
     }
+    // 清理所有旧的 electron.app.* 启动项
+    // Electron 用 "electron.app.{productName}" 作为注册表 key，改名后旧项会残留
+    // 用 PowerShell + .NET 读注册表，避免 reg.exe 的 GBK 编码问题
+    try {
+      const { execSync } = require('child_process')
+      const ps = `
+        $k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\\Microsoft\\Windows\\CurrentVersion\\Run', $true)
+        if ($k) {
+          $k.GetValueNames() | Where-Object { $_ -like 'electron.app.*' } | ForEach-Object {
+            $k.DeleteValue($_)
+            Write-Output "Removed: $_"
+          }
+          $k.Close()
+        }
+      `.replace(/\n/g, ' ')
+      const out = execSync(`powershell.exe -NoProfile -Command "${ps}"`, { encoding: 'utf8', timeout: 5000 })
+      if (out.trim()) console.log('[AutoStart]', out.trim())
+    } catch (e) {
+      console.error('[AutoStart] Registry cleanup failed:', e)
+    }
+
     if (!userDisabled) {
-      // 每次启动都重新注册，确保路径和参数始终最新（便携版移动、版本升级等场景自动修正）
       app.setLoginItemSettings({ openAtLogin: true, path: exePath, args: ['--hidden'] })
       setSetting('autoStartInitialized', 'true')
-      console.log('[AutoStart] Registered/ensured, exe:', exePath)
+      console.log('[AutoStart] Registered, exe:', exePath)
     } else {
       console.log('[AutoStart] Skipped (User disabled)')
-      // 确保系统内的注册也被关闭（防止清理不彻底）
       app.setLoginItemSettings({ openAtLogin: false, path: exePath })
     }
   }
