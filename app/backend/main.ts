@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, shell, Menu, Tray, nativeImage, NativeImage, protocol, globalShortcut, screen, dialog, clipboard, systemPreferences, webContents, Notification } from 'electron'
-import { join, extname, basename } from 'path'
+import { join, dirname, extname, basename } from 'path'
 import { createHash } from 'crypto'
 import { deflateSync } from 'zlib'
 import { existsSync, createReadStream, statSync, copyFileSync, unlinkSync, readFileSync, mkdirSync, writeFileSync } from 'fs'
@@ -400,25 +400,37 @@ function buildTrayMenu(): Electron.Menu {
 }
 
 function createTray(): void {
-  const customIconPath = getSetting('appCustomIcon') ?? ''
-  const trayIcon = (() => {
-    if (customIconPath && existsSync(customIconPath)) {
-      try { const img = nativeImage.createFromPath(customIconPath); if (!img.isEmpty()) return img } catch {}
+  try {
+    const customIconPath = getSetting('appCustomIcon') ?? ''
+    const trayIcon = (() => {
+      if (customIconPath && existsSync(customIconPath)) {
+        try { const img = nativeImage.createFromPath(customIconPath); if (!img.isEmpty()) return img } catch {}
+      }
+      return createTrayIcon()
+    })()
+    tray = new Tray(trayIcon)
+    tray.setToolTip(getSetting('appTitle') || 'AI小抽屉')
+    tray.setContextMenu(buildTrayMenu())
+    tray.on('click', () => {
+      if (!mainWindow) return
+      incWakeCount()
+      mainWindow.setSkipTaskbar(false)
+      mainWindow.show()
+      mainWindow.focus()
+      drawerWindow?.hide()
+      mainWindow.webContents.send('window:trayWake')
+    })
+  } catch (e) {
+    console.error('[Tray] Failed to create tray icon:', e)
+    // Retry with fallback solid color icon
+    try {
+      tray = new Tray(nativeImage.createFromBuffer(makeSolidPng(0x63, 0x66, 0xF1)))
+      tray.setToolTip('AI Cubby')
+      tray.on('click', () => { mainWindow?.show(); mainWindow?.focus() })
+    } catch (e2) {
+      console.error('[Tray] Fallback also failed:', e2)
     }
-    return createTrayIcon()
-  })()
-  tray = new Tray(trayIcon)
-  tray.setToolTip(getSetting('appTitle') || 'AI小抽屉')
-  tray.setContextMenu(buildTrayMenu())
-  tray.on('click', () => {
-    if (!mainWindow) return
-    incWakeCount()
-    mainWindow.setSkipTaskbar(false)
-    mainWindow.show()
-    mainWindow.focus()
-    drawerWindow?.hide()
-    mainWindow.webContents.send('window:trayWake')
-  })
+  }
 }
 
 // Legacy named-preset → numeric (0-100) migration map
@@ -747,8 +759,9 @@ function createWindow(): void {
       mainWindow?.show()
       drawerWindow?.hide()
     } else {
-      // 自动启动隐藏模式：任务栏不显示，只有 tray
+      // 自动启动隐藏模式：任务栏不显示，tray + 悬浮窗为入口
       mainWindow?.setSkipTaskbar(true)
+      if (getSetting('drawerVisible') !== 'false') drawerWindow?.show()
     }
   })
 
@@ -941,7 +954,16 @@ app.whenReady().then(() => {
     const userDisabled = getSetting('autoStartDisabled') === 'true'
     // Prefer the launcher exe (root AI-Cubby.exe) over the Electron exe in core/.
     // LAUNCHER_EXE is set by the launcher stub so the correct path is always registered.
-    const exePath = process.env.LAUNCHER_EXE ?? process.execPath
+    // Self-heal: if LAUNCHER_EXE missing but we're inside core/, infer launcher path
+    let exePath = process.env.LAUNCHER_EXE ?? process.execPath
+    if (!process.env.LAUNCHER_EXE && basename(dirname(process.execPath)).toLowerCase() === 'core') {
+      const inferred = join(dirname(dirname(process.execPath)), basename(process.execPath))
+      if (existsSync(inferred)) {
+        exePath = inferred
+        process.env.LAUNCHER_EXE = inferred  // fix for subsequent code that reads this
+        console.log('[AutoStart] Self-healed LAUNCHER_EXE:', inferred)
+      }
+    }
     if (!userDisabled) {
       // 每次启动都重新注册，确保路径和参数始终最新（便携版移动、版本升级等场景自动修正）
       app.setLoginItemSettings({ openAtLogin: true, path: exePath, args: ['--hidden'] })

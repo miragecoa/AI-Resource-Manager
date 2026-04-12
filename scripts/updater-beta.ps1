@@ -199,4 +199,6 @@ if (Test-Path $coreDir) {
 }
 
 Write-Host 'Done! Launching...' -ForegroundColor Green
+# Set LAUNCHER_EXE so the new Electron process can register correct autostart path
+$env:LAUNCHER_EXE = $exePath
 Start-Process -FilePath $exePath

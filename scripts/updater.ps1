@@ -10,8 +10,20 @@ $host.UI.RawUI.WindowTitle = 'AI Cubby Updater'
 Write-Host 'Waiting for app to exit...' -ForegroundColor Cyan
 while (Get-Process -Id __PID__ -EA SilentlyContinue) { Start-Sleep 1 }
 
-Start-Sleep 1
 $appDir  = '__APP_DIR__'
+
+# Wait for all child processes (GPU, renderer) that may hold file locks
+$timeout = 15
+$waited = 0
+while ($waited -lt $timeout) {
+    $procs = Get-Process | Where-Object {
+        try { $m = $_.MainModule; $m -and $m.FileName -like "$appDir\*" } catch { $false }
+    }
+    if (-not $procs) { break }
+    Start-Sleep 1
+    $waited++
+}
+Start-Sleep 1
 
 $zipPath    = '__ZIP_PATH__'
 $exePath    = '__EXE_PATH__'
@@ -145,4 +157,6 @@ if (Test-Path $coreDir) {
 }
 
 Write-Host 'Done! Launching...' -ForegroundColor Green
+# Set LAUNCHER_EXE so the new Electron process can register correct autostart path
+$env:LAUNCHER_EXE = $exePath
 Start-Process -FilePath $exePath
