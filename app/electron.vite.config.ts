@@ -5,8 +5,15 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   main: {
     build: {
-      lib: {
-        entry: resolve(__dirname, 'backend/main.ts')
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'backend/main.ts'),
+          'content-worker': resolve(__dirname, 'backend/ai/content-worker.ts'),
+          'embed-worker': resolve(__dirname, 'backend/ai/embed-worker.ts'),
+        },
+        output: {
+          entryFileNames: '[name].js'
+        }
       }
     },
     plugins: [externalizeDepsPlugin()]

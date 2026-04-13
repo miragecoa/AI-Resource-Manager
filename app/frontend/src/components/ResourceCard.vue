@@ -44,6 +44,11 @@
       <div v-if="resource.is_private && !selectable" class="private-badge" :class="{ 'badge-compact': compact }" :title="t('resource.private')">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
       </div>
+      <!-- AI 语义匹配徽章：右下角 -->
+      <div v-if="aiMatch && !selectable" class="ai-match-badge">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z" fill="currentColor"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z" fill="currentColor" opacity=".6"/></svg>
+        <span>AI</span>
+      </div>
     </div>
 
     <!-- 精简模式：正方形图标 + 名称（任意缩放都显示名字） -->
@@ -56,6 +61,8 @@
 
     <div v-else-if="!micro" class="info" :class="{ 'info-narrow': narrow, 'info-compact': compact && !narrow }">
       <div class="title" :title="displayTitle" :class="{ 'title-single': narrow }">{{ displayTitle }}</div>
+      <!-- AI 匹配原因 snippet -->
+      <div v-if="aiMatch && !narrow" class="ai-snippet" v-html="snippetHtml" />
       <!-- 统计信息行 -->
       <div v-if="!narrow" class="stats-row">
         <span v-if="props.display?.duration !== false" class="stat-item" :title="`${t('resource.stats.accumulated')}: ${fmtDuration(resource.total_run_time)}, ${t('resource.stats.count', { n: resource.open_count })}${resource.file_size ? ', ' + fmtSize(resource.file_size) : ''}`">
@@ -145,7 +152,7 @@
 
     <!-- micro 悬浮提示 -->
     <Teleport to="body">
-      <div v-if="showMicroTooltip" class="micro-tooltip-popup" :style="{ left: tooltipX + 'px', top: tooltipY + 'px' }">
+      <div v-if="showMicroTooltip" class="micro-tooltip-popup" :class="{ 'tooltip-flip': tooltipFlip }" :style="{ left: tooltipX + 'px', top: tooltipY + 'px' }">
         <!-- 标题 + 类型 -->
         <div class="micro-tt-header">
           <span class="micro-tt-title">{{ displayTitle }}</span>
@@ -174,6 +181,11 @@
         </div>
         <!-- 备注 -->
         <div v-if="resource.note" class="micro-tt-note">{{ resource.note }}</div>
+        <!-- AI 匹配原因 -->
+        <div v-if="aiMatch" class="micro-tt-ai">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2l1.5 4.5L18 8l-4.5 1.5L12 14l-1.5-4.5L6 8l4.5-1.5L12 2z"/><path d="M19 13l.75 2.25L22 16l-2.25.75L19 19l-.75-2.25L16 16l2.25-.75L19 13z" opacity=".6"/></svg>
+          <span v-html="tooltipSnippetHtml" />
+        </div>
       </div>
     </Teleport>
 </template>
@@ -197,7 +209,40 @@ const props = withDefaults(defineProps<{
   showMicroLabel?: boolean
   itemIndex?: number
   display?: { duration?: boolean; count?: boolean; lastUsed?: boolean; tags?: boolean; fileSize?: boolean; cardBg?: boolean }
+  aiMatch?: string
 }>(), { selectable: false, selected: false, cardZoom: 0.75, showMicroLabel: false, itemIndex: 0 })
+
+// ── AI snippet highlighting ──────────────────────────────────────────
+const resourceStore = useResourceStore()
+
+function highlightSnippet(text: string, maxLen: number): string {
+  const truncated = text.length > maxLen ? text.substring(0, maxLen) + '...' : text
+  const q = resourceStore.searchQuery.trim()
+  if (!q) return escHtml(truncated)
+
+  // Split query into tokens (CJK chars individually, Latin words ≥2 chars)
+  const tokens: string[] = []
+  let i = 0
+  while (i < q.length) {
+    const cjk = q.slice(i).match(/^[\u4e00-\u9fff\u3400-\u4dbf]+/)
+    if (cjk) { for (const ch of cjk[0]) tokens.push(ch); i += cjk[0].length; continue }
+    const lat = q.slice(i).match(/^[a-z]{2,}/i)
+    if (lat) { tokens.push(lat[0]); i += lat[0].length; continue }
+    i++
+  }
+  if (tokens.length === 0) return escHtml(truncated)
+
+  const pattern = tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const re = new RegExp(`(${pattern})`, 'gi')
+  return escHtml(truncated).replace(re, '<mark class="ai-hl">$1</mark>')
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+const snippetHtml = computed(() => props.aiMatch ? highlightSnippet(props.aiMatch, 60) : '')
+const tooltipSnippetHtml = computed(() => props.aiMatch ? highlightSnippet(props.aiMatch, 100) : '')
 
 // Responsive breakpoints based on zoom factor (150px * cardZoom = minCardWidth)
 const compact = computed(() => props.cardZoom <= 0.87) // < ~130px: collapse badge, hide tags
@@ -223,6 +268,7 @@ const emit = defineEmits<{
   ignore: [resource: Resource]
   'toggle-select': [resource: Resource]
   'shift-select': [resource: Resource]
+  'set-private': [resource: Resource, isPrivate: boolean]
 }>()
 
 function handleCoverClick(e: MouseEvent) {
@@ -254,11 +300,22 @@ onUnmounted(() => { if (_visTimer) clearInterval(_visTimer) })
 const showMicroTooltip = ref(false)
 const tooltipX = ref(0)
 const tooltipY = ref(0)
+const tooltipFlip = ref(false) // true = show below card instead of above
 function onMicroEnter() {
   const rect = cardRef.value?.getBoundingClientRect()
   if (!rect) return
-  tooltipX.value = rect.left + rect.width / 2
-  tooltipY.value = rect.top - 8
+  // Clamp X so tooltip doesn't overflow left/right
+  const halfWidth = 180 // ~max-width/2
+  const cx = rect.left + rect.width / 2
+  tooltipX.value = Math.max(halfWidth + 8, Math.min(cx, window.innerWidth - halfWidth - 8))
+  // Flip to below if not enough space above (< 120px)
+  if (rect.top < 120) {
+    tooltipY.value = rect.bottom + 8
+    tooltipFlip.value = true
+  } else {
+    tooltipY.value = rect.top - 8
+    tooltipFlip.value = false
+  }
   showMicroTooltip.value = true
 }
 function onMicroLeave() { showMicroTooltip.value = false }
@@ -988,6 +1045,55 @@ function openInExplorer() {
 }
 .private-badge.badge-compact svg { width: 8px; height: 8px; }
 
+/* ── AI 匹配原因 snippet ── */
+.ai-snippet {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--accent) 50%, var(--text-3));
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: -1px;
+}
+.ai-hl {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 2px;
+  padding: 0 1px;
+  font-weight: 600;
+}
+
+/* ── AI 语义匹配徽章 ── */
+.ai-match-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 5px 1px 3px;
+  background: color-mix(in srgb, var(--accent) 30%, rgba(0,0,0,0.5));
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  color: color-mix(in srgb, var(--accent) 85%, #fff);
+  border-radius: 8px;
+  pointer-events: auto;
+  cursor: default;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+.card:hover .ai-match-badge {
+  color: color-mix(in srgb, var(--accent) 70%, #fff);
+  background: color-mix(in srgb, var(--accent) 40%, rgba(0,0,0,0.5));
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+/* If private badge is also showing, offset AI badge to the left */
+.private-badge + .ai-match-badge {
+  right: 30px;
+}
+
 .running-badge {
   position: absolute;
   bottom: 6px;
@@ -1272,6 +1378,9 @@ function openInExplorer() {
   flex-direction: column;
   gap: 5px;
 }
+.micro-tooltip-popup.tooltip-flip {
+  transform: translate(-50%, 0);
+}
 
 .micro-tt-header {
   display: flex;
@@ -1373,5 +1482,23 @@ function openInExplorer() {
   border-top: 1px solid var(--border);
   padding-top: 4px;
   margin-top: 1px;
+}
+.micro-tt-ai {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 10px;
+  color: color-mix(in srgb, var(--accent) 70%, var(--text-3));
+  line-height: 1.4;
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 1px;
+}
+.micro-tt-ai svg { flex-shrink: 0; margin-top: 1px; }
+.micro-tt-ai span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>

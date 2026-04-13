@@ -360,5 +360,42 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('profiles:delete', id),
     switch: (id: string): Promise<void> =>
       ipcRenderer.invoke('profiles:switch', id),
-  }
+  },
+
+  // AI 语义搜索
+  ai: {
+    getStatus: (): Promise<string> =>
+      ipcRenderer.invoke('ai:getStatus'),
+    enable: (): Promise<void> =>
+      ipcRenderer.invoke('ai:enable'),
+    disable: (): Promise<void> =>
+      ipcRenderer.invoke('ai:disable'),
+    search: (query: string): Promise<Array<{ resourceId: string; score: number; chunkText: string }>> =>
+      ipcRenderer.invoke('ai:search', query),
+    getContentStatus: (resourceId: string): Promise<{ status: string; isTruncated: boolean } | null> =>
+      ipcRenderer.invoke('ai:getContentStatus', resourceId),
+    isModelInstalled: (): Promise<boolean> => ipcRenderer.invoke('ai:isModelInstalled'),
+    pauseIndex: (): Promise<void> => ipcRenderer.invoke('ai:pauseIndex'),
+    resumeIndex: (): Promise<void> => ipcRenderer.invoke('ai:resumeIndex'),
+    isIndexPaused: (): Promise<boolean> => ipcRenderer.invoke('ai:isIndexPaused'),
+    getIndexInfo: (resourceId: string): Promise<{
+      metadataText: string | null
+      hasMetadataEmbedding: boolean
+      contentStatus: string
+      contentPreview: string | null
+      contentTruncated: boolean
+      wordCount: number
+      contentChunks: number
+    }> => ipcRenderer.invoke('ai:getIndexInfo', resourceId),
+    onStatusChange: (callback: (status: string) => void) => {
+      const handler = (_e: any, s: string) => callback(s)
+      ipcRenderer.on('ai:statusChange', handler)
+      return () => ipcRenderer.removeListener('ai:statusChange', handler)
+    },
+    onProgress: (callback: (p: { stage: string; percent: number }) => void) => {
+      const handler = (_e: any, p: { stage: string; percent: number }) => callback(p)
+      ipcRenderer.on('ai:progress', handler)
+      return () => ipcRenderer.removeListener('ai:progress', handler)
+    },
+  },
 })

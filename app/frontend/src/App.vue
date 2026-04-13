@@ -94,6 +94,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import { useResourceStore } from './stores/resources'
 import { useSettingsStore } from './stores/settings'
+import { useAiStore } from './stores/ai'
 import Sidebar from './components/Sidebar.vue'
 import ConsentDialog from './components/ConsentDialog.vue'
 import MasonryWindow from './components/MasonryWindow.vue'
@@ -110,6 +111,7 @@ const router = useRouter()
 const route = useRoute()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
+const aiStore = useAiStore()
 const { tips } = useTips()
 const showConsent = ref(false)
 const isMaximized = ref(false)
@@ -146,6 +148,7 @@ const winTogglePin = async () => { isPinned.value = await window.api.win.toggleA
 
 function startApp() {
   store.loadAll()
+  aiStore.init()
   unsubscribe = window.api.onNewResource((entry) => {
     store.addOrUpdate(entry as any)
   })

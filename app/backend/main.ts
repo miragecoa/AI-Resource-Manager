@@ -30,7 +30,7 @@ process.on('uncaughtException', (err: any) => {
 protocol.registerSchemesAsPrivileged([
   { scheme: 'local', privileges: { secure: true, standard: true, supportFetchAPI: true, stream: true } }
 ])
-import { initDatabase, clipboardAddItem, clipboardGetItem, clipboardTogglePin, clipboardCleanup, dataDir } from './db/index'
+import { initDatabase, getDb, clipboardAddItem, clipboardGetItem, clipboardTogglePin, clipboardCleanup, dataDir } from './db/index'
 import { getSetting, setSetting, addManualResource, runDirTagMigration, setShowDirTags } from './db/queries'
 import { ensureProfiles, getProfileDir, loadManifest } from './db/profiles'
 import { registerIpcHandlers, resolveDroppedPaths, setOnLanguageChange } from './ipc/index'
@@ -38,6 +38,7 @@ import { startMonitor, flushRunningSessions } from './monitor/recent-files'
 import type { RunningEvent } from './monitor/recent-files'
 import { initAutoUpdater } from './updater'
 import { initHeartbeat, flushAndStop, incShortcutMain, incShortcutClip, incWakeCount, incDrawerWake } from './heartbeat'
+import { initAiManager, enableAi, disableAi, getAiStatus, isModelInstalled, semanticSearch, queueResourceContent, onStatusChange, onProgress, pauseIndex, resumeIndex, isIndexPaused } from './ai/ai-manager'
 
 let mainWindow: BrowserWindow | null = null
 let masonryWindow: BrowserWindow | null = null
@@ -930,6 +931,60 @@ app.whenReady().then(() => {
   mkdirSync(clipboardImgDir, { recursive: true })
   registerIpcHandlers()
   setOnLanguageChange(() => tray?.setContextMenu(buildTrayMenu()))
+
+  // ── AI Manager ────────────────────────────────────────────
+  {
+    const workerDir = join(__dirname)  // workers built alongside main.js
+    initAiManager(getDb(), workerDir, dataDir)
+    onStatusChange((s) => {
+      for (const wc of webContents.getAllWebContents()) {
+        wc.send('ai:statusChange', s)
+      }
+    })
+    onProgress((p) => {
+      for (const wc of webContents.getAllWebContents()) {
+        wc.send('ai:progress', p)
+      }
+    })
+    ipcMain.handle('ai:getStatus', () => getAiStatus())
+    ipcMain.handle('ai:enable', () => enableAi(workerDir))
+    ipcMain.handle('ai:disable', () => disableAi())
+    ipcMain.handle('ai:search', (_e, query: string) => semanticSearch(query))
+    ipcMain.handle('ai:getContentStatus', (_e, resourceId: string) => {
+      const row = getDb().prepare(
+        'SELECT fetch_status, is_truncated FROM resource_content WHERE resource_id = ?'
+      ).get(resourceId) as { fetch_status: string; is_truncated: number } | undefined
+      return row ? { status: row.fetch_status, isTruncated: !!row.is_truncated } : null
+    })
+    ipcMain.handle('ai:getIndexInfo', (_e, resourceId: string) => {
+      const db = getDb()
+      // Metadata embedding
+      const meta = db.prepare(
+        'SELECT chunk_text FROM resource_embeddings WHERE resource_id = ? AND chunk_index = -1'
+      ).get(resourceId) as { chunk_text: string } | undefined
+      // Content
+      const content = db.prepare(
+        'SELECT text, fetch_status, is_truncated, word_count FROM resource_content WHERE resource_id = ?'
+      ).get(resourceId) as { text: string | null; fetch_status: string; is_truncated: number; word_count: number } | undefined
+      // Chunk count
+      const chunks = db.prepare(
+        'SELECT COUNT(*) as cnt FROM resource_embeddings WHERE resource_id = ? AND chunk_index >= 0'
+      ).get(resourceId) as { cnt: number }
+      return {
+        metadataText: meta?.chunk_text ?? null,
+        hasMetadataEmbedding: !!meta,
+        contentStatus: content?.fetch_status ?? 'pending',
+        contentPreview: content?.text?.substring(0, 300) ?? null,
+        contentTruncated: !!(content?.is_truncated),
+        wordCount: content?.word_count ?? 0,
+        contentChunks: chunks.cnt,
+      }
+    })
+    ipcMain.handle('ai:pauseIndex', () => pauseIndex())
+    ipcMain.handle('ai:resumeIndex', () => resumeIndex())
+    ipcMain.handle('ai:isIndexPaused', () => isIndexPaused())
+    ipcMain.handle('ai:isModelInstalled', () => isModelInstalled())
+  }
   // ── Smart theme ───────────────────────────────────────
   ipcMain.handle('theme:smart:getData', () => getSmartThemeData())
   // Push accent color change immediately when Windows/WE updates it
@@ -1445,6 +1500,7 @@ app.whenReady().then(() => {
       if (!result.existed) {
         added.push(result.resource)
         mainWindow?.webContents.send('resource:new', result.resource)
+        queueResourceContent(result.resource.id, result.resource.file_path)
       }
     }
     dropImportWindow?.close()
@@ -1524,6 +1580,7 @@ app.whenReady().then(() => {
   startMonitor(
     (entry) => {
       mainWindow?.webContents.send('resource:new', entry)
+      queueResourceContent(entry.id, entry.file_path)
     },
     (event: RunningEvent) => {
       mainWindow?.webContents.send('resource:running', event)

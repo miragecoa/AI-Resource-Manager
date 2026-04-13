@@ -171,6 +171,25 @@
               />
             </div>
 
+            <!-- AI 索引信息 -->
+            <div v-if="aiIndexInfo" class="field-row align-start">
+              <label class="field-label">AI 索引</label>
+              <div class="ai-index-info">
+                <div class="ai-index-status">
+                  <span class="ai-index-badge" :class="'ai-index--' + aiIndexStatusKey">{{ aiIndexStatusLabel }}</span>
+                  <span v-if="aiIndexInfo.contentChunks > 0" class="ai-index-chips">{{ aiIndexInfo.contentChunks }} 个内容片段</span>
+                </div>
+                <details v-if="aiIndexInfo.metadataText" class="ai-index-details">
+                  <summary>元数据向量</summary>
+                  <pre class="ai-index-pre">{{ aiIndexInfo.metadataText }}</pre>
+                </details>
+                <details v-if="aiIndexInfo.contentPreview" class="ai-index-details">
+                  <summary>内容摘要 ({{ aiIndexInfo.wordCount }} 词{{ aiIndexInfo.contentTruncated ? ', 已截断' : '' }})</summary>
+                  <pre class="ai-index-pre">{{ aiIndexInfo.contentPreview }}{{ aiIndexInfo.contentPreview.length >= 300 ? '...' : '' }}</pre>
+                </details>
+              </div>
+            </div>
+
             <!-- 文件路径 -->
             <div class="field-row align-start">
               <label class="field-label">{{ t('detail.path') }}</label>
@@ -239,6 +258,37 @@ const emit = defineEmits<{ close: [] }>()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
 
+// ─── AI index info ────────────────────────────────────────────────
+const aiIndexInfo = ref<{
+  metadataText: string | null
+  hasMetadataEmbedding: boolean
+  contentStatus: string
+  contentPreview: string | null
+  contentTruncated: boolean
+  wordCount: number
+  contentChunks: number
+} | null>(null)
+
+const aiIndexStatusKey = computed(() => {
+  if (!aiIndexInfo.value) return 'pending'
+  if (aiIndexInfo.value.hasMetadataEmbedding) return 'done'
+  if (aiIndexInfo.value.contentStatus === 'failed') return 'failed'
+  if (aiIndexInfo.value.contentStatus === 'login_required') return 'login'
+  if (aiIndexInfo.value.contentStatus === 'skipped') return 'skipped'
+  return 'pending'
+})
+const aiIndexStatusLabel = computed(() => {
+  const m: Record<string, string> = { done: '已索引', failed: '抓取失败', login: '需要登录', skipped: '已跳过', pending: '未索引' }
+  return m[aiIndexStatusKey.value] ?? '未索引'
+})
+
+async function loadAiIndex() {
+  try {
+    aiIndexInfo.value = await window.api.ai.getIndexInfo(props.resource.id)
+  } catch { aiIndexInfo.value = null }
+}
+loadAiIndex()
+
 // ─── Local editable state ──────────────────────────────────────────
 const editTitle   = ref(props.resource.title)
 const editNote    = ref(props.resource.note ?? '')
@@ -302,6 +352,7 @@ watch(() => props.resource.id, () => {
   editingDuration.value = false
   statPaused.value      = (props.resource.stat_paused ?? 0) === 1
   loadTagSuggestions()
+  loadAiIndex()
 })
 
 // ─── Tag suggestions ───────────────────────────────────────────────
@@ -1097,6 +1148,60 @@ async function refetchIcon() {
 .danger-btn:hover { background: rgba(239, 68, 68, 0.1); border-color: var(--danger); opacity: 1; }
 .danger-btn span { width: 12px; height: 12px; display: flex; flex-shrink: 0; }
 .danger-btn :deep(svg) { width: 12px; height: 12px; }
+
+/* ── AI 索引信息 ────────────────────────────────── */
+.ai-index-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-index-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-index-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.ai-index--done { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.ai-index--pending { background: rgba(255,255,255,0.06); color: var(--text-3); }
+.ai-index--failed { background: rgba(239,68,68,0.15); color: #f87171; }
+.ai-index--login { background: rgba(251,191,36,0.15); color: #fbbf24; }
+.ai-index--skipped { background: rgba(255,255,255,0.06); color: var(--text-3); }
+.ai-index-chips {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ai-index-details {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.ai-index-details summary {
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.ai-index-details summary:hover { opacity: 1; }
+.ai-index-pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-2);
+  max-height: 150px;
+  overflow-y: auto;
+  font-family: inherit;
+}
 
 /* ── 底部操作栏 ──────────────────────────────────── */
 .modal-footer {

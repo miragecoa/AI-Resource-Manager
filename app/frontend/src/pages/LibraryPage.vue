@@ -21,14 +21,119 @@
             class="search combine-left"
             :placeholder="t('library.searchPlaceholder')"
             type="search"
+            @keydown.enter="aiStore.searchNow(store.searchQuery)"
           />
           <button v-if="store.searchQuery" class="search-clear" @click="store.searchQuery = ''" :title="t('library.clearSearch')">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M1 1l8 8M9 1L1 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
-          <button class="ai-btn combine-right" @click="showAiSearchComingSoon = true" :title="t('library.aiSearchTitle')">
-            <span class="btn-icon" v-html="searchSvg" />
-            <span class="btn-text">{{ t('library.aiSearch') }}</span>
+          <button
+            class="ai-btn combine-right"
+            :class="{
+              'ai-btn--ready': aiStore.status === 'ready',
+              'ai-btn--loading': aiStore.status === 'downloading' || aiStore.status === 'indexing',
+              'ai-btn--shimmer': !aiDiscovered,
+            }"
+            @click="onAiPanelToggle"
+            :title="t('library.aiPanel.btnTitle')"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style="flex-shrink:0">
+              <path d="M12 3l1.3 3.9L17 8.5l-3.7 1.6L12 14l-1.3-3.9L7 8.5l3.7-1.6L12 3z" fill="currentColor"/><path d="M19 13l.7 2L22 15.7l-2.3.7L19 18.7l-.7-2.3L16 15.7l2.3-.7L19 13z" fill="currentColor" opacity=".6"/>
+            </svg>
+            <span v-if="aiStore.status === 'downloading'" class="btn-text">{{ aiStore.progress?.percent ?? 0 }}%</span>
+            <span v-else-if="aiStore.status === 'indexing'" class="btn-text">{{ aiStore.progress?.done ?? 0 }}/{{ aiStore.progress?.total ?? '?' }}</span>
+            <span v-else class="btn-text">{{ t('library.aiPanel.btnLabel') }}</span>
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" style="flex-shrink:0;opacity:0.5"><path d="M1 2.5l3 3 3-3"/></svg>
           </button>
+          <!-- AI 设置面板 + 遮罩 -->
+          <Teleport to="body">
+            <Transition name="fade-in">
+              <div v-if="showAiPanel" class="ai-panel-overlay" @mousedown.self="showAiPanel = false" />
+            </Transition>
+          </Teleport>
+          <Transition name="fade-in">
+            <div v-if="showAiPanel" class="ai-settings-panel" @mousedown.stop>
+              <div class="ai-panel-header">
+                <span class="ai-panel-title">{{ t('library.aiPanel.title') }}</span>
+                <button class="ai-panel-close" @click="showAiPanel = false">
+                  <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 2l8 8M10 2L2 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+
+              <!-- 引擎选择 -->
+              <div class="ai-panel-section">
+                <div class="ai-panel-label">{{ t('library.aiPanel.engine') }}</div>
+                <div class="ai-engine-options">
+                  <label class="ai-engine-opt" :class="{ active: aiEngine === 'local' }">
+                    <input type="radio" v-model="aiEngine" value="local" @change="onAiEngineChange" />
+                    <div class="ai-engine-info">
+                      <span class="ai-engine-name">{{ t('library.aiPanel.localName') }}</span>
+                      <span class="ai-engine-desc">{{ t('library.aiPanel.localDesc') }}</span>
+                    </div>
+                    <span v-if="aiStore.status === 'ready'" class="ai-engine-badge ai-badge-on">{{ t('library.aiPanel.enabled') }}</span>
+                    <span v-else-if="aiStore.status === 'downloading' || aiStore.status === 'indexing'" class="ai-engine-badge ai-badge-loading">{{ aiStore.progress?.percent ?? 0 }}%</span>
+                    <span v-else-if="aiModelInstalled" class="ai-engine-badge">{{ t('library.aiPanel.installed') }}</span>
+                    <span v-else class="ai-engine-badge">{{ t('library.aiPanel.notInstalled') }}</span>
+                  </label>
+                  <label class="ai-engine-opt disabled">
+                    <input type="radio" disabled />
+                    <div class="ai-engine-info">
+                      <span class="ai-engine-name">{{ t('library.aiPanel.ollamaName') }}</span>
+                      <span class="ai-engine-desc">{{ t('library.aiPanel.ollamaDesc') }}</span>
+                    </div>
+                    <span class="ai-engine-badge">{{ t('library.aiPanel.comingSoon') }}</span>
+                  </label>
+                  <label class="ai-engine-opt disabled">
+                    <input type="radio" disabled />
+                    <div class="ai-engine-info">
+                      <span class="ai-engine-name">{{ t('library.aiPanel.proName') }}</span>
+                      <span class="ai-engine-desc">{{ t('library.aiPanel.proDesc') }}</span>
+                    </div>
+                    <span class="ai-engine-badge ai-badge-pro">Pro</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 触发方式 -->
+              <div class="ai-panel-section">
+                <div class="ai-panel-label">{{ t('library.aiPanel.trigger') }}</div>
+                <div class="ai-trigger-options">
+                  <label class="ai-trigger-opt" :class="{ active: aiTrigger === 'auto' }">
+                    <input type="radio" v-model="aiTrigger" value="auto" @change="onAiSettingChange" />
+                    <span>{{ t('library.aiPanel.triggerAuto') }}</span>
+                  </label>
+                  <label class="ai-trigger-opt" :class="{ active: aiTrigger === 'enter' }">
+                    <input type="radio" v-model="aiTrigger" value="enter" @change="onAiSettingChange" />
+                    <span>{{ t('library.aiPanel.triggerEnter') }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 结果数量 -->
+              <div class="ai-panel-section">
+                <div class="ai-panel-label">{{ t('library.aiPanel.maxResults') }}</div>
+                <div class="ai-trigger-options">
+                  <label v-for="n in [3, 5, 10]" :key="n" class="ai-trigger-opt" :class="{ active: aiMaxResults === n }">
+                    <input type="radio" :value="n" v-model.number="aiMaxResults" @change="onAiSettingChange" />
+                    <span>{{ t('library.aiPanel.nResults', { n }) }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- 操作按钮 -->
+              <div class="ai-panel-actions">
+                <button v-if="aiStore.status === 'ready'" class="ai-panel-btn danger" @click="doDisableAi">
+                  {{ t('library.aiPanel.disable') }}
+                </button>
+                <button v-else-if="aiModelInstalled" class="ai-panel-btn primary" @click="confirmEnableAi">
+                  {{ t('library.aiPanel.enable') }}
+                </button>
+                <button v-else-if="aiStore.status === 'disabled' || aiStore.status === 'no_model'" class="ai-panel-btn primary" @click="onInstallLocal">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {{ t('library.aiPanel.install') }}
+                </button>
+              </div>
+            </div>
+          </Transition>
         </div>
 
         <div class="toolbar-right">
@@ -67,7 +172,7 @@
       </div>
 
       <div class="toolbar-row" v-if="!showPrivacy">
-        <button class="ai-btn" @click="showAiComingSoon = true" :title="t('library.aiSettings')">
+        <button class="ai-btn ai-btn--dimmed" @click="showAiComingSoon = true" :title="t('library.aiSettings')">
           <span class="btn-icon" v-html="aiSvg" />
           <span class="btn-text">{{ t('library.aiSettings') }}</span>
         </button>
@@ -92,6 +197,18 @@
           </button>
         </div>
       </div>
+
+      <!-- AI 索引进度条 -->
+      <Transition name="fade-in">
+        <div v-if="aiStore.progress && aiStore.status === 'ready'" class="ai-index-bar">
+          <div class="ai-index-fill" :style="{ width: aiStore.progress.percent + '%' }" />
+          <span class="ai-index-label">{{ aiStore.progress.stage }} {{ aiStore.progress.done ?? '' }}{{ aiStore.progress.total ? '/' + aiStore.progress.total : '' }}{{ aiIndexPaused ? ' (已暂停)' : '' }}</span>
+          <button class="ai-index-pause" @click="toggleIndexPause" :title="aiIndexPaused ? '继续索引' : '暂停索引'">
+            <svg v-if="!aiIndexPaused" width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+      </Transition>
 
       <!-- 托盘呼出快捷键提示 -->
       <Transition name="tray-hint">
@@ -465,6 +582,7 @@
                   :show-micro-label="store.activeType === 'folder' || store.activeType === 'document'"
                   :heat-level="statsPanel === 'heat' ? heatLevel(item) : undefined"
                   :display="settingsStore.cardDisplay"
+                  :ai-match="aiMatchMap.get(item.id)"
                   @toggle-select="toggleSelect(item)"
                   @shift-select="onCardShiftSelect(item)"
                   @select="onCardSelect"
@@ -1099,13 +1217,22 @@
 
     <!-- AI 搜索 — 敬请期待 -->
     <Teleport to="body">
-      <div v-if="showAiSearchComingSoon" class="modal-overlay" @mousedown.self="showAiSearchComingSoon = false">
-        <div class="ai-coming-modal" style="width: 420px;">
-          <span class="ai-coming-icon" v-html="aiLargeSvg" />
-          <div class="ai-coming-title">{{ t('library.aiSearchModal.title') }}</div>
-          <div class="ai-coming-desc" style="text-align: left; padding: 0 10px; white-space: pre-line">{{ t('library.aiSearchModal.desc') }}</div>
-          <div class="ai-coming-badge">{{ t('library.aiModal.badge') }}</div>
-          <button class="ai-coming-close" @click="showAiSearchComingSoon = false">{{ t('library.aiSearchModal.close') }}</button>
+      <!-- AI 安装引导 modal -->
+      <div v-if="showAiInstallModal" class="modal-overlay" @mousedown.self="showAiInstallModal = false">
+        <div class="ai-coming-modal" style="width: 440px;">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="margin-bottom:12px;opacity:0.9"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="var(--accent)"/></svg>
+          <div class="ai-coming-title">开启本地 AI 语义搜索</div>
+          <div class="ai-coming-desc" style="text-align:left; padding:0 10px; line-height:1.7">
+            安装一个 <strong style="color:var(--accent)">约 130MB</strong> 的本地小模型，即可用自然语言搜索你的资源。<br><br>
+            <span class="ai-check-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="var(--accent)"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>&nbsp;完全离线运行，不联网</span><br>
+            <span class="ai-check-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="var(--accent)"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>&nbsp;中英文双语支持</span><br>
+            <span class="ai-check-row"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="4" fill="var(--accent)"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>&nbsp;模型仅下载一次，永久可用</span><br><br>
+            <span style="opacity:0.5;font-size:12px">模型将存储在应用数据目录，随时可关闭或卸载。</span>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:4px">
+            <button class="ai-modal-cancel" @click="showAiInstallModal = false">取消</button>
+            <button class="ai-modal-confirm" @click="confirmEnableAi">安装并开启</button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -1428,6 +1555,7 @@ import { useI18n } from 'vue-i18n'
 import { useResourceStore } from '../stores/resources'
 import type { Resource, ResourceType } from '../stores/resources'
 import { useSettingsStore } from '../stores/settings'
+import { useAiStore } from '../stores/ai'
 import { NAV_ITEM_DEFS } from '../config/navItems'
 import type { ResourceSortField, TagSortField } from '../stores/settings'
 import ResourceCard from '../components/ResourceCard.vue'
@@ -1442,10 +1570,96 @@ import { match as pinyinMatch } from 'pinyin-pro'
 const { t, locale } = useI18n()
 const store = useResourceStore()
 const settingsStore = useSettingsStore()
+const aiStore = useAiStore()
+/** Map of resourceId → chunkText for AI-matched results (hidden for strong literal matches) */
+const aiMatchMap = computed(() => {
+  const m = new Map<string, string>()
+  const q = store.searchQuery.toLowerCase().trim()
+  if (!q) return m
+  for (const r of aiStore.semanticResults) {
+    // If title already contains the query, don't show AI badge (literal gets the credit)
+    const resource = store.items.find(i => i.id === r.resourceId)
+    if (resource && resource.title.toLowerCase().includes(q)) continue
+    m.set(r.resourceId, r.chunkText)
+  }
+  return m
+})
 const searchInputRef = ref<HTMLInputElement | null>(null)
 const showAddModal = ref(false)
 const showAiComingSoon = ref(false)
 const showAiSearchComingSoon = ref(false)
+const showAiInstallModal = ref(false)
+const showAiPanel = ref(false)
+const aiDiscovered = ref(localStorage.getItem('ai_discovered') === '1')
+
+function onAiPanelToggle() {
+  showAiPanel.value = !showAiPanel.value
+  if (!aiDiscovered.value) {
+    aiDiscovered.value = true
+    localStorage.setItem('ai_discovered', '1')
+  }
+}
+const aiEngine = ref('local')
+const aiTrigger = ref('auto') // 'auto' | 'enter'
+const aiMaxResults = ref(5)
+const aiModelInstalled = ref(false)
+
+// Check model status when panel opens
+watch(showAiPanel, async (v) => {
+  if (v) {
+    try { aiModelInstalled.value = await window.api.ai.isModelInstalled() } catch {}
+  }
+})
+
+function onInstallLocal() {
+  showAiPanel.value = false
+  showAiInstallModal.value = true
+}
+
+function doDisableAi() {
+  showAiPanel.value = false
+  aiStore.disable()
+}
+
+function onAiEngineChange() {
+  if (aiEngine.value === 'local' && (aiStore.status === 'disabled' || aiStore.status === 'no_model')) {
+    onInstallLocal()
+  }
+}
+
+function onAiSettingChange() {
+  // Settings are reactive, consumed directly by the search watcher
+}
+
+const aiIndexPaused = ref(false)
+async function toggleIndexPause() {
+  if (aiIndexPaused.value) {
+    await window.api.ai.resumeIndex()
+    aiIndexPaused.value = false
+  } else {
+    await window.api.ai.pauseIndex()
+    aiIndexPaused.value = true
+  }
+}
+
+function confirmEnableAi() {
+  showAiInstallModal.value = false
+  showAiPanel.value = false
+  aiStore.enable()
+}
+
+// Close panel on outside click
+function onDocClick(e: MouseEvent) {
+  if (showAiPanel.value) {
+    const panel = document.querySelector('.ai-settings-panel')
+    const btn = document.querySelector('.ai-btn.combine-right')
+    if (panel && !panel.contains(e.target as Node) && btn && !btn.contains(e.target as Node)) {
+      showAiPanel.value = false
+    }
+  }
+}
+onMounted(() => document.addEventListener('mousedown', onDocClick))
+onUnmounted(() => document.removeEventListener('mousedown', onDocClick))
 const showScanModal = ref(false)
 const sysScanning = ref(false)
 const sysScanResult = ref<number | null>(null)
@@ -2083,6 +2297,8 @@ watch(() => store.searchQuery, (q) => {
     _hadSearchContent = false
     window.api.search.incSearch()
   }
+  // 并行触发语义搜索（AI 开启时）
+  aiStore.scheduleSearch(q)
 })
 
 // 拖放导入
@@ -3097,9 +3313,9 @@ onMounted(async () => {
 })
 
 const unsubWake = window.api.onWake(() => {
+  store.searchQuery = ''
   nextTick(() => {
     searchInputRef.value?.focus()
-    searchInputRef.value?.select()
   })
 })
 
@@ -3110,6 +3326,7 @@ let _trayHintTimer: ReturnType<typeof setTimeout> | null = null
 const TRAY_HINT_KEY = 'trayHintLastDate'
 
 const unsubTrayWake = window.api.onTrayWake(() => {
+  store.searchQuery = ''
   const today = new Date().toDateString()
   if (localStorage.getItem(TRAY_HINT_KEY) === today) return
   localStorage.setItem(TRAY_HINT_KEY, today)
@@ -3709,9 +3926,10 @@ async function deleteIgnored(filePath: string) {
 .search-clear:hover { color: var(--text); }
 
 .search-wrap.combined {
+  position: relative;
   display: flex;
   align-items: stretch;
-  min-width: 140px; /* 保证有一个最小可用宽度 */
+  min-width: 140px;
 }
 
 .search.combine-left {
@@ -3723,6 +3941,188 @@ async function deleteIgnored(filePath: string) {
 .search.combine-left:not(:focus) {
   border-right-color: transparent;
 }
+
+/* AI indexing progress bar */
+.ai-index-bar {
+  position: relative;
+  height: 22px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  margin: 0 16px 6px;
+  overflow: hidden;
+}
+.ai-index-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 40%, transparent), var(--accent));
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+.ai-index-label {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 11px;
+  color: var(--text-2);
+  font-weight: 500;
+  flex: 1;
+}
+.ai-index-pause {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.ai-index-pause:hover { color: var(--text-1); background: rgba(255,255,255,0.08); }
+
+/* AI right-click context menu */
+.ai-context-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  min-width: 140px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.ai-context-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.ai-context-item:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+
+/* ── AI 设置面板 ── */
+.ai-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 199;
+}
+.ai-settings-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 300px;
+  /* Solid bg: black base + theme color on top → kills glass-mode transparency */
+  background: #000;
+  background: linear-gradient(var(--bg), var(--bg)), #000;
+  background-blend-mode: normal;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  z-index: 200;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ai-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.ai-panel-close {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  padding: 4px; border-radius: 4px; display: flex;
+  transition: color 0.15s, background 0.15s;
+}
+.ai-panel-close:hover { color: var(--text-1); background: var(--surface-2); }
+.ai-panel-section { display: flex; flex-direction: column; gap: 6px; }
+.ai-panel-label { font-size: 11px; color: var(--text-3); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Engine options */
+.ai-engine-options { display: flex; flex-direction: column; gap: 4px; }
+.ai-engine-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--border); cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ai-engine-opt input { display: none; }
+.ai-engine-opt:hover { background: var(--surface-2); }
+.ai-engine-opt.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ai-engine-opt.disabled { opacity: 0.45; cursor: not-allowed; }
+.ai-engine-info { flex: 1; display: flex; flex-direction: column; }
+.ai-engine-name { font-size: 12px; font-weight: 500; color: var(--text-1); }
+.ai-engine-desc { font-size: 10px; color: var(--text-3); }
+.ai-engine-badge {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px;
+  background: var(--surface-2); color: var(--text-3); white-space: nowrap;
+}
+.ai-badge-on { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.ai-badge-loading { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.ai-badge-pro {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, transparent), color-mix(in srgb, var(--accent-2, var(--accent)) 25%, transparent));
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Trigger / count options */
+.ai-trigger-options { display: flex; gap: 4px; }
+.ai-trigger-opt {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  padding: 5px 0; border-radius: 6px;
+  border: 1px solid var(--border); cursor: pointer;
+  font-size: 11px; color: var(--text-2);
+  transition: border-color 0.15s, background 0.15s;
+}
+.ai-trigger-opt input { display: none; }
+.ai-trigger-opt:hover { background: var(--surface-2); }
+.ai-trigger-opt.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+/* Action buttons */
+.ai-panel-actions { display: flex; gap: 8px; }
+.ai-panel-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px;
+  padding: 7px 0; border-radius: 8px; border: 1px solid var(--border);
+  font-size: 12px; font-family: inherit; cursor: pointer;
+  color: var(--text-2); background: var(--surface-2);
+  transition: background 0.15s, color 0.15s;
+}
+.ai-panel-btn:hover { background: var(--surface-3, #252540); }
+.ai-panel-btn.primary { background: var(--accent); color: #fff; border: none; }
+.ai-panel-btn.primary:hover { opacity: 0.85; }
+.ai-panel-btn.danger { color: #f87171; border-color: rgba(239,68,68,0.3); }
+.ai-panel-btn.danger:hover { background: rgba(239,68,68,0.1); }
 
 .ai-btn.combine-right {
   flex-shrink: 0; /* 确保右侧按钮不会被意外挤压变形 */
@@ -3792,6 +4192,65 @@ async function deleteIgnored(filePath: string) {
   white-space: nowrap;
 }
 .ai-btn:hover { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 30%, transparent), color-mix(in srgb, var(--accent-2) 30%, transparent)); }
+.ai-btn--ready { background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, transparent), color-mix(in srgb, var(--accent-2) 20%, transparent)) !important; color: var(--accent) !important; }
+.ai-btn--loading { opacity: 0.7; cursor: default; }
+.ai-btn--dimmed { opacity: 0.35; }
+
+/* Shimmer sweep + breathing pulse glow */
+.ai-btn--shimmer {
+  position: relative;
+  overflow: hidden;
+  animation: ai-pulse 2.5s ease-in-out infinite;
+}
+.ai-btn--shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    color-mix(in srgb, var(--accent) 25%, transparent) 45%,
+    color-mix(in srgb, var(--accent) 40%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 25%, transparent) 55%,
+    transparent 65%
+  );
+  animation: ai-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes ai-shimmer {
+  0%, 70%, 100% { transform: translateX(-120%); }
+  85% { transform: translateX(120%); }
+}
+@keyframes ai-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+  50% { box-shadow: 0 0 12px 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+}
+
+/* AI 语义搜索结果区域 */
+.ai-results-section {
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 8px;
+}
+.ai-results-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+  opacity: 0.85;
+}
+.ai-results-count {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 8px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 500;
+}
 
 .scan-sys-toolbar-btn {
   display: flex;
@@ -4481,6 +4940,22 @@ async function deleteIgnored(filePath: string) {
   transition: background 0.15s;
 }
 .ai-coming-close:hover { background: var(--surface-3, #252540); }
+.ai-check-row { display: inline-flex; align-items: center; gap: 2px; }
+.ai-modal-cancel {
+  margin-top: 8px; padding: 7px 28px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-2);
+  font-size: 13px; font-family: inherit; cursor: pointer; transition: background 0.15s;
+}
+.ai-modal-cancel:hover { background: var(--surface-3, #252540); }
+.ai-modal-confirm {
+  margin-top: 8px; padding: 7px 28px;
+  background: var(--accent); border: 1px solid transparent;
+  border-radius: 8px; color: #fff;
+  font-size: 13px; font-family: inherit; cursor: pointer; font-weight: 500;
+  transition: opacity 0.15s;
+}
+.ai-modal-confirm:hover { opacity: 0.85; }
 
 .ignored-toggle {
   display: flex;

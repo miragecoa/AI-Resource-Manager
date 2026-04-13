@@ -62,6 +62,27 @@ export function initDatabase(profileId?: string): Database.Database {
     try { db.exec(sql) } catch { /* column already exists */ }
   }
 
+  // AI tables — CREATE IF NOT EXISTS, safe to re-run
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resource_content (
+      resource_id  TEXT    PRIMARY KEY,
+      text         TEXT,
+      fetch_status TEXT    NOT NULL DEFAULT 'pending',
+      is_truncated INTEGER NOT NULL DEFAULT 0,
+      word_count   INTEGER NOT NULL DEFAULT 0,
+      fetched_at   INTEGER,
+      FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
+    );
+    CREATE TABLE IF NOT EXISTS resource_embeddings (
+      resource_id TEXT    NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      embedding   BLOB    NOT NULL,
+      chunk_text  TEXT    NOT NULL,
+      PRIMARY KEY (resource_id, chunk_index),
+      FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
+    );
+  `)
+
   // Pin groups table
   db.exec(`
     CREATE TABLE IF NOT EXISTS pin_groups (

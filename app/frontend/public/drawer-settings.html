@@ -420,7 +420,7 @@
     })
 
     window.addEventListener('blur', () => {
-      window.settingsApi.close()
+      setTimeout(() => window.settingsApi.close(), 150)
     })
   </script>
 </body>
