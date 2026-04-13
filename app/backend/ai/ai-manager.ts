@@ -183,6 +183,15 @@ function startEmbedWorker(workerPath: string) {
   embedWorker = new Worker(workerPath, { workerData: { cacheDir: modelDir } })
 
   embedWorker.on('message', (msg: any) => {
+    if (msg.type === 'log') {
+      log('[embed-worker]', msg.text)
+      // Forward to all renderers for DevTools visibility
+      try {
+        const { webContents } = require('electron')
+        for (const wc of webContents.getAllWebContents()) wc.send('ai:log', msg.text)
+      } catch {}
+      return
+    }
     if (msg.type === 'ready') {
       embedWorkerReady = true
       runFullIndex()

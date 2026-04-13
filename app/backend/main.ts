@@ -1117,6 +1117,10 @@ app.whenReady().then(() => {
     } catch { /* non-critical */ }
   }
 
+  ipcMain.handle('app:openDevTools', () => {
+    mainWindow?.webContents.openDevTools({ mode: 'detach' })
+  })
+
   // ── 应用标题 / 图标 IPC ───────────────────────────────
   ipcMain.handle('app:setTitle', (_e, title: string) => {
     const t = title || 'AI小抽屉'

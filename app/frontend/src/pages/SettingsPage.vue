@@ -60,6 +60,7 @@
               </div>
             </div>
             <button class="profile-btn" @click="openGitHubRelease">{{ t('settings.update.btnGithub') }}</button>
+            <button class="profile-btn" @click="window.api.app.openDevTools()" title="DevTools">DevTools</button>
             <div class="btn-with-menu">
               <button class="profile-btn" :class="{ 'btn-beta-active': settingsStore.updateChannel === 'beta' }" @click="forceUpdateLatest" @contextmenu.prevent="forceMenuVisible = !forceMenuVisible" :disabled="updateCheckStatus === 'downloading' || updateCheckStatus === 'force-downloading'">
                 {{ t('settings.update.btnForce') }}<span v-if="settingsStore.updateChannel === 'beta'" class="btn-beta-dot" />

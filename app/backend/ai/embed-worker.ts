@@ -14,7 +14,11 @@ let lastEmitPct = -1
 let lastEmitTime = 0
 let progressCount = 0
 
-function log(...args: any[]) { console.log('[embed-worker]', ...args) }
+function log(...args: any[]) {
+  const text = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')
+  console.log('[embed-worker]', text)
+  parentPort?.postMessage({ type: 'log', text })
+}
 
 async function loadModel() {
   log('starting, cacheDir:', workerData.cacheDir)

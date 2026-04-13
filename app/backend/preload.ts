@@ -253,6 +253,7 @@ contextBridge.exposeInMainWorld('api', {
     getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
     openUrl: (url: string): Promise<void> => ipcRenderer.invoke('app:openUrl', url),
     setTitle: (title: string): Promise<void> => ipcRenderer.invoke('app:setTitle', title),
+    openDevTools: (): Promise<void> => ipcRenderer.invoke('app:openDevTools'),
     getCustomIcon: (): Promise<string | null> => ipcRenderer.invoke('app:getCustomIcon'),
     pickIcon: (): Promise<void> => ipcRenderer.invoke('app:pickIcon'),
     clearIcon: (): Promise<void> => ipcRenderer.invoke('app:clearIcon'),
@@ -398,4 +399,9 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('ai:progress', handler)
     },
   },
+})
+
+// Forward embed-worker logs to renderer console
+ipcRenderer.on('ai:log', (_e: any, text: string) => {
+  console.log('%c[embed-worker]', 'color:#a78bfa', text)
 })
