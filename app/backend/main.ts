@@ -1117,9 +1117,61 @@ app.whenReady().then(() => {
     } catch { /* non-critical */ }
   }
 
-  ipcMain.handle('app:openDevTools', () => {
-    mainWindow?.webContents.openDevTools({ mode: 'detach' })
+  // ── Debug console window ───────────────────────────────
+  let debugWindow: BrowserWindow | null = null
+  const debugLogBuffer: string[] = []
+
+  // Intercept main process console.log/error
+  const origLog = console.log
+  const origErr = console.error
+  function pushDebugLog(level: string, args: any[]) {
+    const text = args.map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' ')
+    const line = `[${new Date().toLocaleTimeString('en-US', { hour12: false })}] [${level}] ${text}`
+    debugLogBuffer.push(line)
+    if (debugLogBuffer.length > 2000) debugLogBuffer.splice(0, 500)
+    if (debugWindow && !debugWindow.isDestroyed()) {
+      debugWindow.webContents.send('debug:log', line)
+    }
+  }
+  console.log = (...args: any[]) => { origLog.apply(console, args); pushDebugLog('LOG', args) }
+  console.error = (...args: any[]) => { origErr.apply(console, args); pushDebugLog('ERR', args) }
+
+  ipcMain.handle('app:openDebugConsole', () => {
+    if (debugWindow && !debugWindow.isDestroyed()) { debugWindow.focus(); return }
+    debugWindow = new BrowserWindow({
+      width: 800, height: 500, title: 'Debug Console',
+      autoHideMenuBar: true,
+      webPreferences: {
+        contextIsolation: false,
+        nodeIntegration: true,
+      }
+    })
+    debugWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!DOCTYPE html>
+<html><head><style>
+  body { margin:0; background:#0a0a14; color:#ccc; font:12px/1.6 'Consolas','Monaco',monospace; }
+  #log { padding:8px 12px; white-space:pre-wrap; word-break:break-all; }
+  .line-ERR { color:#f87171; }
+  .line-LOG { color:#d1d5db; }
+</style></head><body>
+<div id="log"></div>
+<script>
+  const {ipcRenderer} = require('electron');
+  const el = document.getElementById('log');
+  function addLine(text) {
+    const div = document.createElement('div');
+    div.className = text.includes('[ERR]') ? 'line-ERR' : 'line-LOG';
+    div.textContent = text;
+    el.appendChild(div);
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  // Load buffer
+  ipcRenderer.invoke('debug:getBuffer').then(lines => lines.forEach(addLine));
+  // Live stream
+  ipcRenderer.on('debug:log', (_, line) => addLine(line));
+</script></body></html>`)}`)
+    debugWindow.on('closed', () => { debugWindow = null })
   })
+  ipcMain.handle('debug:getBuffer', () => debugLogBuffer.slice(-500))
 
   // ── 应用标题 / 图标 IPC ───────────────────────────────
   ipcMain.handle('app:setTitle', (_e, title: string) => {
