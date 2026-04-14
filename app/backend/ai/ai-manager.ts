@@ -1,13 +1,22 @@
 /**
  * ai-manager.ts
- * Orchestrates content fetching (utilityProcess) and embedding (Worker Thread).
+ * Orchestrates content fetching (utilityProcess) and embedding (llama.cpp server).
+ * llama-server runs as an independent child process, communicates via HTTP.
  */
 
 import { join } from 'path'
-import { mkdirSync, existsSync, readdirSync } from 'fs'
-import { Worker } from 'worker_threads'
-import { utilityProcess } from 'electron'
+import { mkdirSync, existsSync, readdirSync, createWriteStream } from 'fs'
+import { ChildProcess, spawn } from 'child_process'
+import { net, utilityProcess } from 'electron'
 import type { Database } from 'better-sqlite3'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const CDN = 'https://download.aicubby.app'
+const LLAMA_SERVER_PORT = 18293 // random high port
+const LLAMA_ZIP = 'llama-ai-module-win-x64.zip'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,9 +55,8 @@ let contentIndexTotal = 0
 let contentIndexDone = 0
 let indexPaused = false
 
-let embedWorker: Worker | null = null
-const embedPending = new Map<string, { resolve: (v: number[][]) => void; reject: (e: Error) => void }>()
-let embedWorkerReady = false
+let llamaProc: ChildProcess | null = null
+let llamaReady = false
 let statusListeners: ((s: AiStatus) => void)[] = []
 let progressListeners: ((p: AiProgress) => void)[] = []
 
@@ -84,6 +92,43 @@ function cosineSim(a: number[], b: number[]): number {
 }
 
 // ---------------------------------------------------------------------------
+// Download helper
+// ---------------------------------------------------------------------------
+
+async function downloadFile(url: string, dest: string, progressStage?: string): Promise<void> {
+  const resp = await net.fetch(url)
+  if (!resp.ok) throw new Error(`Download failed: ${resp.status}`)
+  const reader = resp.body?.getReader()
+  if (!reader) throw new Error('No response body')
+  const totalSize = Number(resp.headers.get('content-length')) || 0
+  const ws = createWriteStream(dest)
+  let received = 0
+  let lastProgressTime = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      ws.write(Buffer.from(value))
+      received += value.byteLength
+      if (progressStage && totalSize > 0) {
+        const now = Date.now()
+        if (now - lastProgressTime > 300) {
+          lastProgressTime = now
+          emitProgress({ stage: progressStage, percent: Math.round((received / totalSize) * 100) })
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  await new Promise<void>((resolve, reject) => {
+    ws.on('error', reject)
+    ws.on('close', resolve)
+    ws.end()
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Metadata
 // ---------------------------------------------------------------------------
 
@@ -98,18 +143,17 @@ function buildMetadataText(resourceId: string): string {
     WHERE rt.resource_id = ?
   `).all(resourceId) as Array<{ name: string }>
 
-  // Pure semantic signal only — no paths, no key prefixes, no noise
   const parts: string[] = []
   if (r.title) parts.push(r.title)
   if (r.type) parts.push(r.type)
   if (tags.length) parts.push(tags.map(t => t.name).join(', '))
   if (r.note) parts.push(r.note)
 
-  return parts.join('\n')
+  return parts.join('. ')
 }
 
 // ---------------------------------------------------------------------------
-// Content Worker (utilityProcess)
+// Content Worker (utilityProcess) — unchanged
 // ---------------------------------------------------------------------------
 
 function startContentWorker(workerPath: string) {
@@ -151,7 +195,6 @@ function drainContentQueue() {
         result.wordCount ?? 0,
         Date.now()
       )
-      // Update progress immediately
       contentIndexDone++
       if (contentIndexTotal > 0) {
         emitProgress({
@@ -166,8 +209,7 @@ function drainContentQueue() {
         contentIndexDone = 0
         emitProgress({ stage: 'done', percent: 100 })
       }
-      // Embed content in background
-      if (result.status === 'done' && result.text && embedWorkerReady) {
+      if (result.status === 'done' && result.text && llamaReady) {
         indexResourceEmbeddings(task.resourceId, result.text).catch(() => {})
       }
     })
@@ -176,39 +218,114 @@ function drainContentQueue() {
 }
 
 // ---------------------------------------------------------------------------
-// Embed Worker (Worker Thread)
+// llama.cpp Embedding Server
 // ---------------------------------------------------------------------------
 
-function startEmbedWorker(workerPath: string) {
-  embedWorker = new Worker(workerPath, { workerData: { cacheDir: modelDir } })
+/** Ensure llama-server + model are downloaded and extracted.
+ *  Uses %LOCALAPPDATA%\ai-cubby-llama\ to avoid Unicode path issues on Windows.
+ *  llama.cpp cannot load models from paths containing non-ASCII characters. */
+async function ensureLlamaFiles(): Promise<{ serverPath: string; modelPath: string }> {
+  const dir = join(process.env.LOCALAPPDATA || modelDir, 'ai-cubby-llama')
+  mkdirSync(dir, { recursive: true })
 
-  embedWorker.on('message', (msg: any) => {
-    if (msg.type === 'ready') {
-      embedWorkerReady = true
-      runFullIndex()
-    } else if (msg.type === 'progress') {
-      emitProgress({ stage: msg.stage, percent: msg.percent })
-    } else if (msg.type === 'embed') {
-      const entry = embedPending.get(msg.id)
-      if (entry) { embedPending.delete(msg.id); entry.resolve(msg.embeddings) }
-    } else if (msg.type === 'error') {
-      log('embed-worker error:', msg.message)
-      const entry = msg.id ? embedPending.get(msg.id) : null
-      if (entry) { embedPending.delete(msg.id!); entry.reject(new Error(msg.message)) }
-    }
-  })
+  const serverPath = join(dir, 'llama-server.exe')
+  const modelPath = join(dir, 'e5-small-v2-q8_0.gguf')
 
-  embedWorker.on('error', (err) => log('embed-worker error:', err))
-  embedWorker.on('exit', () => { embedWorker = null; embedWorkerReady = false })
+  if (!existsSync(serverPath) || !existsSync(modelPath)) {
+    const zipPath = join(modelDir, LLAMA_ZIP)
+    log('downloading AI module zip...')
+    await downloadFile(`${CDN}/${LLAMA_ZIP}`, zipPath, '下载 AI 模块')
+    log('extracting...')
+    emitProgress({ stage: '解压 AI 模块', percent: 80 })
+    // Extract using PowerShell (available on all Windows)
+    const { execSync } = require('child_process')
+    execSync(`powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${dir}' -Force"`, { timeout: 60000 })
+    // Clean up zip
+    try { require('fs').unlinkSync(zipPath) } catch {}
+    log('extraction complete')
+  }
+
+  emitProgress({ stage: 'done', percent: 100 })
+  return { serverPath, modelPath }
 }
 
-function embedTexts(texts: string[]): Promise<number[][]> {
+/** Start llama-server as child process and wait for it to be ready */
+function startLlamaServer(serverPath: string, modelPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (!embedWorker || !embedWorkerReady) return reject(new Error('Embed worker not ready'))
-    const id = Math.random().toString(36).slice(2)
-    embedPending.set(id, { resolve, reject })
-    embedWorker.postMessage({ type: 'embed', id, texts })
+    log('starting llama-server on port', LLAMA_SERVER_PORT)
+    llamaProc = spawn(serverPath, [
+      '--embedding',
+      '-m', modelPath,
+      '-c', '512',
+      '--port', String(LLAMA_SERVER_PORT),
+      '--host', '127.0.0.1',
+      '-fit', 'off',
+    ], { stdio: ['ignore', 'pipe', 'pipe'], cwd: require('path').dirname(serverPath) })
+
+    // Capture stderr for debugging
+    let stderrBuf = ''
+    llamaProc.stderr?.on('data', (chunk: Buffer) => {
+      stderrBuf += chunk.toString()
+      // Log last line for real-time debug
+      const lines = stderrBuf.split('\n').filter(l => l.trim())
+      if (lines.length > 0) log('llama-server:', lines[lines.length - 1].substring(0, 200))
+    })
+
+    let resolved = false
+    const timeout = setTimeout(() => {
+      if (!resolved) { resolved = true; reject(new Error('llama-server startup timeout')) }
+    }, 30000)
+
+    // Poll for readiness
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`http://127.0.0.1:${LLAMA_SERVER_PORT}/health`)
+        if (res.ok) {
+          clearInterval(poll)
+          clearTimeout(timeout)
+          if (!resolved) { resolved = true; llamaReady = true; resolve() }
+        }
+      } catch { /* not ready yet */ }
+    }, 500)
+
+    llamaProc.on('error', (err) => {
+      clearInterval(poll)
+      clearTimeout(timeout)
+      if (!resolved) { resolved = true; reject(err) }
+    })
+
+    llamaProc.on('exit', (code) => {
+      log('llama-server exited, code:', code, stderrBuf ? 'stderr: ' + stderrBuf.substring(0, 500) : '')
+      llamaProc = null
+      llamaReady = false
+      clearInterval(poll)
+      clearTimeout(timeout)
+      if (!resolved) { resolved = true; reject(new Error(`llama-server exited: ${code}`)) }
+    })
   })
+}
+
+function stopLlamaServer() {
+  if (llamaProc) {
+    llamaProc.kill()
+    llamaProc = null
+    llamaReady = false
+  }
+}
+
+/** Call llama-server /v1/embeddings endpoint */
+async function embedTexts(texts: string[]): Promise<number[][]> {
+  if (!llamaReady) throw new Error('llama-server not ready')
+
+  const body = JSON.stringify({ input: texts })
+  const res = await fetch(`http://127.0.0.1:${LLAMA_SERVER_PORT}/v1/embeddings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
+  })
+  if (!res.ok) throw new Error(`Embedding request failed: ${res.status}`)
+  const data = await res.json() as { data: Array<{ embedding: number[] }> }
+  return data.data.map(d => d.embedding)
 }
 
 // ---------------------------------------------------------------------------
@@ -216,9 +333,20 @@ function embedTexts(texts: string[]): Promise<number[][]> {
 // ---------------------------------------------------------------------------
 
 async function runFullIndex() {
-  if (!db || !embedWorkerReady) return
+  log('runFullIndex called, db:', !!db, 'llamaReady:', llamaReady)
+  if (!db || !llamaReady) { log('runFullIndex aborted'); return }
 
   setStatus('indexing')
+
+  // Check if embeddings need rebuild (model switch)
+  const MODEL_KEY = 'e5-small-v2-llama'
+  const lastModel = db.prepare(`SELECT value FROM settings WHERE key = 'aiEmbedModel'`).get() as any
+  if (lastModel?.value !== MODEL_KEY) {
+    log('model changed from', lastModel?.value, '→', MODEL_KEY, '— clearing all embeddings')
+    db.prepare('DELETE FROM resource_embeddings').run()
+    db.prepare('DELETE FROM resource_content').run()
+    db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('aiEmbedModel', ?)`).run(MODEL_KEY)
+  }
 
   // Metadata embedding — only resources missing metadata vector
   const needsEmbed = db.prepare(`
@@ -228,13 +356,14 @@ async function runFullIndex() {
   `).all() as Array<{ id: string }>
   const total = needsEmbed.length
 
+  log('metadata indexing:', total, 'resources need embedding')
   for (let i = 0; i < needsEmbed.length; i++) {
-    if (!embedWorkerReady) break
-    try { await indexMetadataEmbedding(needsEmbed[i].id) } catch {}
+    if (!llamaReady) break
+    try { await indexMetadataEmbedding(needsEmbed[i].id) } catch (e: any) { log('embed error:', e?.message) }
     if (total > 0) emitProgress({ stage: '索引资源', percent: Math.round(((i + 1) / total) * 100), done: i + 1, total })
   }
 
-  // Phase 2: embed content that was fetched but not yet embedded (interrupted last time)
+  // Content that was fetched but not yet embedded
   const needsContentEmbed = db.prepare(`
     SELECT rc.resource_id, rc.text FROM resource_content rc
     LEFT JOIN resource_embeddings re ON re.resource_id = rc.resource_id AND re.chunk_index >= 0
@@ -242,15 +371,14 @@ async function runFullIndex() {
   `).all() as Array<{ resource_id: string; text: string }>
 
   if (needsContentEmbed.length > 0) {
-    log('embedding content for', needsContentEmbed.length, 'resources (interrupted)')
     for (let i = 0; i < needsContentEmbed.length; i++) {
-      if (!embedWorkerReady) break
+      if (!llamaReady) break
       try { await indexResourceEmbeddings(needsContentEmbed[i].resource_id, needsContentEmbed[i].text) } catch {}
       emitProgress({ stage: '索引内容', percent: Math.round(((i + 1) / needsContentEmbed.length) * 100), done: i + 1, total: needsContentEmbed.length })
     }
   }
 
-  // Phase 3: fetch content for resources never attempted
+  // Queue content extraction for resources never attempted
   const needsContent = db.prepare(`
     SELECT r.id, r.file_path FROM resources r
     LEFT JOIN resource_content rc ON rc.resource_id = r.id
@@ -271,13 +399,13 @@ async function runFullIndex() {
     }
     emitProgress({ stage: '抓取内容', percent: 0, done: 0, total: needsContent.length })
     drainContentQueue()
-  } else if (needsContentEmbed.length === 0) {
+  } else if (needsContentEmbed.length === 0 && needsEmbed.length === 0) {
     emitProgress({ stage: 'done', percent: 100 })
   }
 }
 
 async function indexMetadataEmbedding(resourceId: string) {
-  if (!db || !embedWorkerReady) return
+  if (!db || !llamaReady) return
   const metaText = buildMetadataText(resourceId)
   if (!metaText.trim()) return
 
@@ -290,7 +418,7 @@ async function indexMetadataEmbedding(resourceId: string) {
 }
 
 async function indexResourceEmbeddings(resourceId: string, text: string) {
-  if (!db || !embedWorkerReady) return
+  if (!db || !llamaReady) return
   db.prepare('DELETE FROM resource_embeddings WHERE resource_id = ? AND chunk_index >= 0').run(resourceId)
   const chunks = chunkText(text)
   if (chunks.length === 0) return
@@ -323,25 +451,34 @@ export function initAiManager(database: Database, workerDir: string, dataDirecto
   startAi(workerDir)
 }
 
-function startAi(workerDir: string) {
-  setStatus('no_model')
-  startContentWorker(join(workerDir, 'content-worker.js'))
+async function startAi(workerDir: string) {
   setStatus('downloading')
-  startEmbedWorker(join(workerDir, 'embed-worker.js'))
+  startContentWorker(join(workerDir, 'content-worker.js'))
+
+  try {
+    const { serverPath, modelPath } = await ensureLlamaFiles()
+    await startLlamaServer(serverPath, modelPath)
+    log('llama-server ready, llamaReady:', llamaReady, 'db:', !!db)
+    setStatus('ready')
+    runFullIndex()
+  } catch (err) {
+    log('failed to start llama-server:', err)
+    setStatus('disabled')
+  }
 }
 
-export function enableAi(workerDir: string) {
+export async function enableAi(workerDir: string) {
   if (!db) return
   db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('aiEnabled', '1')`).run()
-  if (status === 'disabled') startAi(workerDir)
+  if (status === 'disabled') await startAi(workerDir)
 }
 
 export function disableAi() {
   if (!db) return
   db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES ('aiEnabled', '0')`).run()
   contentProc?.kill()
-  embedWorker?.terminate()
-  contentProc = null; embedWorker = null; embedWorkerReady = false
+  stopLlamaServer()
+  contentProc = null
   contentIndexTotal = 0; contentIndexDone = 0
   setStatus('disabled')
 }
@@ -349,25 +486,15 @@ export function disableAi() {
 export function getAiStatus(): AiStatus { return status }
 
 export function isModelInstalled(): boolean {
-  if (!modelDir) return false
   try {
-    const files = readdirSync(modelDir, { recursive: true }) as string[]
-    return files.some(f => f.endsWith('.onnx'))
+    const dir = join(process.env.LOCALAPPDATA || modelDir, 'ai-cubby-llama')
+    return existsSync(join(dir, 'llama-server.exe')) && existsSync(join(dir, 'e5-small-v2-q8_0.gguf'))
   } catch { return false }
 }
 
+export function pauseIndex() { indexPaused = true }
+export function resumeIndex() { indexPaused = false; drainContentQueue() }
 export function isIndexPaused(): boolean { return indexPaused }
-
-export function pauseIndex() {
-  indexPaused = true
-  log('index paused, queue:', contentQueue.length, 'remaining')
-}
-
-export function resumeIndex() {
-  indexPaused = false
-  log('index resumed, draining queue')
-  drainContentQueue()
-}
 
 export function onStatusChange(fn: (s: AiStatus) => void) {
   statusListeners.push(fn)
@@ -380,7 +507,7 @@ export function onProgress(fn: (p: AiProgress) => void) {
 }
 
 export async function queueResourceContent(resourceId: string, filePath: string) {
-  if (embedWorkerReady) {
+  if (llamaReady) {
     try { await indexMetadataEmbedding(resourceId) } catch {}
   }
   if (status === 'disabled' || !contentProc) return
@@ -390,29 +517,28 @@ export async function queueResourceContent(resourceId: string, filePath: string)
 }
 
 export async function semanticSearch(query: string, topK = 10): Promise<SemanticResult[]> {
-  if (!db || !embedWorkerReady) return []
+  if (!db || !llamaReady) return []
 
   const queryEmb = (await embedTexts([`query: ${query}`]))[0]
+
+  const WEIGHT_META = 1.0
+  const WEIGHT_CONTENT = 0.3
 
   const rows = db.prepare(`
     SELECT resource_id, chunk_index, embedding, chunk_text
     FROM resource_embeddings
   `).all() as Array<{ resource_id: string; chunk_index: number; embedding: Buffer; chunk_text: string }>
 
-  // Field-level weighting: metadata is gold, content chunks are dirt
-  const WEIGHT_META = 1.0    // chunk_index == -1 (title, tags, path)
-  const WEIGHT_CONTENT = 0.3 // chunk_index >= 0  (page body text)
-
   const scored = rows.map(row => {
     const emb = Array.from(new Float32Array(row.embedding.buffer, row.embedding.byteOffset, row.embedding.byteLength / 4))
     const rawScore = cosineSim(queryEmb, emb)
     let weight: number
     if (row.chunk_index === -1) {
-      weight = WEIGHT_META // metadata: full weight
-    } else if (rawScore > 0.85) {
-      weight = 0.9 // content but extremely precise match: pardon
+      weight = WEIGHT_META
+    } else if (rawScore > 0.75) {
+      weight = 0.3 + (rawScore - 0.75) * 2.8
     } else {
-      weight = WEIGHT_CONTENT // content noise: suppressed
+      weight = WEIGHT_CONTENT
     }
     return {
       resourceId: row.resource_id,
@@ -421,7 +547,6 @@ export async function semanticSearch(query: string, topK = 10): Promise<Semantic
     }
   })
 
-  // Deduplicate: keep best weighted chunk per resource
   const best = new Map<string, SemanticResult>()
   for (const r of scored) {
     const prev = best.get(r.resourceId)
@@ -431,5 +556,5 @@ export async function semanticSearch(query: string, topK = 10): Promise<Semantic
   return [...best.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
-    .filter(r => r.score > 0.5) // 0.7 * 1.0 = title needs raw 0.7; 0.5 / 0.3 = content needs raw 0.83+
+    .filter(r => r.score > 0.5)
 }

@@ -67,6 +67,7 @@
               <div v-if="forceMenuVisible" class="btn-dropdown" @mouseleave="forceMenuVisible = false">
                 <div class="btn-dropdown-item" @click="selectChannel('stable', 'force')">{{ t('settings.update.channelStable') }}</div>
                 <div class="btn-dropdown-item" @click="selectChannel('beta', 'force')">{{ t('settings.update.channelBeta') }}</div>
+                <div class="btn-dropdown-item" style="border-top:1px solid rgba(255,255,255,0.06);margin-top:2px;padding-top:6px" @click="openDebugConsole">Debug Console</div>
               </div>
             </div>
           </div>
@@ -832,6 +833,10 @@ function settingsApplyUpdate() {
 
 function openGitHubRelease() {
   window.api.app.openUrl('https://aicubby.app')
+}
+
+function openDebugConsole() {
+  window.api.app.openDebugConsole()
 }
 
 async function forceUpdateLatest(channel?: 'stable' | 'beta') {

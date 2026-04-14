@@ -1,6 +1,6 @@
 {
   "name": "ai-cubby",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "AI小抽屉 - 本地资源自动入库与AI标签",
   "main": "out/main/main.js",
   "scripts": {
@@ -21,7 +21,6 @@
     "vue-tsc": "^2.0.11"
   },
   "dependencies": {
-    "@huggingface/transformers": "^4.0.1",
     "@mozilla/readability": "^0.6.0",
     "better-sqlite3": "^9.4.3",
     "linkedom": "^0.18.12",
