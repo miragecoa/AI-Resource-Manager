@@ -111,11 +111,17 @@
               <!-- 结果数量 -->
               <div class="ai-panel-section">
                 <div class="ai-panel-label">{{ t('library.aiPanel.maxResults') }}</div>
-                <div class="ai-trigger-options">
-                  <label v-for="n in [3, 5, 10]" :key="n" class="ai-trigger-opt" :class="{ active: aiMaxResults === n }">
-                    <input type="radio" :value="n" v-model.number="aiMaxResults" @change="onAiSettingChange" />
-                    <span>{{ t('library.aiPanel.nResults', { n }) }}</span>
-                  </label>
+                <div class="ai-max-row">
+                  <input
+                    type="number"
+                    class="ai-max-input"
+                    v-model.number="aiMaxResults"
+                    min="1"
+                    max="50"
+                    @blur="clampMaxResults"
+                    @keydown.enter="($event.target as HTMLInputElement).blur()"
+                  />
+                  <button v-for="n in [5, 10, 20, 50]" :key="n" class="ai-max-preset" :class="{ active: aiMaxResults === n }" @click="aiMaxResults = n">{{ n }}</button>
                 </div>
               </div>
 
@@ -1604,7 +1610,10 @@ function onAiPanelToggle() {
 }
 const aiEngine = ref('local')
 const aiTrigger = ref('auto') // 'auto' | 'enter'
-const aiMaxResults = ref(5)
+const aiMaxResults = computed({
+  get: () => aiStore.maxResults,
+  set: (v: number) => { aiStore.maxResults = v }
+})
 const aiModelInstalled = ref(false)
 
 // Check model status when panel opens
@@ -1637,6 +1646,12 @@ function onAiEngineChange() {
 
 function onAiSettingChange() {
   // Settings are reactive, consumed directly by the search watcher
+}
+
+function clampMaxResults() {
+  if (!aiMaxResults.value || aiMaxResults.value < 1) aiMaxResults.value = 1
+  if (aiMaxResults.value > 50) aiMaxResults.value = 50
+  aiMaxResults.value = Math.round(aiMaxResults.value)
 }
 
 const aiIndexPaused = ref(false)
@@ -4116,6 +4131,41 @@ async function deleteIgnored(filePath: string) {
 .ai-trigger-opt input { display: none; }
 .ai-trigger-opt:hover { background: var(--surface-2); }
 .ai-trigger-opt.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+.ai-max-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.ai-max-input {
+  width: 52px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-1);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  text-align: center;
+  transition: border-color 0.15s;
+  -moz-appearance: textfield;
+}
+.ai-max-input:focus { border-color: var(--accent); }
+.ai-max-input::-webkit-inner-spin-button { display: none; }
+.ai-max-preset {
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-3);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.ai-max-preset:hover { background: var(--surface-2); color: var(--text-1); }
+.ai-max-preset.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
 /* Action buttons */
 .ai-panel-actions { display: flex; gap: 8px; }

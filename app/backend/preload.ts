@@ -371,8 +371,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('ai:enable'),
     disable: (): Promise<void> =>
       ipcRenderer.invoke('ai:disable'),
-    search: (query: string): Promise<Array<{ resourceId: string; score: number; chunkText: string }>> =>
-      ipcRenderer.invoke('ai:search', query),
+    search: (query: string, topK?: number): Promise<Array<{ resourceId: string; score: number; chunkText: string }>> =>
+      ipcRenderer.invoke('ai:search', query, topK),
     getContentStatus: (resourceId: string): Promise<{ status: string; isTruncated: boolean } | null> =>
       ipcRenderer.invoke('ai:getContentStatus', resourceId),
     isModelInstalled: (): Promise<boolean> => ipcRenderer.invoke('ai:isModelInstalled'),

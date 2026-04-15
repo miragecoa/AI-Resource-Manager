@@ -273,14 +273,9 @@ function startLlamaServer(serverPath: string, modelPath: string): Promise<void> 
       '-fit', 'off',
     ], { stdio: ['ignore', 'pipe', 'pipe'], cwd: require('path').dirname(serverPath) })
 
-    // Capture stderr for debugging
+    // Capture stderr (only logged on exit for debugging)
     let stderrBuf = ''
-    llamaProc.stderr?.on('data', (chunk: Buffer) => {
-      stderrBuf += chunk.toString()
-      // Log last line for real-time debug
-      const lines = stderrBuf.split('\n').filter(l => l.trim())
-      if (lines.length > 0) log('llama-server:', lines[lines.length - 1].substring(0, 200))
-    })
+    llamaProc.stderr?.on('data', (chunk: Buffer) => { stderrBuf += chunk.toString() })
 
     let resolved = false
     const timeout = setTimeout(() => {
@@ -555,7 +550,7 @@ export async function queueResourceContent(resourceId: string, filePath: string)
   drainContentQueue()
 }
 
-export async function semanticSearch(query: string, topK = 10): Promise<SemanticResult[]> {
+export async function semanticSearch(query: string, topK = 20): Promise<SemanticResult[]> {
   if (!db || !llamaReady) return []
 
   const queryEmb = (await embedTexts([`query: ${query}`]))[0]
@@ -595,5 +590,5 @@ export async function semanticSearch(query: string, topK = 10): Promise<Semantic
   return [...best.values()]
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
-    .filter(r => r.score > 0.5)
+    .filter(r => r.score > 0.3)
 }

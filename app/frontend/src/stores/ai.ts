@@ -20,6 +20,7 @@ export const useAiStore = defineStore('ai', () => {
   const status = ref<AiStatus>('disabled')
   const progress = ref<AiProgress | null>(null)
 
+  const maxResults = ref(20)
   const semanticResults = ref<SemanticResult[]>([])
   const semanticQuery = ref('')
   const semanticLoading = ref(false)
@@ -67,21 +68,21 @@ export const useAiStore = defineStore('ai', () => {
       semanticQuery.value = ''
       return
     }
-    searchTimer = setTimeout(() => runSearch(query), 400)
+    searchTimer = setTimeout(() => runSearch(query, maxResults.value), 400)
   }
 
   function searchNow(query: string) {
     if (searchTimer) clearTimeout(searchTimer)
     if (!query.trim() || status.value !== 'ready' || isTooShort(query)) return
-    runSearch(query)
+    runSearch(query, maxResults.value)
   }
 
-  async function runSearch(query: string) {
+  async function runSearch(query: string, topK?: number) {
     if (status.value !== 'ready') return
     semanticQuery.value = query
     semanticLoading.value = true
     try {
-      const results = await window.api.ai.search(query)
+      const results = await window.api.ai.search(query, topK)
       if (semanticQuery.value === query) {
         semanticResults.value = results
       }
@@ -93,7 +94,7 @@ export const useAiStore = defineStore('ai', () => {
   }
 
   return {
-    status, progress,
+    status, progress, maxResults,
     semanticResults, semanticLoading,
     init, enable, disable, scheduleSearch, searchNow,
   }

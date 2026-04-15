@@ -197,10 +197,9 @@ export const useResourceStore = defineStore('resources', () => {
           relevanceMap.set(id, Math.round((rrf / maxRrf) * 5000))
         }
 
-        // Strict cutoff: must be within top ~8 of at least one list
-        const cutoff = 1 / (K + 8)
+        // Remove items with zero RRF score (not in either list)
         for (let i = matched.length - 1; i >= 0; i--) {
-          if ((rrfScores.get(matched[i].id) ?? 0) < cutoff) matched.splice(i, 1)
+          if ((rrfScores.get(matched[i].id) ?? 0) <= 0) matched.splice(i, 1)
         }
       }
 
