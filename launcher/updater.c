@@ -280,11 +280,19 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nCmd
     GetModuleFileNameW(NULL, rootDir, MAX_PATH);
     PathRemoveFileSpecW(rootDir);
 
-    /* 1. Fetch manifest */
+    /* 1. Fetch manifest (with cache-busting timestamp) */
+    DWORD tick = GetTickCount();
+    wchar_t tickStr[16];
+    intToStr(tick, tickStr, 16);
+
     BYTE manifest[4096];
     memset(manifest, 0, sizeof(manifest));
     DWORD mLen = 0;
-    if (!httpGetBuf(L"download.aicubby.app", L"/latest.json", manifest, sizeof(manifest) - 1, &mLen))
+    wchar_t manifestPath[64];
+    memset(manifestPath, 0, sizeof(manifestPath));
+    lstrcpynW(manifestPath, L"/latest.json?_t=", 64);
+    lstrcatW(manifestPath, tickStr);
+    if (!httpGetBuf(L"download.aicubby.app", manifestPath, manifest, sizeof(manifest) - 1, &mLen))
         fatal(T(L"Cannot check for updates.\nCheck your network.",
                 L"\x65e0\x6cd5\x68c0\x67e5\x66f4\x65b0\x3002\n\x8bf7\x68c0\x67e5\x7f51\x7edc\x3002"));
 
@@ -343,6 +351,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrev, LPWSTR lpCmdLine, int nCmd
     lstrcatW(urlPath, tag);
     lstrcatW(urlPath, L"/");
     lstrcatW(urlPath, fname);
+    lstrcatW(urlPath, L"?_t=");
+    lstrcatW(urlPath, tickStr);
 
     if (!httpGetFileProgress(L"download.aicubby.app", urlPath, zipPath, totalSize))
         fatal(T(L"Download failed.", L"\x4e0b\x8f7d\x5931\x8d25\x3002"));
